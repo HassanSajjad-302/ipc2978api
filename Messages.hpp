@@ -1,6 +1,8 @@
 #ifndef MESSAGES_HPP
 #define MESSAGES_HPP
 
+#include "Manager.hpp"
+
 #include <string>
 #include <vector>
 using std::string, std::vector;
@@ -30,11 +32,10 @@ struct CTB
 
 class IPCManagerBS;
 
-void readStringFromPipe()
 struct CTBModule : CTB
 {
     string moduleName;
-    void from(IPCManagerBS &manager, char (&array)[320], uint64_t &bytesRead, uint64_t &bytesProcessed);
+    void from(Manager &manager, char (&buffer)[BUFFERSIZE], uint64_t &bytesRead, uint64_t &bytesProcessed);
 };
 
 struct CTBHeaderUnit : CTB

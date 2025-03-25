@@ -1,4 +1,7 @@
+#include "Manager.hpp"
 #include "Messages.hpp"
+
+#include <cassert>
 #include <print>
 #include <stdio.h>
 #include <string>
@@ -8,14 +11,10 @@
 
 using std::string, std::print;
 
-#define BUFSIZE 4096
-#define PIPE_TIMEOUT 5000
-
 // IPC Manager BuildSystem
-class IPCManagerBS
+class IPCManagerBS : public Manager
 {
     string pipeName;
-    HANDLE hPipe;
 
     explicit IPCManagerBS(string pipeName_) : pipeName(std::move(pipeName_))
     {
@@ -29,8 +28,8 @@ class IPCManagerBS
                                     PIPE_READMODE_MESSAGE |        // message read mode
                                     PIPE_WAIT,                     // blocking mode
                                 1,                                 // unlimited instances
-                                BUFSIZE * sizeof(TCHAR),           // output buffer size
-                                BUFSIZE * sizeof(TCHAR),           // input buffer size
+                                BUFFERSIZE * sizeof(TCHAR),           // output buffer size
+                                BUFFERSIZE * sizeof(TCHAR),           // input buffer size
                                 PIPE_TIMEOUT,                      // client time-out
                                 NULL);                             // default security attributes
         if (hPipe == INVALID_HANDLE_VALUE)
@@ -39,37 +38,22 @@ class IPCManagerBS
         }
     }
 
-    void read(char (&buffer)[BUFSIZE], unsigned long &bytesRead)
-    {
-        const bool fSuccess = ReadFile(hPipe,      // pipe handle
-                                       buffer,     // buffer to receive reply
-                                       BUFSIZE,    // size of buffer
-                                       &bytesRead, // number of bytes read
-                                       NULL);      // not overlapped
-
-        if (!fSuccess && GetLastError() != ERROR_MORE_DATA)
-        {
-            print(stderr, "ReadFile failed with %d.\n", GetLastError());
-        }
-    }
-
     void initialize()
     {
     }
 
-    void receiveMessage(char (&array)[320])
+    void receiveMessage(char (&buffer)[320])
     {
         // Has to first wait for the message
 
         // Read from the pipe.
-        char buffer[BUFSIZE];
-        unsigned long bytesRead;
+        char buffer[BUFFERSIZE];
+        uint64_t bytesRead;
         read(buffer, bytesRead);
 
-        // read call fails if zero byte is read
-        CTB_MessageType messageType = static_cast<CTB_MessageType>(buffer[0]);
+        // read call fails if zero byte is read, so safe to read 1 byte
 
-        switch (messageType)
+        switch (static_cast<CTB_MessageType>(buffer[0]))
         {
         case CTB_MessageType::MODULE:
             break;
