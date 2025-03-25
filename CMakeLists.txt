@@ -3,5 +3,8 @@ project(named_pipes)
 
 set(CMAKE_CXX_STANDARD 26)
 
-add_executable(named_pipes server.cpp)
-add_executable(client client.cpp)
+add_executable(server server.cpp Messages.cpp
+        Manager.cpp)
+
+add_executable(client client.cpp Messages.cpp
+        Manager.cpp)

@@ -28,9 +28,13 @@ struct CTB
     CTB_MessageType type;
 };
 
+class IPCManagerBS;
+
+void readStringFromPipe()
 struct CTBModule : CTB
 {
     string moduleName;
+    void from(IPCManagerBS &manager, char (&array)[320], uint64_t &bytesRead, uint64_t &bytesProcessed);
 };
 
 struct CTBHeaderUnit : CTB
@@ -64,6 +68,7 @@ enum class BTC_MessageType : uint8_t
     REQUESTED_FILE = 0,
     INCLUDE_PATH = 1,
     HEADER_UNIT_OR_INCLUDE_PATH = 2,
+    LAST_MESSAGE = 3,
 };
 
 struct BTC
