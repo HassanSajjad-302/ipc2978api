@@ -35,7 +35,6 @@ class IPCManagerBS;
 struct CTBModule : CTB
 {
     string moduleName;
-    void from(Manager &manager, char (&buffer)[BUFFERSIZE], uint64_t &bytesRead, uint64_t &bytesProcessed);
 };
 
 struct CTBHeaderUnit : CTB
@@ -62,6 +61,7 @@ struct CTBLastMessage : CTB
     string errorOutput;
     string logicalName;
     vector<MaybeMappedFile> outputFiles;
+    void from(Manager &manager, char (&buffer)[BUFFERSIZE], uint64_t &bytesRead, uint64_t &bytesProcessed);
 };
 
 enum class BTC_MessageType : uint8_t

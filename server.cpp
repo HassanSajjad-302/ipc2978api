@@ -28,8 +28,8 @@ class IPCManagerBS : public Manager
                                     PIPE_READMODE_MESSAGE |        // message read mode
                                     PIPE_WAIT,                     // blocking mode
                                 1,                                 // unlimited instances
-                                BUFFERSIZE * sizeof(TCHAR),           // output buffer size
-                                BUFFERSIZE * sizeof(TCHAR),           // input buffer size
+                                BUFFERSIZE * sizeof(TCHAR),        // output buffer size
+                                BUFFERSIZE * sizeof(TCHAR),        // input buffer size
                                 PIPE_TIMEOUT,                      // client time-out
                                 NULL);                             // default security attributes
         if (hPipe == INVALID_HANDLE_VALUE)
@@ -42,7 +42,7 @@ class IPCManagerBS : public Manager
     {
     }
 
-    void receiveMessage(char (&buffer)[320])
+    void receiveMessage(char (&ctbBuffer)[320])
     {
         // Has to first wait for the message
 
@@ -51,11 +51,15 @@ class IPCManagerBS : public Manager
         uint64_t bytesRead;
         read(buffer, bytesRead);
 
-        // read call fails if zero byte is read, so safe to read 1 byte
+        uint64_t bytesProcessed = 0;
 
+        // read call fails if zero byte is read, so safe to read 1 byte
         switch (static_cast<CTB_MessageType>(buffer[0]))
         {
+
         case CTB_MessageType::MODULE:
+            CTBModule &m = reinterpret_cast<CTBModule &>(ctbBuffer);
+            m.moduleName = readStringFromPipe(buffer, bytesRead, bytesProcessed);
             break;
         case CTB_MessageType::HEADER_UNIT:
             break;
@@ -66,8 +70,6 @@ class IPCManagerBS : public Manager
         case CTB_MessageType::LAST_MESSAGE:
             break;
         }
-
-        unsigned long bytesProcessed = 0;
     }
 
     void sendMessage(string message)

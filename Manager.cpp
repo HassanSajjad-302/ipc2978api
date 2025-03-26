@@ -1,11 +1,12 @@
 
 #include "Manager.hpp"
+#include "Messages.hpp"
 #include <Windows.h>
 #include <print>
 
 using std::print;
 
-void Manager::read(char (&buffer)[BUFFERSIZE], uint64_t &bytesRead)
+void Manager::read(char (&buffer)[BUFFERSIZE], uint64_t &bytesRead) const
 {
     const bool fSuccess = ReadFile(hPipe,               // pipe handle
                                    buffer,              // buffer to receive reply
@@ -19,19 +20,56 @@ void Manager::read(char (&buffer)[BUFFERSIZE], uint64_t &bytesRead)
     }
 }
 
-void Manager::readStringFromPipe(string &output, char (&buffer)[BUFFERSIZE], uint64_t &bytesRead,
-                                 uint64_t &bytesProcessed)
+bool Manager::readBoolFromPipe(char (&buffer)[4096], uint64_t &bytesRead, uint64_t &bytesProcessed)
 {
-    // Determining the size of the string
-    if (uint64_t bytesNeeded = 8; bytesProcessed - bytesRead >= bytesNeeded)
+    bool result;
+    readNumberOfBytes(reinterpret_cast<char *>(&result), 1, buffer, bytesRead, bytesProcessed);
+    return result;
+}
+
+string Manager::readStringFromPipe(char (&buffer)[BUFFERSIZE], uint64_t &bytesRead, uint64_t &bytesProcessed)
+{
+    uint64_t stringSize;
+    readNumberOfBytes(reinterpret_cast<char *>(&stringSize), 8, buffer, bytesRead, bytesProcessed);
+    string str(stringSize, 'a');
+    readNumberOfBytes(str.data(), stringSize, buffer, bytesRead, bytesProcessed);
+    return str;
+}
+
+MaybeMappedFile Manager::readMaybeMappedFileFromPipe(char (&buffer)[4096], uint64_t &bytesRead,
+                                                     uint64_t &bytesProcessed)
+{
+    MaybeMappedFile file;
+    file.isMapped = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
+    file.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+    return file;
+}
+
+vector<string> Manager::readVectorOfStringFromPipe(char (&buffer)[4096], uint64_t &bytesRead, uint64_t &bytesProcessed)
+{
+    uint64_t vectorSize;
+    readNumberOfBytes(reinterpret_cast<char *>(&vectorSize), 8, buffer, bytesRead, bytesProcessed);
+    vector<string> vec;
+    vec.reserve(vectorSize);
+    for (uint64_t i = 0; i < vectorSize; ++i)
     {
-        const uint64_t stringSize = buffer[bytesProcessed];
-        bytesProcessed += bytesNeeded;
-        bytesNeeded = stringSize;
+        vec.emplace_back(readStringFromPipe(buffer, bytesRead, bytesProcessed));
     }
-    else
+    return vec;
+}
+
+vector<MaybeMappedFile> Manager::readVectorOfMaybeMappedFileFromPipe(char (&buffer)[4096], uint64_t &bytesRead,
+                                                                     uint64_t &bytesProcessed)
+{
+    uint64_t vectorSize;
+    readNumberOfBytes(reinterpret_cast<char *>(&vectorSize), 8, buffer, bytesRead, bytesProcessed);
+    vector<MaybeMappedFile> vec;
+    vec.reserve(vectorSize);
+    for (uint64_t i = 0; i < vectorSize; ++i)
     {
+        vec.emplace_back(readMaybeMappedFileFromPipe(buffer, bytesRead, bytesProcessed));
     }
+    return vec;
 }
 
 void Manager::readNumberOfBytes(char *output, const uint64_t size, char (&buffer)[4096], uint64_t &bytesRead,
