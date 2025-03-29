@@ -21,7 +21,7 @@ class Manager
     vector<string> readVectorOfStringFromPipe(char (&buffer)[BUFFERSIZE], uint64_t &bytesRead,
                                               uint64_t &bytesProcessed);
     vector<string> readVectorOfMaybeMappedFileFromPipe(char (&buffer)[BUFFERSIZE], uint64_t &bytesRead,
-                                                                uint64_t &bytesProcessed);
+                                                       uint64_t &bytesProcessed);
     void readNumberOfBytes(char *output, uint64_t size, char (&buffer)[BUFFERSIZE], uint64_t &bytesRead,
                            uint64_t &bytesProcessed) const;
 };

@@ -12,7 +12,7 @@ void Manager::read(char (&buffer)[BUFFERSIZE], uint64_t &bytesRead) const
                                    buffer,              // buffer to receive reply
                                    BUFFERSIZE,          // size of buffer
                                    LPDWORD(&bytesRead), // number of bytes read
-                                   nullptr);               // not overlapped
+                                   nullptr);            // not overlapped
 
     if (!fSuccess)
     {
@@ -23,10 +23,10 @@ void Manager::read(char (&buffer)[BUFFERSIZE], uint64_t &bytesRead) const
 void Manager::write(vector<char> &buffer) const
 {
     const bool success = WriteFile(hPipe,         // pipe handle
-                             buffer.data(), // message
-                             buffer.size(), // message length
-                             nullptr,       // bytes written
-                             nullptr);      // not overlapped
+                                   buffer.data(), // message
+                                   buffer.size(), // message length
+                                   nullptr,       // bytes written
+                                   nullptr);      // not overlapped
     if (!success)
     {
         print(stderr, "ReadFile failed with %d.\n", GetLastError());
@@ -63,7 +63,7 @@ vector<string> Manager::readVectorOfStringFromPipe(char (&buffer)[4096], uint64_
 }
 
 vector<string> Manager::readVectorOfMaybeMappedFileFromPipe(char (&buffer)[4096], uint64_t &bytesRead,
-                                                                     uint64_t &bytesProcessed)
+                                                            uint64_t &bytesProcessed)
 {
     uint64_t vectorSize;
     readNumberOfBytes(reinterpret_cast<char *>(&vectorSize), 8, buffer, bytesRead, bytesProcessed);
