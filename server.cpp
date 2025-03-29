@@ -1,9 +1,8 @@
 #include "Manager.hpp"
 #include "Messages.hpp"
 
-#include <cassert>
+#include <cstdio>
 #include <print>
-#include <stdio.h>
 #include <string>
 #include <strsafe.h>
 #include <tchar.h>
@@ -11,71 +10,7 @@
 
 using std::string, std::print;
 
-// IPC Manager BuildSystem
-class IPCManagerBS : public Manager
-{
-    string pipeName;
-
-    explicit IPCManagerBS(string pipeName_) : pipeName(std::move(pipeName_))
-    {
-        char p[] = TEXT("\\\\.\\pipe\\mynamedpipe");
-        LPTSTR lpszPipename = p;
-
-        hPipe = CreateNamedPipe(lpszPipename,                      // pipe name
-                                PIPE_ACCESS_DUPLEX |               // read/write access
-                                    FILE_FLAG_FIRST_PIPE_INSTANCE, // overlapped mode
-                                PIPE_TYPE_MESSAGE |                // message-type pipe
-                                    PIPE_READMODE_MESSAGE |        // message read mode
-                                    PIPE_WAIT,                     // blocking mode
-                                1,                                 // unlimited instances
-                                BUFFERSIZE * sizeof(TCHAR),        // output buffer size
-                                BUFFERSIZE * sizeof(TCHAR),        // input buffer size
-                                PIPE_TIMEOUT,                      // client time-out
-                                NULL);                             // default security attributes
-        if (hPipe == INVALID_HANDLE_VALUE)
-        {
-            printf("CreateNamedPipe failed with %d.\n", GetLastError());
-        }
-    }
-
-    void initialize()
-    {
-    }
-
-    void receiveMessage(char (&ctbBuffer)[320])
-    {
-        // Has to first wait for the message
-
-        // Read from the pipe.
-        char buffer[BUFFERSIZE];
-        uint64_t bytesRead;
-        read(buffer, bytesRead);
-
-        uint64_t bytesProcessed = 0;
-
-        // read call fails if zero byte is read, so safe to read 1 byte
-        switch (static_cast<CTB_MessageType>(buffer[0]))
-        {
-
-        case CTB_MessageType::MODULE:
-            CTBModule &m = reinterpret_cast<CTBModule &>(ctbBuffer);
-            m.moduleName = readStringFromPipe(buffer, bytesRead, bytesProcessed);
-            break;
-        case CTB_MessageType::HEADER_UNIT:
-            break;
-        case CTB_MessageType::RESOLVE_INCLUDE:
-            break;
-        case CTB_MessageType::HEADER_UNIT_INCLUDE_TRANSLATION:
-            break;
-        case CTB_MessageType::LAST_MESSAGE:
-            break;
-        }
-    }
-
-    void sendMessage(string message)
-    {
-    }
-};
+#include "server.hpp"
 
 #define PIPE_TIMEOUT 5000
 #define BUFSIZE 4096
@@ -360,41 +295,7 @@ BOOL CreateAndConnectInstance(LPOVERLAPPED lpoOverlap)
     return ConnectToNewClient(hPipe, lpoOverlap);
 }
 
-BOOL ConnectToNewClient(HANDLE hPipe, LPOVERLAPPED lpo)
-{
-    BOOL fConnected, fPendingIO = FALSE;
 
-    // Start an overlapped connection for this pipe instance.
-    fConnected = ConnectNamedPipe(hPipe, lpo);
-
-    // Overlapped ConnectNamedPipe should return zero.
-    if (fConnected)
-    {
-        printf("ConnectNamedPipe failed with %d.\n", GetLastError());
-        return 0;
-    }
-
-    switch (GetLastError())
-    {
-    // The overlapped connection in progress.
-    case ERROR_IO_PENDING:
-        fPendingIO = TRUE;
-        break;
-
-        // Client is already connected, so signal an event.
-
-    case ERROR_PIPE_CONNECTED:
-        if (SetEvent(lpo->hEvent))
-            break;
-
-    // If an error occurs during the connect operation...
-    default: {
-        printf("ConnectNamedPipe failed with %d.\n", GetLastError());
-        return 0;
-    }
-    }
-    return fPendingIO;
-}
 
 VOID GetAnswerToRequest(LPPIPEINST pipe)
 {

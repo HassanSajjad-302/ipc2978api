@@ -7,16 +7,10 @@
 #include <vector>
 using std::string, std::vector;
 
-struct MaybeMappedFile
-{
-    bool isMapped;
-    string filePath;
-};
-
 // CTB --> Compiler to Build-System
 // BTC --> Build-System to Compiler
 
-enum class CTB_MessageType : uint8_t
+enum class CTB : uint8_t
 {
     MODULE = 0,
     HEADER_UNIT = 1,
@@ -25,46 +19,46 @@ enum class CTB_MessageType : uint8_t
     LAST_MESSAGE = 4,
 };
 
-struct CTB
-{
-    CTB_MessageType type;
-};
-
-class IPCManagerBS;
-
-struct CTBModule : CTB
+struct CTBModule
 {
     string moduleName;
 };
 
-struct CTBHeaderUnit : CTB
+struct CTBHeaderUnit
 {
     string headerUnitName;
 };
 
-struct CTBResolveInclude : CTB
+struct CTBResolveInclude
 {
     string includeName;
 };
 
-struct CTBHeaderUnitIncludeTranslation : CTB
+struct CTBHeaderUnitIncludeTranslation
 {
     string includeName;
 };
 
-struct CTBLastMessage : CTB
+struct CTBFatBMI
+{
+    bool hasLogicalName;
+    string outputFilePath;
+    string logicalName;
+};
+
+struct CTBLastMessage
 {
     bool exitStatus;
     bool hasLogicalName;
+    vector<string> outputFilePaths;
     vector<string> headerFiles;
     string output;
     string errorOutput;
     string logicalName;
-    vector<MaybeMappedFile> outputFiles;
     void from(Manager &manager, char (&buffer)[BUFFERSIZE], uint64_t &bytesRead, uint64_t &bytesProcessed);
 };
 
-enum class BTC_MessageType : uint8_t
+enum class BTC : uint8_t
 {
     REQUESTED_FILE = 0,
     INCLUDE_PATH = 1,
@@ -72,14 +66,9 @@ enum class BTC_MessageType : uint8_t
     LAST_MESSAGE = 3,
 };
 
-struct BTC
-{
-    BTC_MessageType type;
-};
-
 struct BTC_RequestedFile
 {
-    MaybeMappedFile filePath;
+    string filePath;
 };
 
 struct BTC_IncludePath
@@ -87,17 +76,15 @@ struct BTC_IncludePath
     string filePath;
 };
 
-union MappedFileOrPath
-{
-    MaybeMappedFile maybeMappedFilePath;
-    string filePath;
-};
-
 struct BTC_HeaderUnitOrIncludePath
 {
     bool found;
     bool isHeaderUnit;
-    MappedFileOrPath filePath;
+    string filePath;
+};
+
+struct BTC_LastMessage
+{
 };
 
 #endif // MESSAGES_HPP

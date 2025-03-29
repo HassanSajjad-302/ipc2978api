@@ -16,5 +16,5 @@ void CTBLastMessage::from(Manager &manager, char (&buffer)[4096], uint64_t &byte
     {
         logicalName = manager.readStringFromPipe(buffer, bytesRead, bytesProcessed);
     }
-    outputFiles = manager.readVectorOfMaybeMappedFileFromPipe(buffer, bytesRead, bytesProcessed);
+    outputFilePaths = manager.readVectorOfMaybeMappedFileFromPipe(buffer, bytesRead, bytesProcessed);
 }
