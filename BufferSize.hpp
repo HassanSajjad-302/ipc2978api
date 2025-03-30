@@ -7,4 +7,4 @@
 // The following variable is used in CreateNamedFunction.
 #define PIPE_TIMEOUT 5000
 
-#endif //BUFFERSIZE_HPP
+#endif // BUFFERSIZE_HPP

@@ -48,10 +48,10 @@ struct CTBLastMessage
 {
     bool exitStatus;
     bool hasLogicalName;
-    vector<string> outputFilePaths;
     vector<string> headerFiles;
     string output;
     string errorOutput;
+    vector<string> outputFilePaths;
     string logicalName;
     void from(class Manager &manager, char (&buffer)[BUFFERSIZE], uint64_t &bytesRead, uint64_t &bytesProcessed);
 };
@@ -59,30 +59,30 @@ struct CTBLastMessage
 enum class BTC : uint8_t
 {
     REQUESTED_FILE = 0,
-    INCLUDE_PATH = 1,
+    RESOLVED_FILEPATH = 1,
     HEADER_UNIT_OR_INCLUDE_PATH = 2,
     LAST_MESSAGE = 3,
 };
 
-struct BTC_RequestedFile
+struct BTCRequestedFile
 {
     string filePath;
 };
 
-struct BTC_ResolvedFilePath
+struct BTCResolvedFilePath
 {
     bool exists;
     string filePath;
 };
 
-struct BTC_HeaderUnitOrIncludePath
+struct BTCHeaderUnitOrIncludePath
 {
     bool exists;
     bool isHeaderUnit;
     string filePath;
 };
 
-struct BTC_LastMessage
+struct BTCLastMessage
 {
 };
 

@@ -33,6 +33,13 @@ void Manager::write(const vector<char> &buffer) const
     }
 }
 
+vector<char> Manager::getBufferWithType(CTB type)
+{
+    vector<char> buffer;
+    buffer.emplace_back(static_cast<uint8_t>(type));
+    return buffer;
+}
+
 vector<char> Manager::getBufferWithType(const BTC type)
 {
     vector<char> buffer;
@@ -43,9 +50,20 @@ vector<char> Manager::getBufferWithType(const BTC type)
 void Manager::writeString(vector<char> &buffer, const string &str)
 {
     const uint64_t size = str.size();
-    const char *ptr = reinterpret_cast<const char *>(&size);
+    const auto ptr = reinterpret_cast<const char *>(&size);
     buffer.insert(buffer.end(), ptr, ptr + sizeof(uint64_t));
     buffer.insert(buffer.end(), str.begin(), str.end()); // Insert all characters
+}
+
+void Manager::writeVectorOfStrings(vector<char> &buffer, const vector<string> &strs)
+{
+    const uint64_t size = strs.size();
+    const auto ptr = reinterpret_cast<const char *>(&size);
+    buffer.insert(buffer.end(), ptr, ptr + sizeof(uint64_t));
+    for (const string &str : strs)
+    {
+        writeString(buffer, str);
+    }
 }
 
 bool Manager::readBoolFromPipe(char (&buffer)[4096], uint64_t &bytesRead, uint64_t &bytesProcessed) const

@@ -3,8 +3,8 @@ project(named_pipes)
 
 set(CMAKE_CXX_STANDARD 26)
 
-add_library(server server.cpp Messages.cpp
+add_library(BuildSystem IPCManagerBS.cpp Messages.cpp
         Manager.cpp)
 
-add_library(client client.cpp Messages.cpp
+add_library(Compiler IPCManagerCompiler.cpp Messages.cpp
         Manager.cpp)

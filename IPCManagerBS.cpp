@@ -1,5 +1,4 @@
-
-#include "client.hpp"
+#include "IPCManagerBS.hpp"
 #include "Manager.hpp"
 #include "Messages.hpp"
 
@@ -12,7 +11,7 @@
 
 using std::string, std::print;
 
-IPCManagerCompiler::IPCManagerCompiler(const string &objFilePath) : pipeName(R"(\\.\pipe\mynamedpipe)" + objFilePath)
+IPCManagerBS::IPCManagerBS(const string &objFilePath) : pipeName(R"(\\.\pipe\)" + objFilePath)
 {
     hPipe = CreateNamedPipe(pipeName.c_str(),                  // pipe name
                             PIPE_ACCESS_DUPLEX |               // read/write access
@@ -31,7 +30,7 @@ IPCManagerCompiler::IPCManagerCompiler(const string &objFilePath) : pipeName(R"(
     }
 }
 
-void IPCManagerCompiler::connectToNewClient() const
+void IPCManagerBS::connectToCompiler() const
 {
     // Start an overlapped connection for this pipe instance.
 
@@ -51,12 +50,12 @@ void IPCManagerCompiler::connectToNewClient() const
     }
 }
 
-void IPCManagerCompiler::receiveMessage(char (&ctbBuffer)[320], CTB &messageType)
+void IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType)
 {
-    if (!connectedToClient)
+    if (!connectedToCompiler)
     {
-        connectToNewClient();
-        connectedToClient = true;
+        connectToCompiler();
+        connectedToCompiler = true;
     }
 
     // Read from the pipe.
@@ -106,11 +105,13 @@ void IPCManagerCompiler::receiveMessage(char (&ctbBuffer)[320], CTB &messageType
 
     case CTB::LAST_MESSAGE:
         messageType = CTB::HEADER_UNIT_INCLUDE_TRANSLATION;
-
-        CTBLastMessage &lastMessage = reinterpret_cast<CTBLastMessage &>(ctbBuffer);
-        lastMessage.from(*this, buffer, bytesRead, bytesProcessed);
+        reinterpret_cast<CTBLastMessage &>(ctbBuffer).from(*this, buffer, bytesRead, bytesProcessed);
 
         break;
+
+    default:
+
+        print("Build-System received unknown message type on pipe {}.\n", pipeName);
     }
 
     if (bytesRead != bytesProcessed)
@@ -119,13 +120,13 @@ void IPCManagerCompiler::receiveMessage(char (&ctbBuffer)[320], CTB &messageType
     }
 }
 
-void IPCManagerCompiler::sendMessage(const BTC_RequestedFile &requestedFile) const
+void IPCManagerBS::sendMessage(const BTCRequestedFile &requestedFile) const
 {
     vector<char> buffer = getBufferWithType(BTC::REQUESTED_FILE);
     writeString(buffer, requestedFile.filePath);
     write(buffer);
 }
-void IPCManagerCompiler::sendMessage(const BTC_ResolvedFilePath &includePath) const
+void IPCManagerBS::sendMessage(const BTCResolvedFilePath &includePath) const
 {
     vector<char> buffer = getBufferWithType(BTC::REQUESTED_FILE);
     buffer.emplace_back(includePath.exists);
@@ -136,7 +137,7 @@ void IPCManagerCompiler::sendMessage(const BTC_ResolvedFilePath &includePath) co
     write(buffer);
 }
 
-void IPCManagerCompiler::sendMessage(const BTC_HeaderUnitOrIncludePath &headerUnitOrIncludePath) const
+void IPCManagerBS::sendMessage(const BTCHeaderUnitOrIncludePath &headerUnitOrIncludePath) const
 {
     vector<char> buffer = getBufferWithType(BTC::HEADER_UNIT_OR_INCLUDE_PATH);
     buffer.emplace_back(headerUnitOrIncludePath.exists);
@@ -148,116 +149,8 @@ void IPCManagerCompiler::sendMessage(const BTC_HeaderUnitOrIncludePath &headerUn
     write(buffer);
 }
 
-void IPCManagerCompiler::sendMessage(const BTC_LastMessage &) const
+void IPCManagerBS::sendMessage(const BTCLastMessage &) const
 {
     vector<char> buffer = getBufferWithType(BTC::HEADER_UNIT_OR_INCLUDE_PATH);
     write(buffer);
-}
-
-#include <conio.h>
-#include <stdio.h>
-#include <string>
-#include <tchar.h>
-#include <utility>
-
-#include "Messages.hpp"
-#include <windows.h>
-
-using std::string;
-
-#define BUFSIZE 4096
-
-int main(int argc, TCHAR *argv[])
-{
-    string str("Default message from client.");
-    LPTSTR lpvMessage = str.data();
-    TCHAR chBuf[BUFSIZE];
-    BOOL fSuccess = FALSE;
-    DWORD cbRead, cbToWrite, cbWritten, dwMode;
-
-    string pipeName("\\\\.\\pipe\\mynamedpipe");
-    LPTSTR lpszPipename = pipeName.data();
-
-    if (argc > 1)
-        lpvMessage = argv[1];
-
-    // Try to open a named pipe; wait for it, if necessary.
-
-    HANDLE hPipe = CreateFile(lpszPipename,  // pipe name
-                              GENERIC_READ | // read and write access
-                                  GENERIC_WRITE,
-                              0,             // no sharing
-                              NULL,          // default security attributes
-                              OPEN_EXISTING, // opens existing pipe
-                              0,             // default attributes
-                              NULL);         // no template file
-
-    // Break if the pipe handle is valid.
-
-    if (hPipe == INVALID_HANDLE_VALUE)
-    {
-        // Exit if an error other than ERROR_PIPE_BUSY occurs.
-
-        if (GetLastError() != ERROR_PIPE_BUSY)
-        {
-            _tprintf(TEXT("Could not open pipe. GLE=%d\n"), GetLastError());
-            return -1;
-        }
-
-        // All pipe instances are busy, so wait for 20 seconds.
-
-        if (!WaitNamedPipe(lpszPipename, 20000))
-        {
-            printf("Could not open pipe: 20 second wait timed out.");
-            return -1;
-        }
-    }
-
-    // Send a message to the pipe server.
-
-    cbToWrite = (lstrlen(lpvMessage) + 1) * sizeof(TCHAR);
-    _tprintf(TEXT("Sending %d byte message: \"%s\"\n"), cbToWrite, lpvMessage);
-
-    fSuccess = WriteFile(hPipe,      // pipe handle
-                         lpvMessage, // message
-                         cbToWrite,  // message length
-                         &cbWritten, // bytes written
-                         NULL);      // not overlapped
-
-    if (!fSuccess)
-    {
-        _tprintf(TEXT("WriteFile to pipe failed. GLE=%d\n"), GetLastError());
-        return -1;
-    }
-
-    printf("\nMessage sent to server, receiving reply as follows:\n");
-
-    do
-    {
-        // Read from the pipe.
-
-        fSuccess = ReadFile(hPipe,                   // pipe handle
-                            chBuf,                   // buffer to receive reply
-                            BUFSIZE * sizeof(TCHAR), // size of buffer
-                            &cbRead,                 // number of bytes read
-                            NULL);                   // not overlapped
-
-        if (!fSuccess && GetLastError() != ERROR_MORE_DATA)
-            break;
-
-        _tprintf(TEXT("\"%s\"\n"), chBuf);
-    } while (!fSuccess); // repeat loop if ERROR_MORE_DATA
-
-    if (!fSuccess)
-    {
-        _tprintf(TEXT("ReadFile from pipe failed. GLE=%d\n"), GetLastError());
-        return -1;
-    }
-
-    printf("\n<End of message, press ENTER to terminate connection and exit>");
-    _getch();
-
-    CloseHandle(hPipe);
-
-    return 0;
 }

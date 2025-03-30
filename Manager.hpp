@@ -16,8 +16,10 @@ class Manager
     void read(char (&buffer)[BUFFERSIZE], uint64_t &bytesRead) const;
     void write(const vector<char> &buffer) const;
 
+    static vector<char> getBufferWithType(CTB type);
     static vector<char> getBufferWithType(BTC type);
     static void writeString(vector<char> &buffer, const string &str);
+    static void writeVectorOfStrings(vector<char> &buffer, const vector<string> &strs);
 
     bool readBoolFromPipe(char (&buffer)[BUFFERSIZE], uint64_t &bytesRead, uint64_t &bytesProcessed) const;
     string readStringFromPipe(char (&buffer)[BUFFERSIZE], uint64_t &bytesRead, uint64_t &bytesProcessed) const;
