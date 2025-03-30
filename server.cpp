@@ -12,12 +12,9 @@ using std::string, std::print;
 
 #include "server.hpp"
 
-IPCManagerBS::IPCManagerBS(string pipeName_) : pipeName(std::move(pipeName_))
+IPCManagerBS::IPCManagerBS(const string &objFilePath) : pipeName(R"(\\.\pipe\mynamedpipe)" + objFilePath)
 {
-    char p[] = TEXT("\\\\.\\pipe\\mynamedpipe");
-    LPTSTR lpszPipename = p;
-
-    hPipe = CreateNamedPipe(lpszPipename,                      // pipe name
+    hPipe = CreateNamedPipe(pipeName.c_str(),                  // pipe name
                             PIPE_ACCESS_DUPLEX |               // read/write access
                                 FILE_FLAG_FIRST_PIPE_INSTANCE, // overlapped mode
                             PIPE_TYPE_MESSAGE |                // message-type pipe
@@ -54,67 +51,96 @@ void IPCManagerBS::connectToNewClient() const
     }
 }
 
-void IPCManagerBS::receiveMessage(char (&ctbBuffer)[320])
+void IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType)
 {
-    // Has to first wait for the message
+    if (!connectedToClient)
+    {
+        connectToNewClient();
+        connectedToClient = true;
+    }
 
     // Read from the pipe.
     char buffer[BUFFERSIZE];
     uint64_t bytesRead;
     read(buffer, bytesRead);
 
-    uint64_t bytesProcessed = 0;
+    uint64_t bytesProcessed = 1;
 
-    // read call fails if zero byte is read, so safe to read 1 byte
+    // read call fails if zero byte is read, so safe to process 1 byte
     switch (static_cast<CTB>(buffer[0]))
     {
 
     case CTB::MODULE:
-        CTBModule &m = reinterpret_cast<CTBModule &>(ctbBuffer);
-        m.moduleName = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        messageType = CTB::MODULE;
+        reinterpret_cast<CTBModule &>(ctbBuffer).moduleName = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+
         break;
+
     case CTB::HEADER_UNIT:
+        messageType = CTB::HEADER_UNIT;
+        reinterpret_cast<CTBHeaderUnit &>(ctbBuffer).headerUnitFilePath =
+            readStringFromPipe(buffer, bytesRead, bytesProcessed);
+
         break;
+
     case CTB::RESOLVE_INCLUDE:
+        messageType = CTB::RESOLVE_INCLUDE;
+        reinterpret_cast<CTBResolveInclude &>(ctbBuffer).includeName =
+            readStringFromPipe(buffer, bytesRead, bytesProcessed);
+
         break;
+
+    case CTB::RESOLVE_HEADER_UNIT:
+        messageType = CTB::RESOLVE_HEADER_UNIT;
+        reinterpret_cast<CTBResolveHeaderUnit &>(ctbBuffer).logicalName =
+            readStringFromPipe(buffer, bytesRead, bytesProcessed);
+
+        break;
+
     case CTB::HEADER_UNIT_INCLUDE_TRANSLATION:
+        messageType = CTB::HEADER_UNIT_INCLUDE_TRANSLATION;
+        reinterpret_cast<CTBHeaderUnitIncludeTranslation &>(ctbBuffer).includeName =
+            readStringFromPipe(buffer, bytesRead, bytesProcessed);
+
         break;
+
     case CTB::LAST_MESSAGE:
+        messageType = CTB::HEADER_UNIT_INCLUDE_TRANSLATION;
+
+        CTBLastMessage &lastMessage = reinterpret_cast<CTBLastMessage &>(ctbBuffer);
+        lastMessage.from(*this, buffer, bytesRead, bytesProcessed);
+
         break;
+    }
+
+    if (bytesRead != bytesProcessed)
+    {
+        print("BytesRead {} not equal to BytesProcessed {} in receiveMessage.\n", bytesRead, bytesProcessed);
     }
 }
 
-vector<char> IPCManagerBS::getBufferWithType(const BTC type)
-{
-    vector<char> buffer;
-    buffer.emplace_back(static_cast<char>(type));
-    return buffer;
-}
-
-void IPCManagerBS::writeString(vector<char> &buffer, const string &str)
-{
-    uint64_t size = str.size();
-    buffer.emplace_back(&size, sizeof(size));
-    buffer.emplace_back(str.data(), size);
-}
 void IPCManagerBS::sendMessage(const BTC_RequestedFile &requestedFile) const
 {
     vector<char> buffer = getBufferWithType(BTC::REQUESTED_FILE);
     writeString(buffer, requestedFile.filePath);
     write(buffer);
 }
-void IPCManagerBS::sendMessage(const BTC_IncludePath &includePath) const
+void IPCManagerBS::sendMessage(const BTC_ResolvedFilePath &includePath) const
 {
     vector<char> buffer = getBufferWithType(BTC::REQUESTED_FILE);
-    writeString(buffer, includePath.filePath);
+    buffer.emplace_back(includePath.exists);
+    if (includePath.exists)
+    {
+        writeString(buffer, includePath.filePath);
+    }
     write(buffer);
 }
 
 void IPCManagerBS::sendMessage(const BTC_HeaderUnitOrIncludePath &headerUnitOrIncludePath) const
 {
     vector<char> buffer = getBufferWithType(BTC::HEADER_UNIT_OR_INCLUDE_PATH);
-    buffer.emplace_back(headerUnitOrIncludePath.found);
-    if (headerUnitOrIncludePath.found)
+    buffer.emplace_back(headerUnitOrIncludePath.exists);
+    if (headerUnitOrIncludePath.exists)
     {
         buffer.emplace_back(headerUnitOrIncludePath.isHeaderUnit);
         writeString(buffer, headerUnitOrIncludePath.filePath);
@@ -122,7 +148,7 @@ void IPCManagerBS::sendMessage(const BTC_HeaderUnitOrIncludePath &headerUnitOrIn
     write(buffer);
 }
 
-void IPCManagerBS::sendMessage(const BTC_LastMessage &lastMessage) const
+void IPCManagerBS::sendMessage(const BTC_LastMessage &) const
 {
     vector<char> buffer = getBufferWithType(BTC::HEADER_UNIT_OR_INCLUDE_PATH);
     write(buffer);

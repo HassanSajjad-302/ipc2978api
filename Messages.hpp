@@ -15,8 +15,9 @@ enum class CTB : uint8_t
     MODULE = 0,
     HEADER_UNIT = 1,
     RESOLVE_INCLUDE = 2,
-    HEADER_UNIT_INCLUDE_TRANSLATION = 3,
-    LAST_MESSAGE = 4,
+    RESOLVE_HEADER_UNIT = 3,
+    HEADER_UNIT_INCLUDE_TRANSLATION = 4,
+    LAST_MESSAGE = 5,
 };
 
 struct CTBModule
@@ -26,7 +27,7 @@ struct CTBModule
 
 struct CTBHeaderUnit
 {
-    string headerUnitName;
+    string headerUnitFilePath;
 };
 
 struct CTBResolveInclude
@@ -34,16 +35,14 @@ struct CTBResolveInclude
     string includeName;
 };
 
+struct CTBResolveHeaderUnit
+{
+    string logicalName;
+};
+
 struct CTBHeaderUnitIncludeTranslation
 {
     string includeName;
-};
-
-struct CTBFatBMI
-{
-    bool hasLogicalName;
-    string outputFilePath;
-    string logicalName;
 };
 
 struct CTBLastMessage
@@ -71,14 +70,15 @@ struct BTC_RequestedFile
     string filePath;
 };
 
-struct BTC_IncludePath
+struct BTC_ResolvedFilePath
 {
+    bool exists;
     string filePath;
 };
 
 struct BTC_HeaderUnitOrIncludePath
 {
-    bool found;
+    bool exists;
     bool isHeaderUnit;
     string filePath;
 };

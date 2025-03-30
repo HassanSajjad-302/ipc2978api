@@ -10,13 +10,11 @@ class IPCManagerBS : public Manager
     string pipeName;
     bool connectedToClient = false;
 
-    explicit IPCManagerBS(string pipeName_);
+    explicit IPCManagerBS(const string& objFilePath);
     void connectToNewClient() const;
-    void receiveMessage(char (&ctbBuffer)[320]);
-    static vector<char> getBufferWithType(BTC type);
-    static void writeString(vector<char> &buffer, const string &str);
+    void receiveMessage(char (&ctbBuffer)[320], CTB &messageType);
     void sendMessage(const BTC_RequestedFile &requestedFile) const;
-    void sendMessage(const BTC_IncludePath &includePath) const;
+    void sendMessage(const BTC_ResolvedFilePath &includePath) const;
     void sendMessage(const BTC_HeaderUnitOrIncludePath &headerUnitOrIncludePath) const;
     void sendMessage(const BTC_LastMessage &lastMessage) const;
 };

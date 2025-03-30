@@ -14,13 +14,13 @@ void Manager::read(char (&buffer)[BUFFERSIZE], uint64_t &bytesRead) const
                                    LPDWORD(&bytesRead), // number of bytes read
                                    nullptr);            // not overlapped
 
-    if (!fSuccess)
+    if (!fSuccess ||  bytesRead == 0)
     {
         print(stderr, "ReadFile failed with %d.\n", GetLastError());
     }
 }
 
-void Manager::write(vector<char> &buffer) const
+void Manager::write(const vector<char> &buffer) const
 {
     const bool success = WriteFile(hPipe,         // pipe handle
                                    buffer.data(), // message
@@ -33,14 +33,28 @@ void Manager::write(vector<char> &buffer) const
     }
 }
 
-bool Manager::readBoolFromPipe(char (&buffer)[4096], uint64_t &bytesRead, uint64_t &bytesProcessed)
+vector<char> Manager::getBufferWithType(const BTC type)
+{
+    vector<char> buffer;
+    buffer.emplace_back(static_cast<char>(type));
+    return buffer;
+}
+
+void Manager::writeString(vector<char> &buffer, const string &str)
+{
+    uint64_t size = str.size();
+    buffer.emplace_back(&size, sizeof(size));
+    buffer.emplace_back(str.data(), size);
+}
+
+bool Manager::readBoolFromPipe(char (&buffer)[4096], uint64_t &bytesRead, uint64_t &bytesProcessed) const
 {
     bool result;
     readNumberOfBytes(reinterpret_cast<char *>(&result), 1, buffer, bytesRead, bytesProcessed);
     return result;
 }
 
-string Manager::readStringFromPipe(char (&buffer)[BUFFERSIZE], uint64_t &bytesRead, uint64_t &bytesProcessed)
+string Manager::readStringFromPipe(char (&buffer)[BUFFERSIZE], uint64_t &bytesRead, uint64_t &bytesProcessed) const
 {
     uint64_t stringSize;
     readNumberOfBytes(reinterpret_cast<char *>(&stringSize), 8, buffer, bytesRead, bytesProcessed);
@@ -49,7 +63,8 @@ string Manager::readStringFromPipe(char (&buffer)[BUFFERSIZE], uint64_t &bytesRe
     return str;
 }
 
-vector<string> Manager::readVectorOfStringFromPipe(char (&buffer)[4096], uint64_t &bytesRead, uint64_t &bytesProcessed)
+vector<string> Manager::readVectorOfStringFromPipe(char (&buffer)[4096], uint64_t &bytesRead,
+                                                   uint64_t &bytesProcessed) const
 {
     uint64_t vectorSize;
     readNumberOfBytes(reinterpret_cast<char *>(&vectorSize), 8, buffer, bytesRead, bytesProcessed);
@@ -63,7 +78,7 @@ vector<string> Manager::readVectorOfStringFromPipe(char (&buffer)[4096], uint64_
 }
 
 vector<string> Manager::readVectorOfMaybeMappedFileFromPipe(char (&buffer)[4096], uint64_t &bytesRead,
-                                                            uint64_t &bytesProcessed)
+                                                            uint64_t &bytesProcessed) const
 {
     uint64_t vectorSize;
     readNumberOfBytes(reinterpret_cast<char *>(&vectorSize), 8, buffer, bytesRead, bytesProcessed);
