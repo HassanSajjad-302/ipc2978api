@@ -14,7 +14,7 @@ void Manager::read(char (&buffer)[BUFFERSIZE], uint64_t &bytesRead) const
                                    LPDWORD(&bytesRead), // number of bytes read
                                    nullptr);            // not overlapped
 
-    if (!fSuccess ||  bytesRead == 0)
+    if (!fSuccess || bytesRead == 0)
     {
         print(stderr, "ReadFile failed with %d.\n", GetLastError());
     }
@@ -36,15 +36,16 @@ void Manager::write(const vector<char> &buffer) const
 vector<char> Manager::getBufferWithType(const BTC type)
 {
     vector<char> buffer;
-    buffer.emplace_back(static_cast<char>(type));
+    buffer.emplace_back(static_cast<uint8_t>(type));
     return buffer;
 }
 
 void Manager::writeString(vector<char> &buffer, const string &str)
 {
-    uint64_t size = str.size();
-    buffer.emplace_back(&size, sizeof(size));
-    buffer.emplace_back(str.data(), size);
+    const uint64_t size = str.size();
+    const char *ptr = reinterpret_cast<const char *>(&size);
+    buffer.insert(buffer.end(), ptr, ptr + sizeof(uint64_t));
+    buffer.insert(buffer.end(), str.begin(), str.end()); // Insert all characters
 }
 
 bool Manager::readBoolFromPipe(char (&buffer)[4096], uint64_t &bytesRead, uint64_t &bytesProcessed) const

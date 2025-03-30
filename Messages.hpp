@@ -1,8 +1,7 @@
 #ifndef MESSAGES_HPP
 #define MESSAGES_HPP
 
-#include "Manager.hpp"
-
+#include "BufferSize.hpp"
 #include <string>
 #include <vector>
 using std::string, std::vector;
@@ -54,7 +53,7 @@ struct CTBLastMessage
     string output;
     string errorOutput;
     string logicalName;
-    void from(Manager &manager, char (&buffer)[BUFFERSIZE], uint64_t &bytesRead, uint64_t &bytesProcessed);
+    void from(class Manager &manager, char (&buffer)[BUFFERSIZE], uint64_t &bytesRead, uint64_t &bytesProcessed);
 };
 
 enum class BTC : uint8_t

@@ -1,3 +1,4 @@
+#include "server.hpp"
 #include "Manager.hpp"
 #include "Messages.hpp"
 
@@ -9,8 +10,6 @@
 #include <windows.h>
 
 using std::string, std::print;
-
-#include "server.hpp"
 
 IPCManagerBS::IPCManagerBS(const string &objFilePath) : pipeName(R"(\\.\pipe\mynamedpipe)" + objFilePath)
 {

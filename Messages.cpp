@@ -1,5 +1,6 @@
 
 #include "Messages.hpp"
+#include "Manager.hpp"
 
 void CTBLastMessage::from(Manager &manager, char (&buffer)[4096], uint64_t &bytesRead, uint64_t &bytesProcessed)
 {
