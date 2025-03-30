@@ -13,7 +13,7 @@ class IPCManagerBS : public Manager
 
     void connectToCompiler();
 
-public:
+  public:
     explicit IPCManagerBS(const string &objFilePath);
     void receiveMessage(char (&ctbBuffer)[320], CTB &messageType);
     void sendMessage(const BTCRequestedFile &requestedFile) const;

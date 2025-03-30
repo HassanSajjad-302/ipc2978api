@@ -56,58 +56,69 @@ void IPCManagerBS::connectToCompiler()
 
 void IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType)
 {
-
+    connectToCompiler();
     // Read from the pipe.
     char buffer[BUFFERSIZE];
-    uint64_t bytesRead;
+    uint32_t bytesRead;
     read(buffer, bytesRead);
 
-    uint64_t bytesProcessed = 1;
+    uint32_t bytesProcessed = 1;
 
     // read call fails if zero byte is read, so safe to process 1 byte
     switch (static_cast<CTB>(buffer[0]))
     {
 
-    case CTB::MODULE:
+    case CTB::MODULE: {
+
         messageType = CTB::MODULE;
-        reinterpret_cast<CTBModule &>(ctbBuffer).moduleName = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        getInitializedObjectFromBuffer<CTBModule>(ctbBuffer).moduleName =
+            readStringFromPipe(buffer, bytesRead, bytesProcessed);
+    }
 
-        break;
+    break;
 
-    case CTB::HEADER_UNIT:
+    case CTB::HEADER_UNIT: {
+
         messageType = CTB::HEADER_UNIT;
-        reinterpret_cast<CTBHeaderUnit &>(ctbBuffer).headerUnitFilePath =
+        getInitializedObjectFromBuffer<CTBHeaderUnit>(ctbBuffer).headerUnitFilePath =
             readStringFromPipe(buffer, bytesRead, bytesProcessed);
+    }
 
-        break;
+    break;
 
-    case CTB::RESOLVE_INCLUDE:
+    case CTB::RESOLVE_INCLUDE: {
+
         messageType = CTB::RESOLVE_INCLUDE;
-        reinterpret_cast<CTBResolveInclude &>(ctbBuffer).includeName =
+        getInitializedObjectFromBuffer<CTBResolveInclude>(ctbBuffer).includeName =
             readStringFromPipe(buffer, bytesRead, bytesProcessed);
+    }
 
-        break;
+    break;
 
-    case CTB::RESOLVE_HEADER_UNIT:
+    case CTB::RESOLVE_HEADER_UNIT: {
+
         messageType = CTB::RESOLVE_HEADER_UNIT;
-        reinterpret_cast<CTBResolveHeaderUnit &>(ctbBuffer).logicalName =
+        getInitializedObjectFromBuffer<CTBResolveHeaderUnit>(ctbBuffer).logicalName =
             readStringFromPipe(buffer, bytesRead, bytesProcessed);
+    }
 
-        break;
+    break;
 
-    case CTB::HEADER_UNIT_INCLUDE_TRANSLATION:
+    case CTB::HEADER_UNIT_INCLUDE_TRANSLATION: {
+
         messageType = CTB::HEADER_UNIT_INCLUDE_TRANSLATION;
-        reinterpret_cast<CTBHeaderUnitIncludeTranslation &>(ctbBuffer).includeName =
+        getInitializedObjectFromBuffer<CTBHeaderUnitIncludeTranslation>(ctbBuffer).includeName =
             readStringFromPipe(buffer, bytesRead, bytesProcessed);
+    }
 
-        break;
+    break;
 
     case CTB::LAST_MESSAGE: {
 
-        messageType = CTB::HEADER_UNIT_INCLUDE_TRANSLATION;
+        messageType = CTB::LAST_MESSAGE;
 
         auto &[exitStatus, hasLogicalName, headerFiles, output, errorOutput, outputFilePaths, logicalName] =
-            reinterpret_cast<CTBLastMessage &>(ctbBuffer);
+            getInitializedObjectFromBuffer<CTBLastMessage>(ctbBuffer);
 
         exitStatus = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
         if (exitStatus != EXIT_SUCCESS)

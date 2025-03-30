@@ -6,7 +6,7 @@
 
 using std::print;
 
-void Manager::read(char (&buffer)[BUFFERSIZE], uint64_t &bytesRead) const
+void Manager::read(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead) const
 {
     const bool fSuccess = ReadFile(hPipe,               // pipe handle
                                    buffer,              // buffer to receive reply
@@ -49,74 +49,74 @@ vector<char> Manager::getBufferWithType(const BTC type)
 
 void Manager::writeString(vector<char> &buffer, const string &str)
 {
-    const uint64_t size = str.size();
+    const uint32_t size = str.size();
     const auto ptr = reinterpret_cast<const char *>(&size);
-    buffer.insert(buffer.end(), ptr, ptr + sizeof(uint64_t));
+    buffer.insert(buffer.end(), ptr, ptr + sizeof(size));
     buffer.insert(buffer.end(), str.begin(), str.end()); // Insert all characters
 }
 
 void Manager::writeVectorOfStrings(vector<char> &buffer, const vector<string> &strs)
 {
-    const uint64_t size = strs.size();
+    const uint32_t size = strs.size();
     const auto ptr = reinterpret_cast<const char *>(&size);
-    buffer.insert(buffer.end(), ptr, ptr + sizeof(uint64_t));
+    buffer.insert(buffer.end(), ptr, ptr + sizeof(size));
     for (const string &str : strs)
     {
         writeString(buffer, str);
     }
 }
 
-bool Manager::readBoolFromPipe(char (&buffer)[4096], uint64_t &bytesRead, uint64_t &bytesProcessed) const
+bool Manager::readBoolFromPipe(char (&buffer)[4096], uint32_t &bytesRead, uint32_t &bytesProcessed) const
 {
     bool result;
-    readNumberOfBytes(reinterpret_cast<char *>(&result), 1, buffer, bytesRead, bytesProcessed);
+    readNumberOfBytes(reinterpret_cast<char *>(&result), sizeof(result), buffer, bytesRead, bytesProcessed);
     return result;
 }
 
-string Manager::readStringFromPipe(char (&buffer)[BUFFERSIZE], uint64_t &bytesRead, uint64_t &bytesProcessed) const
+string Manager::readStringFromPipe(char (&buffer)[4096], uint32_t &bytesRead, uint32_t &bytesProcessed) const
 {
-    uint64_t stringSize;
-    readNumberOfBytes(reinterpret_cast<char *>(&stringSize), 8, buffer, bytesRead, bytesProcessed);
+    uint32_t stringSize;
+    readNumberOfBytes(reinterpret_cast<char *>(&stringSize), sizeof(stringSize), buffer, bytesRead, bytesProcessed);
     string str(stringSize, 'a');
     readNumberOfBytes(str.data(), stringSize, buffer, bytesRead, bytesProcessed);
     return str;
 }
 
-vector<string> Manager::readVectorOfStringFromPipe(char (&buffer)[4096], uint64_t &bytesRead,
-                                                   uint64_t &bytesProcessed) const
+vector<string> Manager::readVectorOfStringFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
+                                                   uint32_t &bytesProcessed) const
 {
-    uint64_t vectorSize;
-    readNumberOfBytes(reinterpret_cast<char *>(&vectorSize), 8, buffer, bytesRead, bytesProcessed);
+    uint32_t vectorSize;
+    readNumberOfBytes(reinterpret_cast<char *>(&vectorSize), sizeof(vectorSize), buffer, bytesRead, bytesProcessed);
     vector<string> vec;
     vec.reserve(vectorSize);
-    for (uint64_t i = 0; i < vectorSize; ++i)
+    for (uint32_t i = 0; i < vectorSize; ++i)
     {
         vec.emplace_back(readStringFromPipe(buffer, bytesRead, bytesProcessed));
     }
     return vec;
 }
 
-vector<string> Manager::readVectorOfMaybeMappedFileFromPipe(char (&buffer)[4096], uint64_t &bytesRead,
-                                                            uint64_t &bytesProcessed) const
+vector<string> Manager::readVectorOfMaybeMappedFileFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
+                                                            uint32_t &bytesProcessed) const
 {
-    uint64_t vectorSize;
-    readNumberOfBytes(reinterpret_cast<char *>(&vectorSize), 8, buffer, bytesRead, bytesProcessed);
+    uint32_t vectorSize;
+    readNumberOfBytes(reinterpret_cast<char *>(&vectorSize), sizeof(vectorSize), buffer, bytesRead, bytesProcessed);
     vector<string> vec;
     vec.reserve(vectorSize);
-    for (uint64_t i = 0; i < vectorSize; ++i)
+    for (uint32_t i = 0; i < vectorSize; ++i)
     {
         vec.emplace_back(readStringFromPipe(buffer, bytesRead, bytesProcessed));
     }
     return vec;
 }
 
-void Manager::readNumberOfBytes(char *output, const uint64_t size, char (&buffer)[4096], uint64_t &bytesRead,
-                                uint64_t &bytesProcessed) const
+void Manager::readNumberOfBytes(char *output, const uint32_t size, char (&buffer)[4096], uint32_t &bytesRead,
+                                uint32_t &bytesProcessed) const
 {
-    uint64_t pendingSize = size;
+    uint32_t pendingSize = size;
     while (true)
     {
-        const uint64_t bytesAvailable = bytesRead - bytesProcessed;
+        const uint32_t bytesAvailable = bytesRead - bytesProcessed;
         if (bytesAvailable >= pendingSize)
         {
             memcpy(output, buffer + bytesProcessed, pendingSize);
