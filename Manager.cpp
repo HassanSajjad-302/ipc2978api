@@ -29,7 +29,7 @@ void Manager::write(const vector<char> &buffer) const
                                    nullptr);      // not overlapped
     if (!success)
     {
-        print(stderr, "ReadFile failed with %d.\n", GetLastError());
+        print(stderr, "WriteFile failed with %d.\n", GetLastError());
     }
 }
 

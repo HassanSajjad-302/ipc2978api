@@ -53,7 +53,6 @@ struct CTBLastMessage
     string errorOutput;
     vector<string> outputFilePaths;
     string logicalName;
-    void from(class Manager &manager, char (&buffer)[BUFFERSIZE], uint64_t &bytesRead, uint64_t &bytesProcessed);
 };
 
 enum class BTC : uint8_t

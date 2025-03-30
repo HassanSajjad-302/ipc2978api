@@ -3,8 +3,14 @@ project(named_pipes)
 
 set(CMAKE_CXX_STANDARD 26)
 
-add_library(BuildSystem IPCManagerBS.cpp Messages.cpp
+add_library(BuildSystem IPCManagerBS.cpp
         Manager.cpp)
 
-add_library(Compiler IPCManagerCompiler.cpp Messages.cpp
+add_library(Compiler IPCManagerCompiler.cpp
         Manager.cpp)
+
+add_executable(BuildSystemTest BuildSystemTest.cpp)
+add_executable(CompilerTest CompilerTest.cpp)
+
+target_link_libraries(BuildSystemTest BuildSystem)
+target_link_libraries(CompilerTest Compiler)

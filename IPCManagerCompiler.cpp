@@ -17,6 +17,11 @@ IPCManagerCompiler::IPCManagerCompiler(const string &objFilePath) : pipeName(R"(
 
 void IPCManagerCompiler::connectToBuildSystem()
 {
+    if (connectedToBuildSystem)
+    {
+        return;
+    }
+
     hPipe = CreateFile(pipeName.data(), // pipe name
                        GENERIC_READ |   // read and write access
                            GENERIC_WRITE,
@@ -32,6 +37,8 @@ void IPCManagerCompiler::connectToBuildSystem()
     {
         print("Could not open pipe {} to build system\n", pipeName);
     }
+
+    connectedToBuildSystem = true;
 }
 
 void IPCManagerCompiler::receiveMessage(char (&ctbBuffer)[320], BTC &messageType) const
@@ -87,34 +94,39 @@ void IPCManagerCompiler::receiveMessage(char (&ctbBuffer)[320], BTC &messageType
 
 void IPCManagerCompiler::sendMessage(const CTBModule &moduleName)
 {
+    connectToBuildSystem();
     vector<char> buffer = getBufferWithType(CTB::MODULE);
     writeString(buffer, moduleName.moduleName);
     write(buffer);
 }
 
-void IPCManagerCompiler::sendMessage(const CTBHeaderUnit &headerUnitPath) const
+void IPCManagerCompiler::sendMessage(const CTBHeaderUnit &headerUnitPath)
 {
+    connectToBuildSystem();
     vector<char> buffer = getBufferWithType(CTB::HEADER_UNIT);
     writeString(buffer, headerUnitPath.headerUnitFilePath);
     write(buffer);
 }
 
-void IPCManagerCompiler::sendMessage(const CTBResolveInclude &resolveInclude) const
+void IPCManagerCompiler::sendMessage(const CTBResolveInclude &resolveInclude)
 {
+    connectToBuildSystem();
     vector<char> buffer = getBufferWithType(CTB::RESOLVE_INCLUDE);
     writeString(buffer, resolveInclude.includeName);
     write(buffer);
 }
 
-void IPCManagerCompiler::sendMessage(const CTBResolveHeaderUnit &resolveHeaderUnit) const
+void IPCManagerCompiler::sendMessage(const CTBResolveHeaderUnit &resolveHeaderUnit)
 {
+    connectToBuildSystem();
     vector<char> buffer = getBufferWithType(CTB::RESOLVE_HEADER_UNIT);
     writeString(buffer, resolveHeaderUnit.logicalName);
     write(buffer);
 }
 
-void IPCManagerCompiler::sendMessage(const CTBHeaderUnitIncludeTranslation &huIncTranslation) const
+void IPCManagerCompiler::sendMessage(const CTBHeaderUnitIncludeTranslation &huIncTranslation)
 {
+    connectToBuildSystem();
     vector<char> buffer = getBufferWithType(CTB::HEADER_UNIT_INCLUDE_TRANSLATION);
     writeString(buffer, huIncTranslation.includeName);
     write(buffer);
@@ -138,4 +150,3 @@ void IPCManagerCompiler::sendMessage(const CTBLastMessage &lastMessage) const
     }
     write(buffer);
 }
-

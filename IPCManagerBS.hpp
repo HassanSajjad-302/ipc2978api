@@ -11,8 +11,10 @@ class IPCManagerBS : public Manager
     string pipeName;
     bool connectedToCompiler = false;
 
+    void connectToCompiler();
+
+public:
     explicit IPCManagerBS(const string &objFilePath);
-    void connectToCompiler() const;
     void receiveMessage(char (&ctbBuffer)[320], CTB &messageType);
     void sendMessage(const BTCRequestedFile &requestedFile) const;
     void sendMessage(const BTCResolvedFilePath &includePath) const;

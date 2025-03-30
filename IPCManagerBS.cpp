@@ -30,11 +30,14 @@ IPCManagerBS::IPCManagerBS(const string &objFilePath) : pipeName(R"(\\.\pipe\)" 
     }
 }
 
-void IPCManagerBS::connectToCompiler() const
+void IPCManagerBS::connectToCompiler()
 {
-    // Start an overlapped connection for this pipe instance.
+    if (connectedToCompiler)
+    {
+        return;
+    }
 
-    // Overlapped ConnectNamedPipe should return zero.
+    // ConnectNamedPipe should return zero.
     if (!ConnectNamedPipe(hPipe, nullptr))
     {
         switch (GetLastError())
@@ -48,15 +51,11 @@ void IPCManagerBS::connectToCompiler() const
             printf("ConnectNamedPipe failed with %d.\n", GetLastError());
         }
     }
+    connectedToCompiler = true;
 }
 
 void IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType)
 {
-    if (!connectedToCompiler)
-    {
-        connectToCompiler();
-        connectedToCompiler = true;
-    }
 
     // Read from the pipe.
     char buffer[BUFFERSIZE];
@@ -103,11 +102,29 @@ void IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType)
 
         break;
 
-    case CTB::LAST_MESSAGE:
-        messageType = CTB::HEADER_UNIT_INCLUDE_TRANSLATION;
-        reinterpret_cast<CTBLastMessage &>(ctbBuffer).from(*this, buffer, bytesRead, bytesProcessed);
+    case CTB::LAST_MESSAGE: {
 
-        break;
+        messageType = CTB::HEADER_UNIT_INCLUDE_TRANSLATION;
+
+        auto &[exitStatus, hasLogicalName, headerFiles, output, errorOutput, outputFilePaths, logicalName] =
+            reinterpret_cast<CTBLastMessage &>(ctbBuffer);
+
+        exitStatus = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
+        if (exitStatus != EXIT_SUCCESS)
+        {
+            return;
+        }
+        hasLogicalName = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
+        headerFiles = readVectorOfStringFromPipe(buffer, bytesRead, bytesProcessed);
+        output = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        errorOutput = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        outputFilePaths = readVectorOfMaybeMappedFileFromPipe(buffer, bytesRead, bytesProcessed);
+        if (hasLogicalName)
+        {
+            logicalName = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        }
+    }
+    break;
 
     default:
 

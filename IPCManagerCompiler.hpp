@@ -10,14 +10,16 @@ class IPCManagerCompiler : public Manager
     string pipeName;
     bool connectedToBuildSystem = false;
 
-    explicit IPCManagerCompiler(const string &objFilePath);
     void connectToBuildSystem();
+
+  public:
+    explicit IPCManagerCompiler(const string &objFilePath);
     void receiveMessage(char (&ctbBuffer)[320], BTC &messageType) const;
     void sendMessage(const CTBModule &moduleName);
-    void sendMessage(const CTBHeaderUnit &headerUnitPath) const;
-    void sendMessage(const CTBResolveInclude &resolveInclude) const;
-    void sendMessage(const CTBResolveHeaderUnit &resolveHeaderUnit) const;
-    void sendMessage(const CTBHeaderUnitIncludeTranslation &huIncTranslation) const;
+    void sendMessage(const CTBHeaderUnit &headerUnitPath);
+    void sendMessage(const CTBResolveInclude &resolveInclude);
+    void sendMessage(const CTBResolveHeaderUnit &resolveHeaderUnit);
+    void sendMessage(const CTBHeaderUnitIncludeTranslation &huIncTranslation);
     void sendMessage(const CTBLastMessage &lastMessage) const;
 };
 
