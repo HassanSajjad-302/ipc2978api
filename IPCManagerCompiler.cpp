@@ -41,61 +41,6 @@ void IPCManagerCompiler::connectToBuildSystem()
     connectedToBuildSystem = true;
 }
 
-void IPCManagerCompiler::receiveMessage(char (&ctbBuffer)[320], BTC &messageType) const
-{
-    // Read from the pipe.
-    char buffer[BUFFERSIZE];
-    uint32_t bytesRead;
-    read(buffer, bytesRead);
-
-    uint32_t bytesProcessed = 1;
-
-    // read call fails if zero byte is read, so safe to process 1 byte
-    switch (static_cast<BTC>(buffer[0]))
-    {
-    case BTC::REQUESTED_FILE: {
-
-        messageType = BTC::REQUESTED_FILE;
-        getInitializedObjectFromBuffer<BTCRequestedFile>(ctbBuffer).filePath =
-            readStringFromPipe(buffer, bytesRead, bytesProcessed);
-    }
-
-    break;
-
-    case BTC::RESOLVED_FILEPATH: {
-        messageType = BTC::RESOLVED_FILEPATH;
-        auto &[exists, filePath] = getInitializedObjectFromBuffer<BTCResolvedFilePath>(ctbBuffer);
-        exists = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
-        filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
-    }
-
-    break;
-
-    case BTC::HEADER_UNIT_OR_INCLUDE_PATH: {
-        messageType = BTC::HEADER_UNIT_OR_INCLUDE_PATH;
-        auto &[exists, isHeaderUnit, filePath] = getInitializedObjectFromBuffer<BTCHeaderUnitOrIncludePath>(ctbBuffer);
-        exists = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
-        isHeaderUnit = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
-        filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
-    }
-
-    break;
-
-    case BTC::LAST_MESSAGE:
-
-        break;
-
-    default:
-
-        print("Compiler received unknown message type on pipe {}.\n", pipeName);
-    }
-
-    if (bytesRead != bytesProcessed)
-    {
-        print("BytesRead {} not equal to BytesProcessed {} in receiveMessage.\n", bytesRead, bytesProcessed);
-    }
-}
-
 void IPCManagerCompiler::sendMessage(const CTBModule &moduleName)
 {
     connectToBuildSystem();

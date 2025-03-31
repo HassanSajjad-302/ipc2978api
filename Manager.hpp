@@ -23,7 +23,8 @@ class Manager
 
     bool readBoolFromPipe(char (&buffer)[4096], uint32_t &bytesRead, uint32_t &bytesProcessed) const;
     string readStringFromPipe(char (&buffer)[4096], uint32_t &bytesRead, uint32_t &bytesProcessed) const;
-    vector<string> readVectorOfStringFromPipe(char (&buffer)[4096], uint32_t &bytesRead, uint32_t &bytesProcessed) const;
+    vector<string> readVectorOfStringFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
+                                              uint32_t &bytesProcessed) const;
     vector<string> readVectorOfMaybeMappedFileFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
                                                        uint32_t &bytesProcessed) const;
     void readNumberOfBytes(char *output, uint32_t size, char (&buffer)[4096], uint32_t &bytesRead,
