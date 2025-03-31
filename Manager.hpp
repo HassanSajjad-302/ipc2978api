@@ -21,13 +21,13 @@ class Manager
     static void writeString(vector<char> &buffer, const string &str);
     static void writeVectorOfStrings(vector<char> &buffer, const vector<string> &strs);
 
-    bool readBoolFromPipe(char (&buffer)[4096], uint32_t &bytesRead, uint32_t &bytesProcessed) const;
-    string readStringFromPipe(char (&buffer)[4096], uint32_t &bytesRead, uint32_t &bytesProcessed) const;
-    vector<string> readVectorOfStringFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
+    bool readBoolFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead, uint32_t &bytesProcessed) const;
+    string readStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead, uint32_t &bytesProcessed) const;
+    vector<string> readVectorOfStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                                               uint32_t &bytesProcessed) const;
-    vector<string> readVectorOfMaybeMappedFileFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
+    vector<string> readVectorOfMaybeMappedFileFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                                                        uint32_t &bytesProcessed) const;
-    void readNumberOfBytes(char *output, uint32_t size, char (&buffer)[4096], uint32_t &bytesRead,
+    void readNumberOfBytes(char *output, uint32_t size, char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                            uint32_t &bytesProcessed) const;
 };
 

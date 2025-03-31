@@ -8,15 +8,21 @@ using std::print;
 
 void Manager::read(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead) const
 {
-    const bool fSuccess = ReadFile(hPipe,               // pipe handle
-                                   buffer,              // buffer to receive reply
-                                   BUFFERSIZE,          // size of buffer
-                                   LPDWORD(&bytesRead), // number of bytes read
-                                   nullptr);            // not overlapped
+    const bool success = ReadFile(hPipe,               // pipe handle
+                                  buffer,              // buffer to receive reply
+                                  BUFFERSIZE,          // size of buffer
+                                  LPDWORD(&bytesRead), // number of bytes read
+                                  nullptr);            // not overlapped
 
-    if (!fSuccess || bytesRead == 0)
+    if (!bytesRead)
     {
-        print(stderr, "ReadFile failed with %d.\n", GetLastError());
+        print(stderr, "ReadFile failed. Zero bytes Read. Error-Code {}.\n", GetLastError());
+        return;
+    }
+
+    if (const uint32_t lastError = GetLastError(); !success && lastError != ERROR_MORE_DATA)
+    {
+        print(stderr, "ReadFile failed with             {}.\n", lastError);
     }
 }
 
@@ -66,14 +72,14 @@ void Manager::writeVectorOfStrings(vector<char> &buffer, const vector<string> &s
     }
 }
 
-bool Manager::readBoolFromPipe(char (&buffer)[4096], uint32_t &bytesRead, uint32_t &bytesProcessed) const
+bool Manager::readBoolFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead, uint32_t &bytesProcessed) const
 {
     bool result;
     readNumberOfBytes(reinterpret_cast<char *>(&result), sizeof(result), buffer, bytesRead, bytesProcessed);
     return result;
 }
 
-string Manager::readStringFromPipe(char (&buffer)[4096], uint32_t &bytesRead, uint32_t &bytesProcessed) const
+string Manager::readStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead, uint32_t &bytesProcessed) const
 {
     uint32_t stringSize;
     readNumberOfBytes(reinterpret_cast<char *>(&stringSize), sizeof(stringSize), buffer, bytesRead, bytesProcessed);
@@ -82,7 +88,7 @@ string Manager::readStringFromPipe(char (&buffer)[4096], uint32_t &bytesRead, ui
     return str;
 }
 
-vector<string> Manager::readVectorOfStringFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
+vector<string> Manager::readVectorOfStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                                                    uint32_t &bytesProcessed) const
 {
     uint32_t vectorSize;
@@ -96,7 +102,7 @@ vector<string> Manager::readVectorOfStringFromPipe(char (&buffer)[4096], uint32_
     return vec;
 }
 
-vector<string> Manager::readVectorOfMaybeMappedFileFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
+vector<string> Manager::readVectorOfMaybeMappedFileFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                                                             uint32_t &bytesProcessed) const
 {
     uint32_t vectorSize;
@@ -110,23 +116,25 @@ vector<string> Manager::readVectorOfMaybeMappedFileFromPipe(char (&buffer)[4096]
     return vec;
 }
 
-void Manager::readNumberOfBytes(char *output, const uint32_t size, char (&buffer)[4096], uint32_t &bytesRead,
+void Manager::readNumberOfBytes(char *output, const uint32_t size, char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                                 uint32_t &bytesProcessed) const
 {
     uint32_t pendingSize = size;
+    uint32_t offset = 0;
     while (true)
     {
         const uint32_t bytesAvailable = bytesRead - bytesProcessed;
         if (bytesAvailable >= pendingSize)
         {
-            memcpy(output, buffer + bytesProcessed, pendingSize);
+            memcpy(output + offset, buffer + bytesProcessed, pendingSize);
             bytesProcessed += pendingSize;
             break;
         }
 
         if (bytesAvailable)
         {
-            memcpy(output, buffer + bytesProcessed, bytesAvailable);
+            memcpy(output + offset, buffer + bytesProcessed, bytesAvailable);
+            offset += bytesAvailable;
             pendingSize -= bytesAvailable;
         }
 

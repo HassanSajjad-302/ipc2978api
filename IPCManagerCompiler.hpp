@@ -51,6 +51,7 @@ template <typename T> T IPCManagerCompiler::receiveMessage() const
         }
         messageType = BTC::REQUESTED_FILE;
     }
+
     else if constexpr (std::is_same_v<T, BTCResolvedFilePath>)
     {
         if (static_cast<BTC>(buffer[0]) == BTC::RESOLVED_FILEPATH)
@@ -108,7 +109,8 @@ template <typename T> T IPCManagerCompiler::receiveMessage() const
 
     if (messageType != static_cast<BTC>(buffer[0]))
     {
-        print("Received Unexpected Message type from BuildSystem. Expected {} Received {}\n", static_cast<uint8_t>(messageType), buffer[0]);
+        print("Received Unexpected Message type from BuildSystem. Expected {} Received {}\n",
+              static_cast<uint8_t>(messageType), buffer[0]);
     }
 }
 
