@@ -31,8 +31,6 @@ struct CTBModule
 // isHeaderUnit is set when compiler knows that it is a header-unit.
 // if findInclude flag is provided, then compiler sends logicalName,
 // otherwise compiler sends the full path.
-// if translateInclude flag is not provided,
-// then compiler can only send header-unit.
 struct CTBNonModule
 {
     bool isHeaderUnit = false;
