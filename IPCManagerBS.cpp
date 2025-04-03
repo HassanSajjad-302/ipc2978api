@@ -95,19 +95,12 @@ void IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType)
             getInitializedObjectFromBuffer<CTBLastMessage>(ctbBuffer);
 
         exitStatus = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
-        if (exitStatus != EXIT_SUCCESS)
-        {
-            return;
-        }
         hasLogicalName = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
         headerFiles = readVectorOfStringFromPipe(buffer, bytesRead, bytesProcessed);
         output = readStringFromPipe(buffer, bytesRead, bytesProcessed);
         errorOutput = readStringFromPipe(buffer, bytesRead, bytesProcessed);
         outputFilePaths = readVectorOfMaybeMappedFileFromPipe(buffer, bytesRead, bytesProcessed);
-        if (hasLogicalName)
-        {
-            logicalName = readStringFromPipe(buffer, bytesRead, bytesProcessed);
-        }
+        logicalName = readStringFromPipe(buffer, bytesRead, bytesProcessed);
     }
     break;
 

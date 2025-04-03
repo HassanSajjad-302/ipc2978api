@@ -53,7 +53,7 @@ void IPCManagerCompiler::sendMessage(const CTBModule &moduleName)
 void IPCManagerCompiler::sendMessage(const CTBNonModule &nonModule)
 {
     connectToBuildSystem();
-    vector<char> buffer = getBufferWithType(CTB::MODULE);
+    vector<char> buffer = getBufferWithType(CTB::NON_MODULE);
     buffer.emplace_back(nonModule.isHeaderUnit);
     writeString(buffer, nonModule.str);
     write(buffer);
@@ -64,18 +64,12 @@ void IPCManagerCompiler::sendMessage(const CTBLastMessage &lastMessage)
 {
     vector<char> buffer = getBufferWithType(CTB::LAST_MESSAGE);
     buffer.emplace_back(lastMessage.exitStatus);
-    if (lastMessage.exitStatus == EXIT_SUCCESS)
-    {
-        buffer.emplace_back(lastMessage.hasLogicalName);
-        writeVectorOfStrings(buffer, lastMessage.headerFiles);
-        writeString(buffer, lastMessage.output);
-        writeString(buffer, lastMessage.errorOutput);
-        writeVectorOfStrings(buffer, lastMessage.outputFilePaths);
-        if (lastMessage.hasLogicalName)
-        {
-            writeString(buffer, lastMessage.logicalName);
-        }
-    }
+    buffer.emplace_back(lastMessage.hasLogicalName);
+    writeVectorOfStrings(buffer, lastMessage.headerFiles);
+    writeString(buffer, lastMessage.output);
+    writeString(buffer, lastMessage.errorOutput);
+    writeVectorOfStrings(buffer, lastMessage.outputFilePaths);
+    writeString(buffer, lastMessage.logicalName);
     write(buffer);
     expectedMessageType = BTC::LAST_MESSAGE;
 }

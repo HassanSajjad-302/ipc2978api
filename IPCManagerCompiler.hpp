@@ -33,7 +33,7 @@ template <typename T> T IPCManagerCompiler::receiveMessage() const
 
     uint32_t bytesProcessed = 0;
 
-    bool unexpectedMessage = false;
+    bool incompatibleMessage = false;
     bool bytesEqual = true;
     if constexpr (std::is_same_v<T, BTCModule>)
     {
@@ -47,7 +47,10 @@ template <typename T> T IPCManagerCompiler::receiveMessage() const
             }
             bytesEqual = false;
         }
-        unexpectedMessage = true;
+        else
+        {
+            incompatibleMessage = true;
+        }
     }
     else if constexpr (std::is_same_v<T, BTCNonModule>)
     {
@@ -55,39 +58,48 @@ template <typename T> T IPCManagerCompiler::receiveMessage() const
         {
             BTCNonModule nonModule;
             nonModule.found = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
-            if (nonModule.found)
-            {
-                nonModule.isHeaderUnit = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
-                nonModule.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
-            }
+            nonModule.isHeaderUnit = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
+            nonModule.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
             if (bytesRead == bytesProcessed)
             {
                 return nonModule;
             }
             bytesEqual = false;
         }
-        unexpectedMessage = true;
+        else
+        {
+            incompatibleMessage = true;
+        }
     }
     else if constexpr (std::is_same_v<T, BTCLastMessage>)
     {
         if (expectedMessageType == BTC::LAST_MESSAGE)
         {
-            if (bytesRead == bytesProcessed)
+            bytesProcessed = 1;
+            if (buffer[0] != UINT32_MAX)
             {
-                return BTCLastMessage{};
+                print("Incorrect Last Message Received\n");
+                if (bytesRead == bytesProcessed)
+                {
+                    return BTCLastMessage{};
+                }
+                bytesEqual = false;
             }
-            bytesEqual = false;
         }
-        unexpectedMessage = true;
+        else
+        {
+            incompatibleMessage = true;
+        }
     }
     else
     {
         static_assert(false && "Unknown type\n");
     }
 
-    if (unexpectedMessage)
+    if (incompatibleMessage)
     {
-        print("Received Unexpected Message from BuildSystem. Expected {}.", static_cast<uint8_t>(expectedMessageType));
+        print("Receiving incompatible response compared to the sent message. Compatible Response {}.",
+              static_cast<uint8_t>(expectedMessageType));
     }
 
     if (!bytesEqual)

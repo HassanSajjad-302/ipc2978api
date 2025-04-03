@@ -1,12 +1,12 @@
 
 #include "Testing.hpp"
 
-string generateRandomString()
+string getRandomString()
 {
     const string characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     std::uniform_int_distribution<> distribution(0, characters.size() - 1);
-    std::uniform_int_distribution distribution2(0, 20000);
-    const uint64_t length = distribution(generator);
+    std::uniform_int_distribution distribution2(0, 10000);
+    const uint64_t length = distribution2(generator);
     string random_string(length, '\0');
     for (int i = 0; i < length; ++i)
     {
@@ -97,4 +97,3 @@ void printMessage(const BTCLastMessage &lastMessage, const bool sent)
     printSendingOrReceiving(sent);
     print("BTCLastMessage\n\n");
 }
-

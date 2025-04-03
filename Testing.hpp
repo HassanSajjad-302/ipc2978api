@@ -11,7 +11,7 @@ using std::print;
 inline std::random_device rd;
 inline std::mt19937 generator(rd());
 
-string generateRandomString();
+string getRandomString();
 bool getRandomBool();
 void printSendingOrReceiving(bool sent);
 void printMessage(const CTBModule &ctbModule, bool sent);
