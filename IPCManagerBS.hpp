@@ -16,9 +16,8 @@ class IPCManagerBS : public Manager
   public:
     explicit IPCManagerBS(const string &objFilePath);
     void receiveMessage(char (&ctbBuffer)[320], CTB &messageType);
-    void sendMessage(const BTCRequestedFile &requestedFile) const;
-    void sendMessage(const BTCResolvedFilePath &includePath) const;
-    void sendMessage(const BTCHeaderUnitOrIncludePath &headerUnitOrIncludePath) const;
+    void sendMessage(const BTCModule &moduleFile) const;
+    void sendMessage(const BTCNonModule &nonModule) const;
     void sendMessage(const BTCLastMessage &lastMessage) const;
 };
 #endif // IPC_MANAGER_BS_HPP

@@ -9,78 +9,82 @@ using std::string, std::vector;
 // CTB --> Compiler to Build-System
 // BTC --> Build-System to Compiler
 
+// string is 4 bytes that holds the size of the char array, followed by the array.
+// vector is 4 bytes that holds the size of the array, followed by the array.
+
+// Compiler to Build System
+// This is the first byte of the compiler to build-system message.
 enum class CTB : uint8_t
 {
     MODULE = 0,
-    HEADER_UNIT = 1,
-    RESOLVE_INCLUDE = 2,
-    RESOLVE_HEADER_UNIT = 3,
-    HEADER_UNIT_INCLUDE_TRANSLATION = 4,
-    LAST_MESSAGE = 5,
+    NON_MODULE = 1,
+    LAST_MESSAGE = 2,
 };
 
+// This is sent when compiler needs a module.
 struct CTBModule
 {
     string moduleName;
 };
 
-struct CTBHeaderUnit
+// This is sent when compiler needs something else than module.
+// isHeaderUnit is set when compiler knows that it is a header-unit.
+// if findInclude flag is provided, then compiler sends logicalName,
+// otherwise compiler sends the full path.
+// if translateInclude flag is not provided,
+// then compiler can only send header-unit.
+struct CTBNonModule
 {
-    string headerUnitFilePath;
+    bool isHeaderUnit = false;
+    string str;
 };
 
-struct CTBResolveInclude
-{
-    string includeName;
-};
-
-struct CTBResolveHeaderUnit
-{
-    string logicalName;
-};
-
-struct CTBHeaderUnitIncludeTranslation
-{
-    string includeName;
-};
-
+// This is the last message sent by the compiler.
 struct CTBLastMessage
 {
-    bool exitStatus;
-    bool hasLogicalName;
+    // Whether the compilation succeeded or failed.
+    bool exitStatus = false;
+    // Compiler should send following fields only
+    // if the compilation succeeded
+    // True if the file compiled is a module interface unit.
+    bool hasLogicalName = false;
+    // header-includes discovered during compilation.
     vector<string> headerFiles;
+    // compiler output
     string output;
+    // compiler error output.
+    // Any IPC related error output should be on stderr.
     string errorOutput;
+    // output files
     vector<string> outputFilePaths;
+    // This field should be sent only if hasLogicalName is true.
     string logicalName;
 };
 
+// Build System to Compiler
+// This is the first byte of the build-system to compiler message.
 enum class BTC : uint8_t
 {
-    REQUESTED_FILE = 0,
-    RESOLVED_FILEPATH = 1,
-    HEADER_UNIT_OR_INCLUDE_PATH = 2,
-    LAST_MESSAGE = 3,
+    MODULE = 0,
+    NON_MODULE = 1,
+    LAST_MESSAGE = 2,
 };
 
-struct BTCRequestedFile
+// Reply for CTBModule
+struct BTCModule
 {
     string filePath;
 };
 
-struct BTCResolvedFilePath
+// Reply for CTBNonModule
+struct BTCNonModule
 {
-    bool exists;
+    bool found = false;
+    bool isHeaderUnit = false;
     string filePath;
 };
 
-struct BTCHeaderUnitOrIncludePath
-{
-    bool exists;
-    bool isHeaderUnit;
-    string filePath;
-};
-
+// Reply for CTBLastMessage.
 struct BTCLastMessage
 {
 };

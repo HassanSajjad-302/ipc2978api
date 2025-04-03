@@ -17,7 +17,6 @@ class Manager
     void write(const vector<char> &buffer) const;
 
     static vector<char> getBufferWithType(CTB type);
-    static vector<char> getBufferWithType(BTC type);
     static void writeString(vector<char> &buffer, const string &str);
     static void writeVectorOfStrings(vector<char> &buffer, const vector<string> &strs);
 

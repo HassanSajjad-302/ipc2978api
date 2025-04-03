@@ -47,41 +47,20 @@ void IPCManagerCompiler::sendMessage(const CTBModule &moduleName)
     vector<char> buffer = getBufferWithType(CTB::MODULE);
     writeString(buffer, moduleName.moduleName);
     write(buffer);
+    expectedMessageType = BTC::MODULE;
 }
 
-void IPCManagerCompiler::sendMessage(const CTBHeaderUnit &headerUnitPath)
+void IPCManagerCompiler::sendMessage(const CTBNonModule &nonModule)
 {
     connectToBuildSystem();
-    vector<char> buffer = getBufferWithType(CTB::HEADER_UNIT);
-    writeString(buffer, headerUnitPath.headerUnitFilePath);
+    vector<char> buffer = getBufferWithType(CTB::MODULE);
+    buffer.emplace_back(nonModule.isHeaderUnit);
+    writeString(buffer, nonModule.str);
     write(buffer);
+    expectedMessageType = BTC::NON_MODULE;
 }
 
-void IPCManagerCompiler::sendMessage(const CTBResolveInclude &resolveInclude)
-{
-    connectToBuildSystem();
-    vector<char> buffer = getBufferWithType(CTB::RESOLVE_INCLUDE);
-    writeString(buffer, resolveInclude.includeName);
-    write(buffer);
-}
-
-void IPCManagerCompiler::sendMessage(const CTBResolveHeaderUnit &resolveHeaderUnit)
-{
-    connectToBuildSystem();
-    vector<char> buffer = getBufferWithType(CTB::RESOLVE_HEADER_UNIT);
-    writeString(buffer, resolveHeaderUnit.logicalName);
-    write(buffer);
-}
-
-void IPCManagerCompiler::sendMessage(const CTBHeaderUnitIncludeTranslation &huIncTranslation)
-{
-    connectToBuildSystem();
-    vector<char> buffer = getBufferWithType(CTB::HEADER_UNIT_INCLUDE_TRANSLATION);
-    writeString(buffer, huIncTranslation.includeName);
-    write(buffer);
-}
-
-void IPCManagerCompiler::sendMessage(const CTBLastMessage &lastMessage) const
+void IPCManagerCompiler::sendMessage(const CTBLastMessage &lastMessage)
 {
     vector<char> buffer = getBufferWithType(CTB::LAST_MESSAGE);
     buffer.emplace_back(lastMessage.exitStatus);
@@ -98,4 +77,5 @@ void IPCManagerCompiler::sendMessage(const CTBLastMessage &lastMessage) const
         }
     }
     write(buffer);
+    expectedMessageType = BTC::LAST_MESSAGE;
 }

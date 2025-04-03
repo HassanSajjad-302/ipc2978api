@@ -77,38 +77,12 @@ void IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType)
 
     break;
 
-    case CTB::HEADER_UNIT: {
+    case CTB::NON_MODULE: {
 
-        messageType = CTB::HEADER_UNIT;
-        getInitializedObjectFromBuffer<CTBHeaderUnit>(ctbBuffer).headerUnitFilePath =
-            readStringFromPipe(buffer, bytesRead, bytesProcessed);
-    }
-
-    break;
-
-    case CTB::RESOLVE_INCLUDE: {
-
-        messageType = CTB::RESOLVE_INCLUDE;
-        getInitializedObjectFromBuffer<CTBResolveInclude>(ctbBuffer).includeName =
-            readStringFromPipe(buffer, bytesRead, bytesProcessed);
-    }
-
-    break;
-
-    case CTB::RESOLVE_HEADER_UNIT: {
-
-        messageType = CTB::RESOLVE_HEADER_UNIT;
-        getInitializedObjectFromBuffer<CTBResolveHeaderUnit>(ctbBuffer).logicalName =
-            readStringFromPipe(buffer, bytesRead, bytesProcessed);
-    }
-
-    break;
-
-    case CTB::HEADER_UNIT_INCLUDE_TRANSLATION: {
-
-        messageType = CTB::HEADER_UNIT_INCLUDE_TRANSLATION;
-        getInitializedObjectFromBuffer<CTBHeaderUnitIncludeTranslation>(ctbBuffer).includeName =
-            readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        messageType = CTB::NON_MODULE;
+        auto &[isHeaderUnit, str] = getInitializedObjectFromBuffer<CTBNonModule>(ctbBuffer);
+        isHeaderUnit = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
+        str = readStringFromPipe(buffer, bytesRead, bytesProcessed);
     }
 
     break;
@@ -148,37 +122,25 @@ void IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType)
     }
 }
 
-void IPCManagerBS::sendMessage(const BTCRequestedFile &requestedFile) const
+void IPCManagerBS::sendMessage(const BTCModule &moduleFile) const
 {
-    vector<char> buffer = getBufferWithType(BTC::REQUESTED_FILE);
-    writeString(buffer, requestedFile.filePath);
-    write(buffer);
-}
-void IPCManagerBS::sendMessage(const BTCResolvedFilePath &includePath) const
-{
-    vector<char> buffer = getBufferWithType(BTC::REQUESTED_FILE);
-    buffer.emplace_back(includePath.exists);
-    if (includePath.exists)
-    {
-        writeString(buffer, includePath.filePath);
-    }
+    vector<char> buffer;
+    writeString(buffer, moduleFile.filePath);
     write(buffer);
 }
 
-void IPCManagerBS::sendMessage(const BTCHeaderUnitOrIncludePath &headerUnitOrIncludePath) const
+void IPCManagerBS::sendMessage(const BTCNonModule &nonModule) const
 {
-    vector<char> buffer = getBufferWithType(BTC::HEADER_UNIT_OR_INCLUDE_PATH);
-    buffer.emplace_back(headerUnitOrIncludePath.exists);
-    if (headerUnitOrIncludePath.exists)
-    {
-        buffer.emplace_back(headerUnitOrIncludePath.isHeaderUnit);
-        writeString(buffer, headerUnitOrIncludePath.filePath);
-    }
+    vector<char> buffer;
+    buffer.emplace_back(nonModule.found);
+    buffer.emplace_back(nonModule.isHeaderUnit);
+    writeString(buffer, nonModule.filePath);
     write(buffer);
 }
 
 void IPCManagerBS::sendMessage(const BTCLastMessage &) const
 {
-    vector<char> buffer = getBufferWithType(BTC::HEADER_UNIT_OR_INCLUDE_PATH);
+    vector<char> buffer;
+    buffer.emplace_back(UINT32_MAX);
     write(buffer);
 }

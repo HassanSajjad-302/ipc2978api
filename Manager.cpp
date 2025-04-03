@@ -46,13 +46,6 @@ vector<char> Manager::getBufferWithType(CTB type)
     return buffer;
 }
 
-vector<char> Manager::getBufferWithType(const BTC type)
-{
-    vector<char> buffer;
-    buffer.emplace_back(static_cast<uint8_t>(type));
-    return buffer;
-}
-
 void Manager::writeString(vector<char> &buffer, const string &str)
 {
     const uint32_t size = str.size();

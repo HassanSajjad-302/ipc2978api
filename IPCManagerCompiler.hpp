@@ -11,6 +11,7 @@ using std::print;
 class IPCManagerCompiler : public Manager
 {
     string pipeName;
+    BTC expectedMessageType;
     bool connectedToBuildSystem = false;
 
     void connectToBuildSystem();
@@ -19,11 +20,8 @@ class IPCManagerCompiler : public Manager
     explicit IPCManagerCompiler(const string &objFilePath);
     template <typename T> T receiveMessage() const;
     void sendMessage(const CTBModule &moduleName);
-    void sendMessage(const CTBHeaderUnit &headerUnitPath);
-    void sendMessage(const CTBResolveInclude &resolveInclude);
-    void sendMessage(const CTBResolveHeaderUnit &resolveHeaderUnit);
-    void sendMessage(const CTBHeaderUnitIncludeTranslation &huIncTranslation);
-    void sendMessage(const CTBLastMessage &lastMessage) const;
+    void sendMessage(const CTBNonModule &nonModule);
+    void sendMessage(const CTBLastMessage &lastMessage);
 };
 
 template <typename T> T IPCManagerCompiler::receiveMessage() const
@@ -33,61 +31,46 @@ template <typename T> T IPCManagerCompiler::receiveMessage() const
     uint32_t bytesRead;
     read(buffer, bytesRead);
 
-    uint32_t bytesProcessed = 1;
+    uint32_t bytesProcessed = 0;
 
-    BTC messageType;
+    bool unexpectedMessage = false;
     bool bytesEqual = true;
-    if constexpr (std::is_same_v<T, BTCRequestedFile>)
+    if constexpr (std::is_same_v<T, BTCModule>)
     {
-        if (static_cast<BTC>(buffer[0]) == BTC::REQUESTED_FILE)
+        if (expectedMessageType == BTC::MODULE)
         {
-            BTCRequestedFile requestedFile;
-            requestedFile.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+            BTCModule moduleFile;
+            moduleFile.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
             if (bytesRead == bytesProcessed)
             {
-                return requestedFile;
+                return moduleFile;
             }
             bytesEqual = false;
         }
-        messageType = BTC::REQUESTED_FILE;
+        unexpectedMessage = true;
     }
-
-    else if constexpr (std::is_same_v<T, BTCResolvedFilePath>)
+    else if constexpr (std::is_same_v<T, BTCNonModule>)
     {
-        if (static_cast<BTC>(buffer[0]) == BTC::RESOLVED_FILEPATH)
+        if (expectedMessageType == BTC::NON_MODULE)
         {
-            BTCResolvedFilePath resolvedFilePath;
-            resolvedFilePath.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
-            if (bytesRead == bytesProcessed)
+            BTCNonModule nonModule;
+            nonModule.found = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
+            if (nonModule.found)
             {
-                return resolvedFilePath;
-            }
-            bytesEqual = false;
-        }
-        messageType = BTC::RESOLVED_FILEPATH;
-    }
-    else if constexpr (std::is_same_v<T, BTCHeaderUnitOrIncludePath>)
-    {
-        if (static_cast<BTC>(buffer[0]) == BTC::HEADER_UNIT_OR_INCLUDE_PATH)
-        {
-            BTCHeaderUnitOrIncludePath headerUnitOrIncludePath;
-            headerUnitOrIncludePath.exists = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
-            if (headerUnitOrIncludePath.exists)
-            {
-                headerUnitOrIncludePath.isHeaderUnit = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
-                headerUnitOrIncludePath.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+                nonModule.isHeaderUnit = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
+                nonModule.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
             }
             if (bytesRead == bytesProcessed)
             {
-                return headerUnitOrIncludePath;
+                return nonModule;
             }
             bytesEqual = false;
         }
-        messageType = BTC::HEADER_UNIT_OR_INCLUDE_PATH;
+        unexpectedMessage = true;
     }
     else if constexpr (std::is_same_v<T, BTCLastMessage>)
     {
-        if (static_cast<BTC>(buffer[0]) == BTC::LAST_MESSAGE)
+        if (expectedMessageType == BTC::LAST_MESSAGE)
         {
             if (bytesRead == bytesProcessed)
             {
@@ -95,22 +78,21 @@ template <typename T> T IPCManagerCompiler::receiveMessage() const
             }
             bytesEqual = false;
         }
-        messageType = BTC::LAST_MESSAGE;
+        unexpectedMessage = true;
     }
     else
     {
         static_assert(false && "Unknown type\n");
     }
 
+    if (unexpectedMessage)
+    {
+        print("Received Unexpected Message from BuildSystem. Expected {}.", static_cast<uint8_t>(expectedMessageType));
+    }
+
     if (!bytesEqual)
     {
         print("BytesRead {} not equal to BytesProcessed {} in receiveMessage.\n", bytesRead, bytesProcessed);
-    }
-
-    if (messageType != static_cast<BTC>(buffer[0]))
-    {
-        print("Received Unexpected Message type from BuildSystem. Expected {} Received {}\n",
-              static_cast<uint8_t>(messageType), buffer[0]);
     }
 }
 
