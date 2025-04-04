@@ -42,8 +42,8 @@ struct CTBLastMessage
 {
     // Whether the compilation succeeded or failed.
     bool exitStatus = false;
-    // Compiler should send following fields only
-    // if the compilation succeeded
+    // Following fields are sent but are empty
+    // if the compilation failed.
     // True if the file compiled is a module interface unit.
     bool hasLogicalName = false;
     // header-includes discovered during compilation.
@@ -55,7 +55,7 @@ struct CTBLastMessage
     string errorOutput;
     // output files
     vector<string> outputFilePaths;
-    // This field should be sent only if hasLogicalName is true.
+    // exported module name
     string logicalName;
 };
 
