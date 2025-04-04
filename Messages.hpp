@@ -9,8 +9,9 @@ using std::string, std::vector;
 // CTB --> Compiler to Build-System
 // BTC --> Build-System to Compiler
 
-// string is 4 bytes that holds the size of the char array, followed by the array.
-// vector is 4 bytes that holds the size of the array, followed by the array.
+// string is 4 bytes that hold the size of the char array, followed by the array.
+// vector is 4 bytes that hold the size of the array, followed by the array.
+// All fields are to be sent, even if unused/empty.
 
 // Compiler to Build System
 // This is the first byte of the compiler to build-system message.
@@ -21,16 +22,16 @@ enum class CTB : uint8_t
     LAST_MESSAGE = 2,
 };
 
-// This is sent when compiler needs a module.
+// This is sent when the compiler needs a module.
 struct CTBModule
 {
     string moduleName;
 };
 
-// This is sent when compiler needs something else than module.
-// isHeaderUnit is set when compiler knows that it is a header-unit.
-// if findInclude flag is provided, then compiler sends logicalName,
-// otherwise compiler sends the full path.
+// This is sent when the compiler needs something else than a module.
+// isHeaderUnit is set when the compiler knows that it is a header-unit.
+// If findInclude flag is provided, then the compiler sends logicalName,
+// Otherwise compiler sends the full path.
 struct CTBNonModule
 {
     bool isHeaderUnit = false;
@@ -60,7 +61,8 @@ struct CTBLastMessage
 };
 
 // Build System to Compiler
-// This is the first byte of the build-system to compiler message.
+// Unlike CTB, this is not written as the first byte
+// since the compiler knows what message it will receive.
 enum class BTC : uint8_t
 {
     MODULE = 0,
@@ -82,7 +84,7 @@ struct BTCNonModule
     string filePath;
 };
 
-// Reply for CTBLastMessage.
+// Reply for CTBLastMessage if the compilation succeeded.
 struct BTCLastMessage
 {
 };
