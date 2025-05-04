@@ -60,23 +60,22 @@ BTCNonModule IPCManagerCompiler::receiveBTCNonModule(const CTBNonModule &nonModu
     return receiveMessage<BTCNonModule>();
 }
 
-void IPCManagerCompiler::sendBTCLastMessage(const CTBLastMessage &lastMessage)
+void IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage)
 {
     connectToBuildSystem();
     vector<char> buffer = getBufferWithType(CTB::LAST_MESSAGE);
     buffer.emplace_back(lastMessage.exitStatus);
-    buffer.emplace_back(lastMessage.hasLogicalName);
     writeVectorOfStrings(buffer, lastMessage.headerFiles);
     writeString(buffer, lastMessage.output);
     writeString(buffer, lastMessage.errorOutput);
-    writeVectorOfStrings(buffer, lastMessage.outputFilePaths);
     writeString(buffer, lastMessage.logicalName);
     write(buffer);
 }
 
-void IPCManagerCompiler::sendBTCLastMessage(const CTBLastMessage &lastMessage, const string &bmiFile)
+void IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage, const string &bmiFile,
+                                            const string &filePath)
 {
-    const HANDLE hFile = CreateFile(lastMessage.outputFilePaths[0].c_str(), GENERIC_READ | GENERIC_WRITE,
+    const HANDLE hFile = CreateFile(filePath.c_str(), GENERIC_READ | GENERIC_WRITE,
                                     0, // no sharing during setup
                                     nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (hFile == INVALID_HANDLE_VALUE)
@@ -86,8 +85,8 @@ void IPCManagerCompiler::sendBTCLastMessage(const CTBLastMessage &lastMessage, c
     LARGE_INTEGER fileSize;
     fileSize.QuadPart = bmiFile.size();
     // 3) Create a RW mapping of that file:
-    const HANDLE hMap = CreateFileMapping(hFile, nullptr, PAGE_READWRITE, fileSize.HighPart, fileSize.LowPart,
-                                          lastMessage.outputFilePaths[0].c_str());
+    const HANDLE hMap =
+        CreateFileMapping(hFile, nullptr, PAGE_READWRITE, fileSize.HighPart, fileSize.LowPart, filePath.c_str());
     if (!hMap)
     {
         CloseHandle(hFile);
@@ -111,7 +110,7 @@ void IPCManagerCompiler::sendBTCLastMessage(const CTBLastMessage &lastMessage, c
 
     CloseHandle(hFile);
 
-    sendBTCLastMessage(lastMessage);
+    sendCTBLastMessage(lastMessage);
     if (lastMessage.exitStatus == EXIT_SUCCESS)
     {
         receiveMessage<BTCLastMessage>();

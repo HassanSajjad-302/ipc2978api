@@ -46,22 +46,39 @@ vector<char> Manager::getBufferWithType(CTB type)
     return buffer;
 }
 
+void Manager::writeUInt32(vector<char> &buffer, const uint32_t value)
+{
+    const auto ptr = reinterpret_cast<const char *>(&value);
+    buffer.insert(buffer.end(), ptr, ptr + sizeof(value));
+}
+
 void Manager::writeString(vector<char> &buffer, const string &str)
 {
-    const uint32_t size = str.size();
-    const auto ptr = reinterpret_cast<const char *>(&size);
-    buffer.insert(buffer.end(), ptr, ptr + sizeof(size));
+    writeUInt32(buffer, str.size());
     buffer.insert(buffer.end(), str.begin(), str.end()); // Insert all characters
+}
+
+void Manager::writeMemoryMappedBMIFile(vector<char> &buffer, const MemoryMappedBMIFile &file)
+{
+    writeUInt32(buffer, file.fileSize);
+    writeUInt32(buffer, file.fileSize);
 }
 
 void Manager::writeVectorOfStrings(vector<char> &buffer, const vector<string> &strs)
 {
-    const uint32_t size = strs.size();
-    const auto ptr = reinterpret_cast<const char *>(&size);
-    buffer.insert(buffer.end(), ptr, ptr + sizeof(size));
+    writeUInt32(buffer, strs.size());
     for (const string &str : strs)
     {
         writeString(buffer, str);
+    }
+}
+
+void Manager::writeVectorOfMemoryMappedBMIFiles(vector<char> &buffer, const vector<MemoryMappedBMIFile> &files)
+{
+    writeUInt32(buffer, files.size());
+    for (const MemoryMappedBMIFile &file : files)
+    {
+        writeMemoryMappedBMIFile(buffer, file);
     }
 }
 
@@ -72,20 +89,34 @@ bool Manager::readBoolFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead, 
     return result;
 }
 
+uint32_t Manager::readUInt32FromPipe(char (&buffer)[4096], uint32_t &bytesRead, uint32_t &bytesProcessed) const
+{
+    uint32_t size;
+    readNumberOfBytes(reinterpret_cast<char *>(&size), 4, buffer, bytesRead, bytesProcessed);
+    return size;
+}
+
 string Manager::readStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead, uint32_t &bytesProcessed) const
 {
-    uint32_t stringSize;
-    readNumberOfBytes(reinterpret_cast<char *>(&stringSize), sizeof(stringSize), buffer, bytesRead, bytesProcessed);
+    const uint32_t stringSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
     string str(stringSize, 'a');
     readNumberOfBytes(str.data(), stringSize, buffer, bytesRead, bytesProcessed);
     return str;
 }
 
+MemoryMappedBMIFile Manager::readMemoryMappedBMIFileFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
+                                                             uint32_t &bytesProcessed) const
+{
+    MemoryMappedBMIFile file;
+    file.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+    file.fileSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
+    return file;
+}
+
 vector<string> Manager::readVectorOfStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                                                    uint32_t &bytesProcessed) const
 {
-    uint32_t vectorSize;
-    readNumberOfBytes(reinterpret_cast<char *>(&vectorSize), sizeof(vectorSize), buffer, bytesRead, bytesProcessed);
+    const uint32_t vectorSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
     vector<string> vec;
     vec.reserve(vectorSize);
     for (uint32_t i = 0; i < vectorSize; ++i)
@@ -95,16 +126,15 @@ vector<string> Manager::readVectorOfStringFromPipe(char (&buffer)[BUFFERSIZE], u
     return vec;
 }
 
-vector<string> Manager::readVectorOfMaybeMappedFileFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
-                                                            uint32_t &bytesProcessed) const
+vector<MemoryMappedBMIFile> Manager::readVectorOfMemoryMappedBMIFilesFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
+                                                                              uint32_t &bytesProcessed) const
 {
-    uint32_t vectorSize;
-    readNumberOfBytes(reinterpret_cast<char *>(&vectorSize), sizeof(vectorSize), buffer, bytesRead, bytesProcessed);
-    vector<string> vec;
+    const uint32_t vectorSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
+    vector<MemoryMappedBMIFile> vec;
     vec.reserve(vectorSize);
     for (uint32_t i = 0; i < vectorSize; ++i)
     {
-        vec.emplace_back(readStringFromPipe(buffer, bytesRead, bytesProcessed));
+        vec.emplace_back(readMemoryMappedBMIFileFromPipe(buffer, bytesRead, bytesProcessed));
     }
     return vec;
 }
@@ -135,4 +165,3 @@ void Manager::readNumberOfBytes(char *output, const uint32_t size, char (&buffer
         read(buffer, bytesRead);
     }
 }
-

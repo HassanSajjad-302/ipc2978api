@@ -11,7 +11,7 @@ using std::string, std::vector;
 
 // string is 4 bytes that hold the size of the char array, followed by the array.
 // vector is 4 bytes that hold the size of the array, followed by the array.
-// All fields are to be sent, even if unused/empty.
+// All fields are sent in declaration order, even if meaningless.
 
 // Compiler to Build System
 // This is the first byte of the compiler to build-system message.
@@ -43,21 +43,22 @@ struct CTBLastMessage
 {
     // Whether the compilation succeeded or failed.
     bool exitStatus = false;
-    // Following fields are sent but are empty
-    // if the compilation failed.
-    // True if the file compiled is a module interface unit.
-    bool hasLogicalName = false;
+    // Following fields are meaningless if the compilation failed.
     // header-includes discovered during compilation.
     vector<string> headerFiles;
     // compiler output
     string output;
     // compiler error output.
-    // Any IPC related error output should be on stderr.
+    // Any IPC related error output should be reported on stderr.
     string errorOutput;
-    // output files
-    vector<string> outputFilePaths;
-    // exported module name
+    // exported module name if any.
     string logicalName;
+    // This is communicated because the receiving process has no
+    // way to learn the shared memory file size on both Windows
+    // and Linux without making a filesystem call.
+    // Meaningless if the file compiled is not a module interface unit
+    // or a header-unit.
+    uint32_t fileSize = UINT32_MAX;
 };
 
 // Build System to Compiler
@@ -70,10 +71,17 @@ enum class BTC : uint8_t
     LAST_MESSAGE = 2,
 };
 
+struct MemoryMappedBMIFile
+{
+    string filePath;
+    uint32_t fileSize = UINT32_MAX;
+};
+
 // Reply for CTBModule
 struct BTCModule
 {
-    string filePath;
+    MemoryMappedBMIFile requested;
+    vector<MemoryMappedBMIFile> deps;
 };
 
 // Reply for CTBNonModule
@@ -82,6 +90,9 @@ struct BTCNonModule
     bool found = false;
     bool isHeaderUnit = false;
     string filePath;
+    // if isHeaderUnit == true, fileSize of the requested file
+    uint32_t fileSize;
+    vector<MemoryMappedBMIFile> deps;
 };
 
 // Reply for CTBLastMessage if the compilation succeeded.

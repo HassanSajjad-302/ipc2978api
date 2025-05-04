@@ -21,9 +21,9 @@ class IPCManagerCompiler : public Manager
     explicit IPCManagerCompiler(const string &objFilePath);
     BTCModule receiveBTCModule(const CTBModule &moduleName);
     BTCNonModule receiveBTCNonModule(const CTBNonModule &nonModule);
-    void sendBTCLastMessage(const CTBLastMessage &lastMessage);
+    void sendCTBLastMessage(const CTBLastMessage &lastMessage);
     // The BMI file-path should be the first in the outputs in CTBLastMessage::outputFilePaths
-    void sendBTCLastMessage(const CTBLastMessage &lastMessage, const string &bmiFile);
+    void sendCTBLastMessage(const CTBLastMessage &lastMessage, const string &bmiFile, const string &filePath);
 };
 
 template <typename T> T IPCManagerCompiler::receiveMessage() const
@@ -39,7 +39,8 @@ template <typename T> T IPCManagerCompiler::receiveMessage() const
     if constexpr (std::is_same_v<T, BTCModule>)
     {
         BTCModule moduleFile;
-        moduleFile.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        moduleFile.requested = readMemoryMappedBMIFileFromPipe(buffer, bytesRead, bytesProcessed);
+        moduleFile.deps = readVectorOfMemoryMappedBMIFilesFromPipe(buffer, bytesRead, bytesProcessed);
         if (bytesRead == bytesProcessed)
         {
             return moduleFile;
@@ -52,6 +53,8 @@ template <typename T> T IPCManagerCompiler::receiveMessage() const
         nonModule.found = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
         nonModule.isHeaderUnit = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
         nonModule.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        nonModule.fileSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
+        nonModule.deps = readVectorOfMemoryMappedBMIFilesFromPipe(buffer, bytesRead, bytesProcessed);
         if (bytesRead == bytesProcessed)
         {
             return nonModule;

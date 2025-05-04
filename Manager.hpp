@@ -17,15 +17,22 @@ class Manager
     void write(const vector<char> &buffer) const;
 
     static vector<char> getBufferWithType(CTB type);
+    static void writeUInt32(vector<char> &buffer, uint32_t value);
     static void writeString(vector<char> &buffer, const string &str);
+    static void writeMemoryMappedBMIFile(vector<char> &buffer, const MemoryMappedBMIFile &file);
     static void writeVectorOfStrings(vector<char> &buffer, const vector<string> &strs);
+    static void writeVectorOfMemoryMappedBMIFiles(vector<char> &buffer, const vector<MemoryMappedBMIFile> &files);
 
     bool readBoolFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead, uint32_t &bytesProcessed) const;
+    uint32_t readUInt32FromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead, uint32_t &bytesProcessed) const;
     string readStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead, uint32_t &bytesProcessed) const;
+    MemoryMappedBMIFile readMemoryMappedBMIFileFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
+                                                        uint32_t &bytesProcessed) const;
     vector<string> readVectorOfStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                                               uint32_t &bytesProcessed) const;
-    vector<string> readVectorOfMaybeMappedFileFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
-                                                       uint32_t &bytesProcessed) const;
+    vector<MemoryMappedBMIFile> readVectorOfMemoryMappedBMIFilesFromPipe(char (&buffer)[BUFFERSIZE],
+                                                                         uint32_t &bytesRead,
+                                                                         uint32_t &bytesProcessed) const;
     void readNumberOfBytes(char *output, uint32_t size, char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                            uint32_t &bytesProcessed) const;
 };

@@ -91,15 +91,13 @@ void IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType)
 
         messageType = CTB::LAST_MESSAGE;
 
-        auto &[exitStatus, hasLogicalName, headerFiles, output, errorOutput, outputFilePaths, logicalName] =
+        auto &[exitStatus, headerFiles, output, errorOutput, logicalName, fileSize] =
             getInitializedObjectFromBuffer<CTBLastMessage>(ctbBuffer);
 
         exitStatus = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
-        hasLogicalName = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
         headerFiles = readVectorOfStringFromPipe(buffer, bytesRead, bytesProcessed);
         output = readStringFromPipe(buffer, bytesRead, bytesProcessed);
         errorOutput = readStringFromPipe(buffer, bytesRead, bytesProcessed);
-        outputFilePaths = readVectorOfMaybeMappedFileFromPipe(buffer, bytesRead, bytesProcessed);
         logicalName = readStringFromPipe(buffer, bytesRead, bytesProcessed);
     }
     break;
@@ -118,7 +116,8 @@ void IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType)
 void IPCManagerBS::sendMessage(const BTCModule &moduleFile) const
 {
     vector<char> buffer;
-    writeString(buffer, moduleFile.filePath);
+    writeMemoryMappedBMIFile(buffer, moduleFile.requested);
+    writeVectorOfMemoryMappedBMIFiles(buffer, moduleFile.deps);
     write(buffer);
 }
 
@@ -128,6 +127,8 @@ void IPCManagerBS::sendMessage(const BTCNonModule &nonModule) const
     buffer.emplace_back(nonModule.found);
     buffer.emplace_back(nonModule.isHeaderUnit);
     writeString(buffer, nonModule.filePath);
+    writeUInt32(buffer, nonModule.fileSize);
+    writeVectorOfMemoryMappedBMIFiles(buffer, nonModule.deps);
     write(buffer);
 }
 
