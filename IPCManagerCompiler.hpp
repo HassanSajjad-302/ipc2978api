@@ -11,17 +11,19 @@ using std::print;
 class IPCManagerCompiler : public Manager
 {
     string pipeName;
-    BTC expectedMessageType;
     bool connectedToBuildSystem = false;
 
     void connectToBuildSystem();
 
+    template <typename T> T receiveMessage() const;
+
   public:
     explicit IPCManagerCompiler(const string &objFilePath);
-    template <typename T> T receiveMessage() const;
-    void sendMessage(const CTBModule &moduleName);
-    void sendMessage(const CTBNonModule &nonModule);
-    void sendMessage(const CTBLastMessage &lastMessage);
+    BTCModule receiveBTCModule(const CTBModule &moduleName);
+    BTCNonModule receiveBTCNonModule(const CTBNonModule &nonModule);
+    void sendBTCLastMessage(const CTBLastMessage &lastMessage);
+    // The BMI file-path should be the first in the outputs in CTBLastMessage::outputFilePaths
+    void sendBTCLastMessage(const CTBLastMessage &lastMessage, const string &bmiFile);
 };
 
 template <typename T> T IPCManagerCompiler::receiveMessage() const
@@ -33,73 +35,45 @@ template <typename T> T IPCManagerCompiler::receiveMessage() const
 
     uint32_t bytesProcessed = 0;
 
-    bool incompatibleMessage = false;
     bool bytesEqual = true;
     if constexpr (std::is_same_v<T, BTCModule>)
     {
-        if (expectedMessageType == BTC::MODULE)
+        BTCModule moduleFile;
+        moduleFile.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        if (bytesRead == bytesProcessed)
         {
-            BTCModule moduleFile;
-            moduleFile.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
-            if (bytesRead == bytesProcessed)
-            {
-                return moduleFile;
-            }
-            bytesEqual = false;
+            return moduleFile;
         }
-        else
-        {
-            incompatibleMessage = true;
-        }
+        bytesEqual = false;
     }
     else if constexpr (std::is_same_v<T, BTCNonModule>)
     {
-        if (expectedMessageType == BTC::NON_MODULE)
+        BTCNonModule nonModule;
+        nonModule.found = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
+        nonModule.isHeaderUnit = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
+        nonModule.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        if (bytesRead == bytesProcessed)
         {
-            BTCNonModule nonModule;
-            nonModule.found = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
-            nonModule.isHeaderUnit = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
-            nonModule.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
-            if (bytesRead == bytesProcessed)
-            {
-                return nonModule;
-            }
-            bytesEqual = false;
+            return nonModule;
         }
-        else
-        {
-            incompatibleMessage = true;
-        }
+        bytesEqual = false;
     }
     else if constexpr (std::is_same_v<T, BTCLastMessage>)
     {
-        if (expectedMessageType == BTC::LAST_MESSAGE)
+        bytesProcessed = 1;
+        if (buffer[0] != UINT32_MAX)
         {
-            bytesProcessed = 1;
-            if (buffer[0] != UINT32_MAX)
+            print("Incorrect Last Message Received\n");
+            if (bytesRead == bytesProcessed)
             {
-                print("Incorrect Last Message Received\n");
-                if (bytesRead == bytesProcessed)
-                {
-                    return BTCLastMessage{};
-                }
-                bytesEqual = false;
+                return BTCLastMessage{};
             }
-        }
-        else
-        {
-            incompatibleMessage = true;
+            bytesEqual = false;
         }
     }
     else
     {
         static_assert(false && "Unknown type\n");
-    }
-
-    if (incompatibleMessage)
-    {
-        print("Receiving incompatible response compared to the sent message. Compatible Response {}.",
-              static_cast<uint8_t>(expectedMessageType));
     }
 
     if (!bytesEqual)

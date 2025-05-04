@@ -4,8 +4,7 @@ project(named_pipes)
 set(CMAKE_CXX_STANDARD 26)
 
 add_library(BuildSystem IPCManagerBS.cpp
-        Manager.cpp
-        Testing.cpp)
+        Manager.cpp)
 
 add_library(Compiler IPCManagerCompiler.cpp
         Manager.cpp)

@@ -137,3 +137,30 @@ void IPCManagerBS::sendMessage(const BTCLastMessage &) const
     buffer.emplace_back(UINT32_MAX);
     write(buffer);
 }
+
+void IPCManagerBS::createBMIFileSharing(const string &filePath)
+{
+    const HANDLE hMap = OpenFileMapping(FILE_MAP_READ, FALSE, filePath.c_str());
+    if (!hMap)
+    {
+        return nullptr;
+    }
+
+    // 2) Map the entire file into memory:
+    void *p = MapViewOfFile(hMap, FILE_MAP_READ, 0, 0, 0);
+    if (!p)
+    {
+        CloseHandle(hMap);
+        return nullptr;
+    }
+
+    // 3) Find out the size (optional; you must track size yourself or embed it):
+    //    For simplicity, assume you already know the size, or store it:
+    //    *outSize = ...;
+
+    // 4) When done:
+    //    UnmapViewOfFile(p);
+    //    CloseHandle(hMap);
+
+    return p;
+}

@@ -41,27 +41,28 @@ void IPCManagerCompiler::connectToBuildSystem()
     connectedToBuildSystem = true;
 }
 
-void IPCManagerCompiler::sendMessage(const CTBModule &moduleName)
+BTCModule IPCManagerCompiler::receiveBTCModule(const CTBModule &moduleName)
 {
     connectToBuildSystem();
     vector<char> buffer = getBufferWithType(CTB::MODULE);
     writeString(buffer, moduleName.moduleName);
     write(buffer);
-    expectedMessageType = BTC::MODULE;
+    return receiveMessage<BTCModule>();
 }
 
-void IPCManagerCompiler::sendMessage(const CTBNonModule &nonModule)
+BTCNonModule IPCManagerCompiler::receiveBTCNonModule(const CTBNonModule &nonModule)
 {
     connectToBuildSystem();
     vector<char> buffer = getBufferWithType(CTB::NON_MODULE);
     buffer.emplace_back(nonModule.isHeaderUnit);
     writeString(buffer, nonModule.str);
     write(buffer);
-    expectedMessageType = BTC::NON_MODULE;
+    return receiveMessage<BTCNonModule>();
 }
 
-void IPCManagerCompiler::sendMessage(const CTBLastMessage &lastMessage)
+void IPCManagerCompiler::sendBTCLastMessage(const CTBLastMessage &lastMessage)
 {
+    connectToBuildSystem();
     vector<char> buffer = getBufferWithType(CTB::LAST_MESSAGE);
     buffer.emplace_back(lastMessage.exitStatus);
     buffer.emplace_back(lastMessage.hasLogicalName);
@@ -71,5 +72,50 @@ void IPCManagerCompiler::sendMessage(const CTBLastMessage &lastMessage)
     writeVectorOfStrings(buffer, lastMessage.outputFilePaths);
     writeString(buffer, lastMessage.logicalName);
     write(buffer);
-    expectedMessageType = BTC::LAST_MESSAGE;
+}
+
+void IPCManagerCompiler::sendBTCLastMessage(const CTBLastMessage &lastMessage, const string &bmiFile)
+{
+    const HANDLE hFile = CreateFile(lastMessage.outputFilePaths[0].c_str(), GENERIC_READ | GENERIC_WRITE,
+                                    0, // no sharing during setup
+                                    nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile == INVALID_HANDLE_VALUE)
+    {
+    }
+
+    LARGE_INTEGER fileSize;
+    fileSize.QuadPart = bmiFile.size();
+    // 3) Create a RW mapping of that file:
+    const HANDLE hMap = CreateFileMapping(hFile, nullptr, PAGE_READWRITE, fileSize.HighPart, fileSize.LowPart,
+                                          lastMessage.outputFilePaths[0].c_str());
+    if (!hMap)
+    {
+        CloseHandle(hFile);
+    }
+
+    void *pView = MapViewOfFile(hMap, FILE_MAP_WRITE, 0, 0, bmiFile.size());
+    if (!pView)
+    {
+        CloseHandle(hMap);
+        CloseHandle(hFile);
+    }
+
+    memcpy(pView, bmiFile.c_str(), bmiFile.size());
+
+    if (!FlushViewOfFile(pView, bmiFile.size()))
+    {
+        // even if flush fails, we’ll still tear down handles
+    }
+
+    UnmapViewOfFile(pView);
+
+    CloseHandle(hFile);
+
+    sendBTCLastMessage(lastMessage);
+    if (lastMessage.exitStatus == EXIT_SUCCESS)
+    {
+        receiveMessage<BTCLastMessage>();
+    }
+
+    CloseHandle(hMap);
 }

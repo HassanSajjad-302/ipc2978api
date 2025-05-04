@@ -135,3 +135,4 @@ void Manager::readNumberOfBytes(char *output, const uint32_t size, char (&buffer
         read(buffer, bytesRead);
     }
 }
+
