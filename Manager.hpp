@@ -30,7 +30,6 @@ class Manager
                            uint32_t &bytesProcessed) const;
 };
 
-
 template <typename T> T &getInitializedObjectFromBuffer(char (&buffer)[320])
 {
     T &t = reinterpret_cast<T &>(buffer);
