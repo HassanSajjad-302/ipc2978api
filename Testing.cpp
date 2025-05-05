@@ -56,7 +56,6 @@ void printMessage(const CTBLastMessage &lastMessage, const bool sent)
     print("ExitStatus: {}\n\n", lastMessage.exitStatus);
     if (lastMessage.exitStatus)
     {
-        print("HasLogicalName: {}\n\n", lastMessage.hasLogicalName);
         print("HeaderFiles Size: {}\n\n", lastMessage.headerFiles.size());
         for (uint32_t i = 0; i < lastMessage.headerFiles.size(); i++)
         {
@@ -64,15 +63,8 @@ void printMessage(const CTBLastMessage &lastMessage, const bool sent)
         }
         print("Output: {}\n\n", lastMessage.output);
         print("ErrorOutput: {}\n\n", lastMessage.errorOutput);
-        print("OutputFilePaths Size: {}\n\n", lastMessage.outputFilePaths.size());
-        for (uint32_t i = 0; i < lastMessage.outputFilePaths.size(); i++)
-        {
-            print("OutputFilePaths[{}]: {}\n\n", i, lastMessage.outputFilePaths[i]);
-        }
-        if (lastMessage.hasLogicalName)
-        {
-            print("LogicalName: {}\n\n", lastMessage.hasLogicalName);
-        }
+        print("LogicalName: {}\n\n", lastMessage.logicalName);
+        print("FileSize: {}\n\n", lastMessage.fileSize);
     }
 }
 
@@ -80,7 +72,15 @@ void printMessage(const BTCModule &btcModule, const bool sent)
 {
     printSendingOrReceiving(sent);
     print("BTCModule\n\n");
-    print("Module filepath: {}\n\n", btcModule.filePath);
+
+    print("Requested FilePath: {}\n\n", btcModule.requested.filePath);
+    print("Requested FileSize: {}\n\n", btcModule.requested.fileSize);
+    print("Deps Size: {}\n\n", btcModule.deps.size());
+    for (uint32_t i = 0; i < btcModule.deps.size(); i++)
+    {
+        print("Deps[{}] FilePath: {}\n\n", i, btcModule.deps[i].filePath);
+        print("Deps[{}] FileSize: {}\n\n", i, btcModule.deps[i].fileSize);
+    }
 }
 
 void printMessage(const BTCNonModule &nonModule, const bool sent)
@@ -90,6 +90,12 @@ void printMessage(const BTCNonModule &nonModule, const bool sent)
     print("Found {}\n\n", nonModule.found);
     print("IsHeaderUnit {}\n\n", nonModule.isHeaderUnit);
     print("FilePath {}\n\n", nonModule.filePath);
+    print("FileSize {}\n\n", nonModule.fileSize);
+    for (uint32_t i = 0; i < nonModule.deps.size(); i++)
+    {
+        print("Deps[{}] FilePath: {}\n\n", i, nonModule.deps[i].filePath);
+        print("Deps[{}] FileSize: {}\n\n", i, nonModule.deps[i].fileSize);
+    }
 }
 
 void printMessage(const BTCLastMessage &lastMessage, const bool sent)

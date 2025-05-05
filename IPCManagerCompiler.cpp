@@ -11,6 +11,24 @@
 
 using std::string, std::print;
 
+void IPCManagerCompiler::receiveBTCLastMessage() const
+{
+    char buffer[BUFFERSIZE];
+    uint32_t bytesRead;
+    read(buffer, bytesRead);
+
+    uint32_t bytesProcessed = 0;
+    bytesProcessed = 1;
+    if (buffer[0] != false)
+    {
+        print("Incorrect Last Message Received\n");
+        if (bytesRead != bytesProcessed)
+        {
+            print("BytesRead {} not equal to BytesProcessed {} in receiveMessage.\n", bytesRead, bytesProcessed);
+        }
+    }
+}
+
 IPCManagerCompiler::IPCManagerCompiler(const string &objFilePath) : pipeName(R"(\\.\pipe\)" + objFilePath)
 {
 }
@@ -113,7 +131,7 @@ void IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage, c
     sendCTBLastMessage(lastMessage);
     if (lastMessage.exitStatus == EXIT_SUCCESS)
     {
-        receiveMessage<BTCLastMessage>();
+        receiveBTCLastMessage();
     }
 
     CloseHandle(hMap);

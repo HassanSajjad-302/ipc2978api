@@ -16,6 +16,8 @@ class IPCManagerCompiler : public Manager
     void connectToBuildSystem();
 
     template <typename T> T receiveMessage() const;
+    // This is not exposed. sendCTBLastMessage calls this.
+    void receiveBTCLastMessage() const;
 
   public:
     explicit IPCManagerCompiler(const string &objFilePath);
@@ -60,19 +62,6 @@ template <typename T> T IPCManagerCompiler::receiveMessage() const
             return nonModule;
         }
         bytesEqual = false;
-    }
-    else if constexpr (std::is_same_v<T, BTCLastMessage>)
-    {
-        bytesProcessed = 1;
-        if (buffer[0] != UINT32_MAX)
-        {
-            print("Incorrect Last Message Received\n");
-            if (bytesRead == bytesProcessed)
-            {
-                return BTCLastMessage{};
-            }
-            bytesEqual = false;
-        }
     }
     else
     {

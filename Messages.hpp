@@ -90,7 +90,8 @@ struct BTCNonModule
     bool found = false;
     bool isHeaderUnit = false;
     string filePath;
-    // if isHeaderUnit == true, fileSize of the requested file
+    // if isHeaderUnit == true, fileSize of the requested file.
+    // if isHeaderUnit == false, following two are meaning-less.
     uint32_t fileSize;
     vector<MemoryMappedBMIFile> deps;
 };

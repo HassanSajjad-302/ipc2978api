@@ -99,6 +99,7 @@ void IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType)
         output = readStringFromPipe(buffer, bytesRead, bytesProcessed);
         errorOutput = readStringFromPipe(buffer, bytesRead, bytesProcessed);
         logicalName = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        fileSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
     }
     break;
 
@@ -135,7 +136,7 @@ void IPCManagerBS::sendMessage(const BTCNonModule &nonModule) const
 void IPCManagerBS::sendMessage(const BTCLastMessage &) const
 {
     vector<char> buffer;
-    buffer.emplace_back(UINT32_MAX);
+    buffer.emplace_back(false);
     write(buffer);
 }
 
