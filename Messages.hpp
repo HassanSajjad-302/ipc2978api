@@ -55,7 +55,7 @@ struct CTBLastMessage
     string logicalName;
     // This is communicated because the receiving process has no
     // way to learn the shared memory file size on both Windows
-    // and Linux without making a filesystem call.
+    // and Linux without a filesystem call.
     // Meaningless if the file compiled is not a module interface unit
     // or a header-unit.
     uint32_t fileSize = UINT32_MAX;
@@ -71,7 +71,7 @@ enum class BTC : uint8_t
     LAST_MESSAGE = 2,
 };
 
-struct MemoryMappedBMIFile
+struct BMIFile
 {
     string filePath;
     uint32_t fileSize = UINT32_MAX;
@@ -80,8 +80,9 @@ struct MemoryMappedBMIFile
 // Reply for CTBModule
 struct BTCModule
 {
-    MemoryMappedBMIFile requested;
-    vector<MemoryMappedBMIFile> deps;
+    BMIFile requested;
+    // duplicates not allowed.
+    vector<BMIFile> deps;
 };
 
 // Reply for CTBNonModule
@@ -93,7 +94,7 @@ struct BTCNonModule
     // if isHeaderUnit == true, fileSize of the requested file.
     // if isHeaderUnit == false, following two are meaning-less.
     uint32_t fileSize;
-    vector<MemoryMappedBMIFile> deps;
+    vector<BMIFile> deps;
 };
 
 // Reply for CTBLastMessage if the compilation succeeded.

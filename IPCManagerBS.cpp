@@ -140,29 +140,18 @@ void IPCManagerBS::sendMessage(const BTCLastMessage &) const
     write(buffer);
 }
 
-void IPCManagerBS::createBMIFileSharing(const string &filePath)
+void* IPCManagerBS::createSharedMemoryBMIFile(const string &bmiFilePath)
 {
-    const HANDLE hMap = OpenFileMapping(FILE_MAP_READ, FALSE, filePath.c_str());
-    if (!hMap)
+    // 1) Open the existing file‐mapping object (must have been created by another process)
+    const HANDLE mapping = OpenFileMapping(FILE_MAP_READ,       // read‐only access
+                                     FALSE,               // do not inherit handle
+                                     bmiFilePath.data() // name of mapping
+    );
+
+    if (mapping == nullptr)
     {
-        return nullptr;
+        print("Could not open file mapping of file {}.\n", bmiFilePath);
     }
 
-    // 2) Map the entire file into memory:
-    void *p = MapViewOfFile(hMap, FILE_MAP_READ, 0, 0, 0);
-    if (!p)
-    {
-        CloseHandle(hMap);
-        return nullptr;
-    }
-
-    // 3) Find out the size (optional; you must track size yourself or embed it):
-    //    For simplicity, assume you already know the size, or store it:
-    //    *outSize = ...;
-
-    // 4) When done:
-    //    UnmapViewOfFile(p);
-    //    CloseHandle(hMap);
-
-    return p;
+    return mapping;
 }

@@ -5,17 +5,24 @@
 #include "Manager.hpp"
 #include <print>
 
-using std::print;
+using std::print, std::string_view;
+
+struct MemoryMappedBMIFile
+{
+    void *mapping;
+    void *view;
+};
 
 // IPC Manager BuildSystem
 class IPCManagerCompiler : public Manager
 {
     string pipeName;
+    vector<MemoryMappedBMIFile> memoryMappedBMIFiles;
     bool connectedToBuildSystem = false;
 
     void connectToBuildSystem();
 
-    template <typename T> T receiveMessage() const;
+    template <typename T> T receiveMessage();
     // This is not exposed. sendCTBLastMessage calls this.
     void receiveBTCLastMessage() const;
 
@@ -26,9 +33,10 @@ class IPCManagerCompiler : public Manager
     void sendCTBLastMessage(const CTBLastMessage &lastMessage);
     // The BMI file-path should be the first in the outputs in CTBLastMessage::outputFilePaths
     void sendCTBLastMessage(const CTBLastMessage &lastMessage, const string &bmiFile, const string &filePath);
+    string_view readSharedMemoryBMIFile(const BMIFile &file);
 };
 
-template <typename T> T IPCManagerCompiler::receiveMessage() const
+template <typename T> T IPCManagerCompiler::receiveMessage()
 {
     // Read from the pipe.
     char buffer[BUFFERSIZE];
@@ -45,6 +53,7 @@ template <typename T> T IPCManagerCompiler::receiveMessage() const
         moduleFile.deps = readVectorOfMemoryMappedBMIFilesFromPipe(buffer, bytesRead, bytesProcessed);
         if (bytesRead == bytesProcessed)
         {
+            memoryMappedBMIFiles.reserve(memoryMappedBMIFiles.size() + 1 + moduleFile.deps.size());
             return moduleFile;
         }
         bytesEqual = false;
@@ -59,6 +68,10 @@ template <typename T> T IPCManagerCompiler::receiveMessage() const
         nonModule.deps = readVectorOfMemoryMappedBMIFilesFromPipe(buffer, bytesRead, bytesProcessed);
         if (bytesRead == bytesProcessed)
         {
+            if (nonModule.fileSize != UINT32_MAX)
+            {
+                memoryMappedBMIFiles.reserve(memoryMappedBMIFiles.size() + 1 + nonModule.deps.size());
+            }
             return nonModule;
         }
         bytesEqual = false;

@@ -19,6 +19,6 @@ class IPCManagerBS : public Manager
     void sendMessage(const BTCModule &moduleFile) const;
     void sendMessage(const BTCNonModule &nonModule) const;
     void sendMessage(const BTCLastMessage &lastMessage) const;
-    static void createBMIFileSharing(const string &filePath);
+    static void* createSharedMemoryBMIFile(const string &bmiFilePath);
 };
 #endif // IPC_MANAGER_BS_HPP

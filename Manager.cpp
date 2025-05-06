@@ -58,7 +58,7 @@ void Manager::writeString(vector<char> &buffer, const string &str)
     buffer.insert(buffer.end(), str.begin(), str.end()); // Insert all characters
 }
 
-void Manager::writeMemoryMappedBMIFile(vector<char> &buffer, const MemoryMappedBMIFile &file)
+void Manager::writeMemoryMappedBMIFile(vector<char> &buffer, const BMIFile &file)
 {
     writeUInt32(buffer, file.fileSize);
     writeUInt32(buffer, file.fileSize);
@@ -73,10 +73,10 @@ void Manager::writeVectorOfStrings(vector<char> &buffer, const vector<string> &s
     }
 }
 
-void Manager::writeVectorOfMemoryMappedBMIFiles(vector<char> &buffer, const vector<MemoryMappedBMIFile> &files)
+void Manager::writeVectorOfMemoryMappedBMIFiles(vector<char> &buffer, const vector<BMIFile> &files)
 {
     writeUInt32(buffer, files.size());
-    for (const MemoryMappedBMIFile &file : files)
+    for (const BMIFile &file : files)
     {
         writeMemoryMappedBMIFile(buffer, file);
     }
@@ -104,10 +104,10 @@ string Manager::readStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRe
     return str;
 }
 
-MemoryMappedBMIFile Manager::readMemoryMappedBMIFileFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
+BMIFile Manager::readMemoryMappedBMIFileFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
                                                              uint32_t &bytesProcessed) const
 {
-    MemoryMappedBMIFile file;
+    BMIFile file;
     file.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
     file.fileSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
     return file;
@@ -126,11 +126,11 @@ vector<string> Manager::readVectorOfStringFromPipe(char (&buffer)[BUFFERSIZE], u
     return vec;
 }
 
-vector<MemoryMappedBMIFile> Manager::readVectorOfMemoryMappedBMIFilesFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
+vector<BMIFile> Manager::readVectorOfMemoryMappedBMIFilesFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
                                                                               uint32_t &bytesProcessed) const
 {
     const uint32_t vectorSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
-    vector<MemoryMappedBMIFile> vec;
+    vector<BMIFile> vec;
     vec.reserve(vectorSize);
     for (uint32_t i = 0; i < vectorSize; ++i)
     {
