@@ -42,8 +42,7 @@ int main()
     printMessage(ctbLastMessage, true);
     print("Received Last Message\n");
 
-    // This tests file sharing. Contents of the both outputs were same. It was ensured process monitor that the
-    // build-system did not made a filesystem call by filtering the executable and bmi.txt
+    // This tests file sharing. Contents of the both outputs should be same.
     CTBLastMessage ctbLastMessage2;
     ctbLastMessage2.exitStatus = EXIT_SUCCESS;
     string fileContent = getRandomString();

@@ -98,6 +98,7 @@ void IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage, c
                                     nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (hFile == INVALID_HANDLE_VALUE)
     {
+        print("Could not create file {}.\n", filePath);
     }
 
     LARGE_INTEGER fileSize;
@@ -108,21 +109,25 @@ void IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage, c
     if (!hMap)
     {
         CloseHandle(hFile);
+        print("Could not create file mapping of the file {}.\n", filePath);
     }
 
     void *pView = MapViewOfFile(hMap, FILE_MAP_WRITE, 0, 0, bmiFile.size());
     if (!pView)
     {
-        CloseHandle(hMap);
         CloseHandle(hFile);
+        CloseHandle(hMap);
+        print("Could not map view for the file mapping of the file {}.\n", filePath);
     }
 
     memcpy(pView, bmiFile.c_str(), bmiFile.size());
 
     if (!FlushViewOfFile(pView, bmiFile.size()))
     {
+        UnmapViewOfFile(pView);
+        CloseHandle(hFile);
+        CloseHandle(hMap);
         print("Could not flush the file mapping of file {}.\n", filePath);
-        // even if flush fails, we’ll still tear down handles
     }
 
     UnmapViewOfFile(pView);
