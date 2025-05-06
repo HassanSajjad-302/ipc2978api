@@ -142,8 +142,8 @@ string_view IPCManagerCompiler::readSharedMemoryBMIFile(const BMIFile &file)
 {
     // 1) Open the existing file‐mapping object (must have been created by another process)
     const HANDLE mapping = OpenFileMapping(FILE_MAP_READ,       // read‐only access
-                                     FALSE,               // do not inherit handle
-                                     file.filePath.data() // name of mapping
+                                           FALSE,               // do not inherit handle
+                                           file.filePath.data() // name of mapping
     );
 
     if (mapping == nullptr)
@@ -153,10 +153,10 @@ string_view IPCManagerCompiler::readSharedMemoryBMIFile(const BMIFile &file)
 
     // 2) Map a view of the file into our address space
     const LPVOID view = MapViewOfFile(mapping,       // handle to mapping object
-                                FILE_MAP_READ, // read‐only view
-                                0,             // file offset high
-                                0,             // file offset low
-                                file.fileSize  // number of bytes to map (0 maps the whole file)
+                                      FILE_MAP_READ, // read‐only view
+                                      0,             // file offset high
+                                      0,             // file offset low
+                                      file.fileSize  // number of bytes to map (0 maps the whole file)
     );
 
     if (view == nullptr)
