@@ -31,7 +31,6 @@ class IPCManagerCompiler : public Manager
     BTCModule receiveBTCModule(const CTBModule &moduleName);
     BTCNonModule receiveBTCNonModule(const CTBNonModule &nonModule);
     void sendCTBLastMessage(const CTBLastMessage &lastMessage);
-    // The BMI file-path should be the first in the outputs in CTBLastMessage::outputFilePaths
     void sendCTBLastMessage(const CTBLastMessage &lastMessage, const string &bmiFile, const string &filePath);
     string_view readSharedMemoryBMIFile(const BMIFile &file);
 };
