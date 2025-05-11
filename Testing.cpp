@@ -87,7 +87,6 @@ void printMessage(const BTCNonModule &nonModule, const bool sent)
 {
     printSendingOrReceiving(sent);
     print("BTCNonModule\n\n");
-    print("Found {}\n\n", nonModule.found);
     print("IsHeaderUnit {}\n\n", nonModule.isHeaderUnit);
     print("FilePath {}\n\n", nonModule.filePath);
     print("FileSize {}\n\n", nonModule.fileSize);

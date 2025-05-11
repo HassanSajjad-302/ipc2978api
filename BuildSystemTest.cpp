@@ -11,10 +11,10 @@ using std::print;
 std::string_view readSharedMemoryBMIFile(const BMIFile &file)
 {
     // 1) Open the existing file‐mapping object (must have been created by another process)
-    const HANDLE mapping = OpenFileMapping(FILE_MAP_READ,       // read‐only access
-                                           FALSE,               // do not inherit handle
+    const HANDLE mapping = OpenFileMapping(FILE_MAP_READ, // read‐only access
+                                           FALSE, // do not inherit handle
                                            file.filePath.data() // name of mapping
-    );
+        );
 
     if (mapping == nullptr)
     {
@@ -22,12 +22,12 @@ std::string_view readSharedMemoryBMIFile(const BMIFile &file)
     }
 
     // 2) Map a view of the file into our address space
-    const LPVOID view = MapViewOfFile(mapping,       // handle to mapping object
+    const LPVOID view = MapViewOfFile(mapping, // handle to mapping object
                                       FILE_MAP_READ, // read‐only view
-                                      0,             // file offset high
-                                      0,             // file offset low
-                                      file.fileSize  // number of bytes to map (0 maps the whole file)
-    );
+                                      0, // file offset high
+                                      0, // file offset low
+                                      file.fileSize // number of bytes to map (0 maps the whole file)
+        );
 
     if (view == nullptr)
     {
@@ -37,6 +37,7 @@ std::string_view readSharedMemoryBMIFile(const BMIFile &file)
 
     return {static_cast<char *>(view), file.fileSize};
 }
+
 int main()
 {
     IPCManagerBS manager("test");
@@ -66,12 +67,8 @@ int main()
             const auto &ctbNonModule = reinterpret_cast<CTBNonModule &>(buffer);
             printMessage(ctbNonModule, false);
             BTCNonModule nonModule;
-            nonModule.found = getRandomBool();
-            if (nonModule.found)
-            {
-                nonModule.isHeaderUnit = getRandomBool();
-                nonModule.filePath = getRandomString();
-            }
+            nonModule.isHeaderUnit = getRandomBool();
+            nonModule.filePath = getRandomString();
             manager.sendMessage(nonModule);
             printMessage(nonModule, true);
         }

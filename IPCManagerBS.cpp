@@ -125,7 +125,6 @@ void IPCManagerBS::sendMessage(const BTCModule &moduleFile) const
 void IPCManagerBS::sendMessage(const BTCNonModule &nonModule) const
 {
     vector<char> buffer;
-    buffer.emplace_back(nonModule.found);
     buffer.emplace_back(nonModule.isHeaderUnit);
     writeString(buffer, nonModule.filePath);
     writeUInt32(buffer, nonModule.fileSize);

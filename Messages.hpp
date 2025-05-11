@@ -1,7 +1,6 @@
 #ifndef MESSAGES_HPP
 #define MESSAGES_HPP
 
-#include "BufferSize.hpp"
 #include <string>
 #include <vector>
 using std::string, std::vector;
@@ -88,7 +87,6 @@ struct BTCModule
 // Reply for CTBNonModule
 struct BTCNonModule
 {
-    bool found = false;
     bool isHeaderUnit = false;
     string filePath;
     // if isHeaderUnit == true, fileSize of the requested file.

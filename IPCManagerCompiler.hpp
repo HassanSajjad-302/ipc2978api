@@ -60,7 +60,6 @@ template <typename T> T IPCManagerCompiler::receiveMessage()
     else if constexpr (std::is_same_v<T, BTCNonModule>)
     {
         BTCNonModule nonModule;
-        nonModule.found = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
         nonModule.isHeaderUnit = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
         nonModule.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
         nonModule.fileSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
