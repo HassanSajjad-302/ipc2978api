@@ -11,6 +11,9 @@
 
 using std::string, std::print;
 
+namespace N2978
+{
+
 void IPCManagerCompiler::receiveBTCLastMessage() const
 {
     char buffer[BUFFERSIZE];
@@ -53,7 +56,7 @@ void IPCManagerCompiler::connectToBuildSystem()
 
     if (hPipe == INVALID_HANDLE_VALUE)
     {
-        print("Could not open pipe {} to build system\n", pipeName);
+        print("Could not open pipe {} to build system\n{}\n", pipeName, GetLastError());
     }
 
     connectedToBuildSystem = true;
@@ -98,7 +101,7 @@ void IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage, c
                                     nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (hFile == INVALID_HANDLE_VALUE)
     {
-        print("Could not create file {}.\n", filePath);
+        print("Could not create file {}.\n{}\n", filePath, GetLastError());
     }
 
     LARGE_INTEGER fileSize;
@@ -109,7 +112,7 @@ void IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage, c
     if (!hMap)
     {
         CloseHandle(hFile);
-        print("Could not create file mapping of the file {}.\n", filePath);
+        print("Could not create file mapping of the file {}.\n{}\n", filePath, GetLastError());
     }
 
     void *pView = MapViewOfFile(hMap, FILE_MAP_WRITE, 0, 0, bmiFile.size());
@@ -117,7 +120,7 @@ void IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage, c
     {
         CloseHandle(hFile);
         CloseHandle(hMap);
-        print("Could not map view for the file mapping of the file {}.\n", filePath);
+        print("Could not map view for the file mapping of the file {}.\n{}\n", filePath, GetLastError());
     }
 
     memcpy(pView, bmiFile.c_str(), bmiFile.size());
@@ -127,7 +130,7 @@ void IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage, c
         UnmapViewOfFile(pView);
         CloseHandle(hFile);
         CloseHandle(hMap);
-        print("Could not flush the file mapping of file {}.\n", filePath);
+        print("Could not flush the file mapping of file {}.\n{}\n", filePath, GetLastError());
     }
 
     UnmapViewOfFile(pView);
@@ -153,7 +156,7 @@ string_view IPCManagerCompiler::readSharedMemoryBMIFile(const BMIFile &file)
 
     if (mapping == nullptr)
     {
-        print("Could not open file mapping of file {}.\n", file.filePath);
+        print("Could not open file mapping of file {}.\n{}\n", file.filePath, GetLastError());
     }
 
     // 2) Map a view of the file into our address space
@@ -173,3 +176,4 @@ string_view IPCManagerCompiler::readSharedMemoryBMIFile(const BMIFile &file)
     memoryMappedBMIFiles.emplace_back(MemoryMappedBMIFile{.mapping = mapping, .view = view});
     return {static_cast<char *>(view), file.fileSize};
 }
+} // namespace N2978

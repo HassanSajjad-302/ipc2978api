@@ -6,6 +6,9 @@
 
 using std::print;
 
+namespace N2978
+{
+
 void Manager::read(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead) const
 {
     const bool success = ReadFile(hPipe,               // pipe handle
@@ -105,7 +108,7 @@ string Manager::readStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRe
 }
 
 BMIFile Manager::readMemoryMappedBMIFileFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
-                                                             uint32_t &bytesProcessed) const
+                                                 uint32_t &bytesProcessed) const
 {
     BMIFile file;
     file.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
@@ -127,7 +130,7 @@ vector<string> Manager::readVectorOfStringFromPipe(char (&buffer)[BUFFERSIZE], u
 }
 
 vector<BMIFile> Manager::readVectorOfMemoryMappedBMIFilesFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
-                                                                              uint32_t &bytesProcessed) const
+                                                                  uint32_t &bytesProcessed) const
 {
     const uint32_t vectorSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
     vector<BMIFile> vec;
@@ -165,3 +168,4 @@ void Manager::readNumberOfBytes(char *output, const uint32_t size, char (&buffer
         read(buffer, bytesRead);
     }
 }
+} // namespace N2978

@@ -8,6 +8,9 @@
 #include <vector>
 using std::string, std::vector;
 
+namespace N2978
+{
+
 class Manager
 {
   public:
@@ -27,12 +30,11 @@ class Manager
     uint32_t readUInt32FromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead, uint32_t &bytesProcessed) const;
     string readStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead, uint32_t &bytesProcessed) const;
     BMIFile readMemoryMappedBMIFileFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
-                                                        uint32_t &bytesProcessed) const;
+                                            uint32_t &bytesProcessed) const;
     vector<string> readVectorOfStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                                               uint32_t &bytesProcessed) const;
-    vector<BMIFile> readVectorOfMemoryMappedBMIFilesFromPipe(char (&buffer)[BUFFERSIZE],
-                                                                         uint32_t &bytesRead,
-                                                                         uint32_t &bytesProcessed) const;
+    vector<BMIFile> readVectorOfMemoryMappedBMIFilesFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
+                                                             uint32_t &bytesProcessed) const;
     void readNumberOfBytes(char *output, uint32_t size, char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                            uint32_t &bytesProcessed) const;
 };
@@ -43,5 +45,5 @@ template <typename T> T &getInitializedObjectFromBuffer(char (&buffer)[320])
     std::construct_at(&t);
     return t;
 }
-
+} // namespace N2978
 #endif // MANAGER_HPP

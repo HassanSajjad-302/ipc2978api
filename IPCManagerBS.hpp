@@ -5,6 +5,9 @@
 #include "Manager.hpp"
 #include "Messages.hpp"
 
+namespace N2978
+{
+
 // IPC Manager BuildSystem
 class IPCManagerBS : public Manager
 {
@@ -19,6 +22,7 @@ class IPCManagerBS : public Manager
     void sendMessage(const BTCModule &moduleFile) const;
     void sendMessage(const BTCNonModule &nonModule) const;
     void sendMessage(const BTCLastMessage &lastMessage) const;
-    static void* createSharedMemoryBMIFile(const string &bmiFilePath);
+    static void *createSharedMemoryBMIFile(const string &bmiFilePath);
 };
+} // namespace N2978
 #endif // IPC_MANAGER_BS_HPP

@@ -6,6 +6,8 @@
 #include <print>
 
 using std::print, std::string_view;
+namespace N2978
+{
 
 struct MemoryMappedBMIFile
 {
@@ -84,5 +86,5 @@ template <typename T> T IPCManagerCompiler::receiveMessage()
         print("BytesRead {} not equal to BytesProcessed {} in receiveMessage.\n", bytesRead, bytesProcessed);
     }
 }
-
+} // namespace N2978
 #endif // IPC_MANAGER_COMPILER_HPP

@@ -5,6 +5,9 @@
 #include <vector>
 using std::string, std::vector;
 
+namespace N2978
+{
+
 // CTB --> Compiler to Build-System
 // BTC --> Build-System to Compiler
 
@@ -99,5 +102,5 @@ struct BTCNonModule
 struct BTCLastMessage
 {
 };
-
+} // namespace N2978
 #endif // MESSAGES_HPP

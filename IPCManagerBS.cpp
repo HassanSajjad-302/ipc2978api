@@ -11,6 +11,9 @@
 
 using std::string, std::print;
 
+namespace N2978
+{
+
 IPCManagerBS::IPCManagerBS(const string &objFilePath) : pipeName(R"(\\.\pipe\)" + objFilePath)
 {
     hPipe = CreateNamedPipe(pipeName.c_str(),                  // pipe name
@@ -105,12 +108,13 @@ void IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType)
 
     default:
 
-        print("Build-System received unknown message type on pipe {}.\n", pipeName);
+        print("Build-System received unknown message type on pipe {}.\n{}\n", pipeName, GetLastError());
     }
 
     if (bytesRead != bytesProcessed)
     {
-        print("BytesRead {} not equal to BytesProcessed {} in receiveMessage.\n", bytesRead, bytesProcessed);
+        print("BytesRead {} not equal to BytesProcessed {} in receiveMessage.\n{}\n", bytesRead, bytesProcessed,
+              GetLastError());
     }
 }
 
@@ -139,18 +143,19 @@ void IPCManagerBS::sendMessage(const BTCLastMessage &) const
     write(buffer);
 }
 
-void* IPCManagerBS::createSharedMemoryBMIFile(const string &bmiFilePath)
+void *IPCManagerBS::createSharedMemoryBMIFile(const string &bmiFilePath)
 {
     // 1) Open the existing file‐mapping object (must have been created by another process)
-    const HANDLE mapping = OpenFileMapping(FILE_MAP_READ,       // read‐only access
-                                     FALSE,               // do not inherit handle
-                                     bmiFilePath.data() // name of mapping
+    const HANDLE mapping = OpenFileMapping(FILE_MAP_READ,     // read‐only access
+                                           FALSE,             // do not inherit handle
+                                           bmiFilePath.data() // name of mapping
     );
 
     if (mapping == nullptr)
     {
-        print("Could not open file mapping of file {}.\n", bmiFilePath);
+        print("Could not open file mapping of file {}.\n{}\n", bmiFilePath, GetLastError());
     }
 
     return mapping;
 }
+} // namespace N2978

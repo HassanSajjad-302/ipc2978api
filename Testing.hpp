@@ -6,6 +6,7 @@
 #include <print>
 #include <random>
 
+using namespace N2978;
 using std::print;
 
 inline std::random_device rd;
