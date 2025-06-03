@@ -3,7 +3,7 @@
 #include "Manager.hpp"
 #include "Messages.hpp"
 
-#include "fmt/printf.h"
+#include "fmt/fmt/printf.h"
 #include <string>
 #include <strsafe.h>
 #include <tchar.h>

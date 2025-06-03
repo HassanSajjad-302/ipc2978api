@@ -1,5 +1,8 @@
 
 #include "Testing.hpp"
+#include "fmt/printf.h"
+
+using fmt::print;
 
 string getRandomString()
 {

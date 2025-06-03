@@ -3,16 +3,15 @@ project(named_pipes)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_library(fmt src/fmt/src/format.cc src/fmt/src/os.cc)
-target_include_directories(fmt PUBLIC src/fmt/include)
+add_library(fmt src/fmt/format.cc src/fmt/os.cc)
 
 add_library(BuildSystem src/IPCManagerBS.cpp
         src/Manager.cpp)
-target_include_directories(BuildSystem PUBLIC include)
+target_include_directories(BuildSystem PUBLIC include src/fmt)
 
 add_library(Compiler src/IPCManagerCompiler.cpp
         src/Manager.cpp)
-target_include_directories(Compiler PUBLIC include)
+target_include_directories(Compiler PUBLIC include src/fmt)
 
 target_link_libraries(BuildSystem PUBLIC fmt)
 target_link_libraries(Compiler PUBLIC fmt)

@@ -4,8 +4,6 @@
 
 #include "Manager.hpp"
 
-#include <fmt/printf.h>
-
 using std::string_view;
 namespace N2978
 {
@@ -30,6 +28,7 @@ class IPCManagerCompiler : public Manager
     void receiveBTCLastMessage() const;
 
     void checkBytesReadEqualBytesProcessed(uint32_t bytesRead, uint32_t bytesProcessed);
+
   public:
     explicit IPCManagerCompiler(const string &objFilePath);
     BTCModule receiveBTCModule(const CTBModule &moduleName);

@@ -2,12 +2,15 @@
 #include "IPCManagerCompiler.hpp"
 #include "Testing.hpp"
 
+#include "fmt/printf.h"
 #include <chrono>
 #include <filesystem>
-#include <print>
 #include <random>
 #include <string>
 #include <thread>
+
+using fmt::print;
+
 int main()
 {
     IPCManagerCompiler manager("test");
