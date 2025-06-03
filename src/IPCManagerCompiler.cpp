@@ -3,13 +3,13 @@
 #include "Manager.hpp"
 #include "Messages.hpp"
 
-#include <print>
+#include "fmt/printf.h"
 #include <string>
 #include <strsafe.h>
 #include <tchar.h>
 #include <windows.h>
 
-using std::string, std::print;
+using std::string, fmt::print;
 
 namespace N2978
 {
@@ -29,6 +29,14 @@ void IPCManagerCompiler::receiveBTCLastMessage() const
         {
             print("BytesRead {} not equal to BytesProcessed {} in receiveMessage.\n", bytesRead, bytesProcessed);
         }
+    }
+}
+
+void IPCManagerCompiler::checkBytesReadEqualBytesProcessed(uint32_t bytesRead, uint32_t bytesProcessed)
+{
+    if (bytesRead != bytesProcessed)
+    {
+        print("BytesRead {} not equal to BytesProcessed {} in receiveMessage.\n", bytesRead, bytesProcessed);
     }
 }
 
@@ -173,7 +181,10 @@ string_view IPCManagerCompiler::readSharedMemoryBMIFile(const BMIFile &file)
         CloseHandle(mapping);
     }
 
-    memoryMappedBMIFiles.emplace_back(MemoryMappedBMIFile{.mapping = mapping, .view = view});
+    MemoryMappedBMIFile f;
+    f.mapping = mapping;
+    f.view = view;
+    memoryMappedBMIFiles.emplace_back(std::move(f));
     return {static_cast<char *>(view), file.fileSize};
 }
 } // namespace N2978

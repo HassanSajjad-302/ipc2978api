@@ -39,10 +39,15 @@ class Manager
                            uint32_t &bytesProcessed) const;
 };
 
+template <typename T, typename... Args>
+constexpr T* construct_at(T* p, Args&&... args) {
+  return ::new (static_cast<void*>(p)) T(std::forward<Args>(args)...);
+}
+
 template <typename T> T &getInitializedObjectFromBuffer(char (&buffer)[320])
 {
     T &t = reinterpret_cast<T &>(buffer);
-    std::construct_at(&t);
+    construct_at(&t);
     return t;
 }
 } // namespace N2978

@@ -3,9 +3,10 @@
 #define IPC_MANAGER_COMPILER_HPP
 
 #include "Manager.hpp"
-#include <print>
 
-using std::print, std::string_view;
+#include <fmt/printf.h>
+
+using std::string_view;
 namespace N2978
 {
 
@@ -28,6 +29,7 @@ class IPCManagerCompiler : public Manager
     // This is not exposed. sendCTBLastMessage calls this.
     void receiveBTCLastMessage() const;
 
+    void checkBytesReadEqualBytesProcessed(uint32_t bytesRead, uint32_t bytesProcessed);
   public:
     explicit IPCManagerCompiler(const string &objFilePath);
     BTCModule receiveBTCModule(const CTBModule &moduleName);
@@ -46,7 +48,6 @@ template <typename T> T IPCManagerCompiler::receiveMessage()
 
     uint32_t bytesProcessed = 0;
 
-    bool bytesEqual = true;
     if constexpr (std::is_same_v<T, BTCModule>)
     {
         BTCModule moduleFile;
@@ -57,7 +58,6 @@ template <typename T> T IPCManagerCompiler::receiveMessage()
             memoryMappedBMIFiles.reserve(memoryMappedBMIFiles.size() + 1 + moduleFile.deps.size());
             return moduleFile;
         }
-        bytesEqual = false;
     }
     else if constexpr (std::is_same_v<T, BTCNonModule>)
     {
@@ -74,17 +74,13 @@ template <typename T> T IPCManagerCompiler::receiveMessage()
             }
             return nonModule;
         }
-        bytesEqual = false;
     }
     else
     {
         static_assert(false && "Unknown type\n");
     }
 
-    if (!bytesEqual)
-    {
-        print("BytesRead {} not equal to BytesProcessed {} in receiveMessage.\n", bytesRead, bytesProcessed);
-    }
+    checkBytesReadEqualBytesProcessed(bytesRead, bytesProcessed);
 }
 } // namespace N2978
 #endif // IPC_MANAGER_COMPILER_HPP

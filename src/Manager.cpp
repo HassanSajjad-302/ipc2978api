@@ -1,10 +1,10 @@
 
 #include "Manager.hpp"
 #include "Messages.hpp"
+#include "fmt/printf.h"
 #include <Windows.h>
-#include <print>
 
-using std::print;
+using fmt::print;
 
 namespace N2978
 {

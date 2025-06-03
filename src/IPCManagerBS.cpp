@@ -2,14 +2,14 @@
 #include "Manager.hpp"
 #include "Messages.hpp"
 
+#include "fmt/printf.h"
 #include <cstdio>
-#include <print>
 #include <string>
 #include <strsafe.h>
 #include <tchar.h>
 #include <windows.h>
 
-using std::string, std::print;
+using std::string, fmt::print;
 
 namespace N2978
 {

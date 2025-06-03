@@ -3,11 +3,11 @@
 #define TESTING_HPP
 
 #include "Messages.hpp"
-#include <print>
+#include "fmt/printf.h"
 #include <random>
 
 using namespace N2978;
-using std::print;
+using fmt::print;
 
 inline std::random_device rd;
 inline std::mt19937 generator(rd());
