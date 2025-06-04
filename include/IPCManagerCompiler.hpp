@@ -51,7 +51,7 @@ template <typename T> T IPCManagerCompiler::receiveMessage()
     {
         BTCModule moduleFile;
         moduleFile.requested = readMemoryMappedBMIFileFromPipe(buffer, bytesRead, bytesProcessed);
-        moduleFile.deps = readVectorOfMemoryMappedBMIFilesFromPipe(buffer, bytesRead, bytesProcessed);
+        moduleFile.deps = readVectorOfModuleDepFromPipe(buffer, bytesRead, bytesProcessed);
         if (bytesRead == bytesProcessed)
         {
             memoryMappedBMIFiles.reserve(memoryMappedBMIFiles.size() + 1 + moduleFile.deps.size());
@@ -63,8 +63,9 @@ template <typename T> T IPCManagerCompiler::receiveMessage()
         BTCNonModule nonModule;
         nonModule.isHeaderUnit = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
         nonModule.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        nonModule.angled = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
         nonModule.fileSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
-        nonModule.deps = readVectorOfMemoryMappedBMIFilesFromPipe(buffer, bytesRead, bytesProcessed);
+        nonModule.deps = readVectorOfHuDepFromPipe(buffer, bytesRead, bytesProcessed);
         if (bytesRead == bytesProcessed)
         {
             if (nonModule.fileSize != UINT32_MAX)

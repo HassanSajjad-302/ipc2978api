@@ -1,6 +1,7 @@
 
 #include "IPCManagerCompiler.hpp"
 #include "Testing.hpp"
+#define FMT_THROW(ex) std::abort()
 
 #include "fmt/printf.h"
 #include <chrono>

@@ -67,6 +67,19 @@ void Manager::writeMemoryMappedBMIFile(vector<char> &buffer, const BMIFile &file
     writeUInt32(buffer, file.fileSize);
 }
 
+void Manager::writeModuleDep(vector<char> &buffer, const ModuleDep &dep)
+{
+    writeMemoryMappedBMIFile(buffer, dep.file);
+    writeString(buffer, dep.logicalName);
+}
+
+void Manager::writeHuDep(vector<char> &buffer, const HuDep &dep)
+{
+    writeMemoryMappedBMIFile(buffer, dep.file);
+    writeString(buffer, dep.logicalName);
+    buffer.emplace_back(dep.angled);
+}
+
 void Manager::writeVectorOfStrings(vector<char> &buffer, const vector<string> &strs)
 {
     writeUInt32(buffer, strs.size());
@@ -82,6 +95,24 @@ void Manager::writeVectorOfMemoryMappedBMIFiles(vector<char> &buffer, const vect
     for (const BMIFile &file : files)
     {
         writeMemoryMappedBMIFile(buffer, file);
+    }
+}
+
+void Manager::writeVectorOfModuleDep(vector<char> &buffer, const vector<ModuleDep> &deps)
+{
+    writeUInt32(buffer, deps.size());
+    for (const ModuleDep &dep : deps)
+    {
+        writeModuleDep(buffer, dep);
+    }
+}
+
+void Manager::writeVectorOfHuDep(vector<char> &buffer, const vector<HuDep> &deps)
+{
+    writeUInt32(buffer, deps.size());
+    for (const HuDep &dep : deps)
+    {
+        writeHuDep(buffer, dep);
     }
 }
 
@@ -129,15 +160,46 @@ vector<string> Manager::readVectorOfStringFromPipe(char (&buffer)[BUFFERSIZE], u
     return vec;
 }
 
-vector<BMIFile> Manager::readVectorOfMemoryMappedBMIFilesFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
-                                                                  uint32_t &bytesProcessed) const
+ModuleDep Manager::readModuleDepFromPipe(char (&buffer)[4096], uint32_t &bytesRead, uint32_t &bytesProcessed) const
+{
+    ModuleDep modDep;
+    modDep.file.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+    modDep.file.fileSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
+    modDep.logicalName = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+    return modDep;
+}
+
+vector<ModuleDep> Manager::readVectorOfModuleDepFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
+                                                         uint32_t &bytesProcessed) const
 {
     const uint32_t vectorSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
-    vector<BMIFile> vec;
+    vector<ModuleDep> vec;
     vec.reserve(vectorSize);
     for (uint32_t i = 0; i < vectorSize; ++i)
     {
-        vec.emplace_back(readMemoryMappedBMIFileFromPipe(buffer, bytesRead, bytesProcessed));
+        vec.emplace_back(readModuleDepFromPipe(buffer, bytesRead, bytesProcessed));
+    }
+    return vec;
+}
+
+HuDep Manager::readHuDepFromPipe(char (&buffer)[4096], uint32_t &bytesRead, uint32_t &bytesProcessed) const
+{
+    HuDep huDep;
+    huDep.file = readMemoryMappedBMIFileFromPipe(buffer, bytesRead, bytesProcessed);
+    huDep.logicalName = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+    huDep.angled = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
+    return huDep;
+}
+
+vector<HuDep> Manager::readVectorOfHuDepFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
+                                                 uint32_t &bytesProcessed) const
+{
+    const uint32_t vectorSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
+    vector<HuDep> vec;
+    vec.reserve(vectorSize);
+    for (uint32_t i = 0; i < vectorSize; ++i)
+    {
+        vec.emplace_back(readHuDepFromPipe(buffer, bytesRead, bytesProcessed));
     }
     return vec;
 }

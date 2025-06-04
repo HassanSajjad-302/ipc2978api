@@ -79,12 +79,25 @@ struct BMIFile
     uint32_t fileSize = UINT32_MAX;
 };
 
+struct ModuleDep
+{
+    BMIFile file;
+    string logicalName;
+};
+
 // Reply for CTBModule
 struct BTCModule
 {
     BMIFile requested;
     // duplicates not allowed.
-    vector<BMIFile> deps;
+    vector<ModuleDep> deps;
+};
+
+struct HuDep
+{
+    BMIFile file;
+    string logicalName;
+    bool angled = false;
 };
 
 // Reply for CTBNonModule
@@ -92,10 +105,11 @@ struct BTCNonModule
 {
     bool isHeaderUnit = false;
     string filePath;
+    // if isHeaderUnit == false, following three are meaning-less.
+    bool angled = false;
     // if isHeaderUnit == true, fileSize of the requested file.
-    // if isHeaderUnit == false, following two are meaning-less.
     uint32_t fileSize;
-    vector<BMIFile> deps;
+    vector<HuDep> deps;
 };
 
 // Reply for CTBLastMessage if the compilation succeeded.

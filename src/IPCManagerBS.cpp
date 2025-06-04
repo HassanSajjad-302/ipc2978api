@@ -122,7 +122,7 @@ void IPCManagerBS::sendMessage(const BTCModule &moduleFile) const
 {
     vector<char> buffer;
     writeMemoryMappedBMIFile(buffer, moduleFile.requested);
-    writeVectorOfMemoryMappedBMIFiles(buffer, moduleFile.deps);
+    writeVectorOfModuleDep(buffer, moduleFile.deps);
     write(buffer);
 }
 
@@ -131,8 +131,9 @@ void IPCManagerBS::sendMessage(const BTCNonModule &nonModule) const
     vector<char> buffer;
     buffer.emplace_back(nonModule.isHeaderUnit);
     writeString(buffer, nonModule.filePath);
+    buffer.emplace_back(nonModule.angled);
     writeUInt32(buffer, nonModule.fileSize);
-    writeVectorOfMemoryMappedBMIFiles(buffer, nonModule.deps);
+    writeVectorOfHuDep(buffer, nonModule.deps);
     write(buffer);
 }
 

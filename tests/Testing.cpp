@@ -81,8 +81,9 @@ void printMessage(const BTCModule &btcModule, const bool sent)
     print("Deps Size: {}\n\n", btcModule.deps.size());
     for (uint32_t i = 0; i < btcModule.deps.size(); i++)
     {
-        print("Deps[{}] FilePath: {}\n\n", i, btcModule.deps[i].filePath);
-        print("Deps[{}] FileSize: {}\n\n", i, btcModule.deps[i].fileSize);
+        print("Deps[{}] FilePath: {}\n\n", i, btcModule.deps[i].file.filePath);
+        print("Deps[{}] FileSize: {}\n\n", i, btcModule.deps[i].file.fileSize);
+        print("Deps[{}] LogicalName: {}\n\n", i, btcModule.deps[i].logicalName);
     }
 }
 
@@ -95,8 +96,10 @@ void printMessage(const BTCNonModule &nonModule, const bool sent)
     print("FileSize {}\n\n", nonModule.fileSize);
     for (uint32_t i = 0; i < nonModule.deps.size(); i++)
     {
-        print("Deps[{}] FilePath: {}\n\n", i, nonModule.deps[i].filePath);
-        print("Deps[{}] FileSize: {}\n\n", i, nonModule.deps[i].fileSize);
+        print("Deps[{}] FilePath: {}\n\n", i, nonModule.deps[i].file.filePath);
+        print("Deps[{}] FileSize: {}\n\n", i, nonModule.deps[i].file.fileSize);
+        print("Deps[{}] LogicalName: {}\n\n", i, nonModule.deps[i].logicalName);
+        print("Deps[{}] Angled: {}\n\n", i, nonModule.deps[i].angled);
     }
 }
 
