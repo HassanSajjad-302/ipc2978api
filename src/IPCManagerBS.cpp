@@ -51,7 +51,7 @@ void IPCManagerBS::connectToCompiler()
 
         // If an error occurs during the connect operation...
         default:
-            printf("ConnectNamedPipe failed with %d.\n", GetLastError());
+            print("ConnectNamedPipe failed with {}.\n", GetLastError());
         }
     }
     connectedToCompiler = true;
