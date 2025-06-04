@@ -29,7 +29,7 @@ IPCManagerBS::IPCManagerBS(const string &objFilePath) : pipeName(R"(\\.\pipe\)" 
                             nullptr);                          // default security attributes
     if (hPipe == INVALID_HANDLE_VALUE)
     {
-        printf("CreateNamedPipe failed with %d.\n", GetLastError());
+        print("CreateNamedPipe failed with {}.\n", GetLastError());
     }
 }
 

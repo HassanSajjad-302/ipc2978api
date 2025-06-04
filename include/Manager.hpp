@@ -37,14 +37,12 @@ class Manager
                                             uint32_t &bytesProcessed) const;
     vector<string> readVectorOfStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                                               uint32_t &bytesProcessed) const;
-    ModuleDep readModuleDepFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
-                                            uint32_t &bytesProcessed) const;
+    ModuleDep readModuleDepFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead, uint32_t &bytesProcessed) const;
     vector<ModuleDep> readVectorOfModuleDepFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
-                                                             uint32_t &bytesProcessed) const;
-    HuDep readHuDepFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
-                                            uint32_t &bytesProcessed) const;
+                                                    uint32_t &bytesProcessed) const;
+    HuDep readHuDepFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead, uint32_t &bytesProcessed) const;
     vector<HuDep> readVectorOfHuDepFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
-                                                             uint32_t &bytesProcessed) const;
+                                            uint32_t &bytesProcessed) const;
     void readNumberOfBytes(char *output, uint32_t size, char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                            uint32_t &bytesProcessed) const;
 };
