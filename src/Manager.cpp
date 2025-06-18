@@ -1,35 +1,82 @@
 
 #include "Manager.hpp"
 #include "Messages.hpp"
-#include "fmt/fmt/printf.h"
-#include <Windows.h>
-
-using fmt::print;
+#include "expected.hpp"
+#include <windows.h>
 
 namespace N2978
 {
 
-void Manager::read(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead) const
+string getErrorString()
 {
+    const DWORD err = GetLastError();
+
+    char *msg_buf;
+    FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr,
+                   err, MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT), reinterpret_cast<char *>(&msg_buf), 0, nullptr);
+
+    if (msg_buf == nullptr)
+    {
+        char fallback_msg[128] = {};
+        snprintf(fallback_msg, sizeof(fallback_msg), "GetLastError() = %d", err);
+        return fallback_msg;
+    }
+
+    string msg = msg_buf;
+    LocalFree(msg_buf);
+    return msg;
+}
+
+string getErrorString(const uint32_t bytesRead_, const uint32_t bytesProcessed_)
+{
+    return "Error: Bytes Readd vs Bytes Processed Mismatch.\nBytes Read: " + std::to_string(bytesRead_) +
+           ", Bytes Processed: " + std::to_string(bytesProcessed_);
+}
+
+string getErrorString(const ErrorCategory errorCategory_)
+{
+    string errorString;
+
+    switch (errorCategory_)
+    {
+    case ErrorCategory::READ_FILE_ZERO_BYTES_READ:
+        errorString = "Error: ReadFile Zero Bytes Read.";
+        break;
+    case ErrorCategory::INCORRECT_BTC_LAST_MESSAGE:
+        errorString = "Error: Incorrect BTC Last Message.";
+        break;
+    case ErrorCategory::UNKNOWN_CTB_TYPE:
+        errorString = "Error: Unknown CTB message received.";
+        break;
+    }
+
+    return errorString;
+}
+
+tl::expected<uint32_t, string> Manager::read(char (&buffer)[BUFFERSIZE]) const
+{
+    uint32_t bytesRead;
+
     const bool success = ReadFile(hPipe,               // pipe handle
                                   buffer,              // buffer to receive reply
                                   BUFFERSIZE,          // size of buffer
                                   LPDWORD(&bytesRead), // number of bytes read
                                   nullptr);            // not overlapped
 
-    if (!bytesRead)
-    {
-        print(stderr, "ReadFile failed. Zero bytes Read. Error-Code {}.\n", GetLastError());
-        return;
-    }
-
     if (const uint32_t lastError = GetLastError(); !success && lastError != ERROR_MORE_DATA)
     {
-        print(stderr, "ReadFile failed with             {}.\n", lastError);
+        return tl::unexpected(string{});
     }
+
+    if (!bytesRead)
+    {
+        IPCErr(ErrorCategory::READ_FILE_ZERO_BYTES_READ)
+    }
+
+    return bytesRead;
 }
 
-void Manager::write(const vector<char> &buffer) const
+tl::expected<void, string> Manager::write(const vector<char> &buffer) const
 {
     const bool success = WriteFile(hPipe,         // pipe handle
                                    buffer.data(), // message
@@ -38,8 +85,10 @@ void Manager::write(const vector<char> &buffer) const
                                    nullptr);      // not overlapped
     if (!success)
     {
-        print(stderr, "WriteFile failed with %d.\n", GetLastError());
+        return tl::unexpected(string{});
     }
+
+    return {};
 }
 
 vector<char> Manager::getBufferWithType(CTB type)
@@ -63,7 +112,7 @@ void Manager::writeString(vector<char> &buffer, const string &str)
 
 void Manager::writeMemoryMappedBMIFile(vector<char> &buffer, const BMIFile &file)
 {
-    writeUInt32(buffer, file.fileSize);
+    writeString(buffer, file.filePath);
     writeUInt32(buffer, file.fileSize);
 }
 
@@ -116,96 +165,195 @@ void Manager::writeVectorOfHuDep(vector<char> &buffer, const vector<HuDep> &deps
     }
 }
 
-bool Manager::readBoolFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead, uint32_t &bytesProcessed) const
+tl::expected<bool, string> Manager::readBoolFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
+                                                     uint32_t &bytesProcessed) const
 {
     bool result;
-    readNumberOfBytes(reinterpret_cast<char *>(&result), sizeof(result), buffer, bytesRead, bytesProcessed);
+    const auto &r =
+        readNumberOfBytes(reinterpret_cast<char *>(&result), sizeof(result), buffer, bytesRead, bytesProcessed);
+    if (!r)
+    {
+        return tl::unexpected(r.error());
+    }
     return result;
 }
 
-uint32_t Manager::readUInt32FromPipe(char (&buffer)[4096], uint32_t &bytesRead, uint32_t &bytesProcessed) const
+tl::expected<uint32_t, string> Manager::readUInt32FromPipe(char (&buffer)[4096], uint32_t &bytesRead,
+                                                           uint32_t &bytesProcessed) const
 {
     uint32_t size;
-    readNumberOfBytes(reinterpret_cast<char *>(&size), 4, buffer, bytesRead, bytesProcessed);
+    if (const auto &r = readNumberOfBytes(reinterpret_cast<char *>(&size), 4, buffer, bytesRead, bytesProcessed); !r)
+    {
+        return tl::unexpected(r.error());
+    }
     return size;
 }
 
-string Manager::readStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead, uint32_t &bytesProcessed) const
+tl::expected<string, string> Manager::readStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
+                                                         uint32_t &bytesProcessed) const
 {
-    const uint32_t stringSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
+    auto r = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
+    if (!r)
+    {
+        return tl::unexpected(r.error());
+    }
+    const uint32_t stringSize = *r;
     string str(stringSize, 'a');
-    readNumberOfBytes(str.data(), stringSize, buffer, bytesRead, bytesProcessed);
+    if (const auto &r2 = readNumberOfBytes(str.data(), stringSize, buffer, bytesRead, bytesProcessed); !r2)
+    {
+        return tl::unexpected(r2.error());
+    }
     return str;
 }
 
-BMIFile Manager::readMemoryMappedBMIFileFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
-                                                 uint32_t &bytesProcessed) const
+tl::expected<BMIFile, string> Manager::readMemoryMappedBMIFileFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
+                                                                       uint32_t &bytesProcessed) const
 {
+    const auto &r = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+    if (!r)
+    {
+        return tl::unexpected(r.error());
+    }
+    const auto &r2 = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
+
     BMIFile file;
-    file.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
-    file.fileSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
+    file.filePath = *r;
+    file.fileSize = *r2;
     return file;
 }
 
-vector<string> Manager::readVectorOfStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
-                                                   uint32_t &bytesProcessed) const
+tl::expected<vector<string>, string> Manager::readVectorOfStringFromPipe(char (&buffer)[BUFFERSIZE],
+                                                                         uint32_t &bytesRead,
+                                                                         uint32_t &bytesProcessed) const
 {
-    const uint32_t vectorSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
+    const auto &r = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
+    if (!r)
+    {
+        return tl::unexpected(r.error());
+    }
+    const uint32_t vectorSize = *r;
     vector<string> vec;
     vec.reserve(vectorSize);
     for (uint32_t i = 0; i < vectorSize; ++i)
     {
-        vec.emplace_back(readStringFromPipe(buffer, bytesRead, bytesProcessed));
+        const auto &r2 = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        if (!r2)
+        {
+            return tl::unexpected(r2.error());
+        }
+        vec.emplace_back(*r2);
     }
     return vec;
 }
 
-ModuleDep Manager::readModuleDepFromPipe(char (&buffer)[4096], uint32_t &bytesRead, uint32_t &bytesProcessed) const
+tl::expected<ModuleDep, string> Manager::readModuleDepFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
+                                                               uint32_t &bytesProcessed) const
 {
+    const auto &r = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+    if (!r)
+    {
+        return tl::unexpected(r.error());
+    }
+
+    const auto &r2 = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
+    if (!r2)
+    {
+        return tl::unexpected(r2.error());
+    }
+
+    const auto &r3 = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+    if (!r3)
+    {
+        return tl::unexpected(r3.error());
+    }
+
     ModuleDep modDep;
-    modDep.file.filePath = readStringFromPipe(buffer, bytesRead, bytesProcessed);
-    modDep.file.fileSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
-    modDep.logicalName = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+
+    modDep.file.filePath = *r;
+    modDep.file.fileSize = *r2;
+    modDep.logicalName = *r3;
+
     return modDep;
 }
 
-vector<ModuleDep> Manager::readVectorOfModuleDepFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
-                                                         uint32_t &bytesProcessed) const
+tl::expected<vector<ModuleDep>, string> Manager::readVectorOfModuleDepFromPipe(char (&buffer)[4096],
+                                                                               uint32_t &bytesRead,
+                                                                               uint32_t &bytesProcessed) const
 {
-    const uint32_t vectorSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
-    vector<ModuleDep> vec;
-    vec.reserve(vectorSize);
-    for (uint32_t i = 0; i < vectorSize; ++i)
+    const auto &vectorSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
+    if (!vectorSize)
     {
-        vec.emplace_back(readModuleDepFromPipe(buffer, bytesRead, bytesProcessed));
+        return tl::unexpected(vectorSize.error());
+    }
+
+    vector<ModuleDep> vec;
+    vec.reserve(*vectorSize);
+    for (uint32_t i = 0; i < *vectorSize; ++i)
+    {
+        const auto &r = readModuleDepFromPipe(buffer, bytesRead, bytesProcessed);
+        if (!r)
+        {
+            return tl::unexpected(r.error());
+        }
+
+        vec.emplace_back(*r);
     }
     return vec;
 }
 
-HuDep Manager::readHuDepFromPipe(char (&buffer)[4096], uint32_t &bytesRead, uint32_t &bytesProcessed) const
+tl::expected<HuDep, string> Manager::readHuDepFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
+                                                       uint32_t &bytesProcessed) const
 {
+    const auto &r = readMemoryMappedBMIFileFromPipe(buffer, bytesRead, bytesProcessed);
+    if (!r)
+    {
+        return tl::unexpected(r.error());
+    }
+
+    const auto &r2 = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+    if (!r2)
+    {
+        return tl::unexpected(r2.error());
+    }
+
+    const auto &r3 = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
+    if (!r3)
+    {
+        return tl::unexpected(r3.error());
+    }
+
     HuDep huDep;
-    huDep.file = readMemoryMappedBMIFileFromPipe(buffer, bytesRead, bytesProcessed);
-    huDep.logicalName = readStringFromPipe(buffer, bytesRead, bytesProcessed);
-    huDep.angled = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
+    huDep.file = *r;
+    huDep.logicalName = *r2;
+    huDep.angled = *r3;
     return huDep;
 }
 
-vector<HuDep> Manager::readVectorOfHuDepFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
-                                                 uint32_t &bytesProcessed) const
+tl::expected<vector<HuDep>, string> Manager::readVectorOfHuDepFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
+                                                                       uint32_t &bytesProcessed) const
 {
-    const uint32_t vectorSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
-    vector<HuDep> vec;
-    vec.reserve(vectorSize);
-    for (uint32_t i = 0; i < vectorSize; ++i)
+    const auto &vectorSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
+    if (!vectorSize)
     {
-        vec.emplace_back(readHuDepFromPipe(buffer, bytesRead, bytesProcessed));
+        return tl::unexpected(vectorSize.error());
+    }
+
+    vector<HuDep> vec;
+    vec.reserve(*vectorSize);
+    for (uint32_t i = 0; i < *vectorSize; ++i)
+    {
+        const auto &r = readHuDepFromPipe(buffer, bytesRead, bytesProcessed);
+        if (!r)
+        {
+            return tl::unexpected(r.error());
+        }
+        vec.emplace_back(*r);
     }
     return vec;
 }
 
-void Manager::readNumberOfBytes(char *output, const uint32_t size, char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
-                                uint32_t &bytesProcessed) const
+tl::expected<void, string> Manager::readNumberOfBytes(char *output, const uint32_t size, char (&buffer)[BUFFERSIZE],
+                                                      uint32_t &bytesRead, uint32_t &bytesProcessed) const
 {
     uint32_t pendingSize = size;
     uint32_t offset = 0;
@@ -227,7 +375,15 @@ void Manager::readNumberOfBytes(char *output, const uint32_t size, char (&buffer
         }
 
         bytesProcessed = 0;
-        read(buffer, bytesRead);
+        if (const auto &r = read(buffer); r)
+        {
+            bytesRead = *r;
+        }
+        else
+        {
+            return tl::make_unexpected(r.error());
+        }
     }
+    return {};
 }
 } // namespace N2978

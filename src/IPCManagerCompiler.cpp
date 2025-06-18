@@ -3,55 +3,52 @@
 #include "Manager.hpp"
 #include "Messages.hpp"
 
-#include "fmt/fmt/printf.h"
 #include <string>
-#include <strsafe.h>
-#include <tchar.h>
 #include <windows.h>
 
-using std::string, fmt::print;
+using std::string;
 
 namespace N2978
 {
 
-void IPCManagerCompiler::receiveBTCLastMessage() const
+tl::expected<void, string> IPCManagerCompiler::receiveBTCLastMessage() const
 {
     char buffer[BUFFERSIZE];
     uint32_t bytesRead;
-    read(buffer, bytesRead);
+    if (const auto &r = read(buffer); !r)
+    {
+        return tl::unexpected(r.error());
+    }
+    else
+    {
+        bytesRead = *r;
+    }
 
-    uint32_t bytesProcessed = 0;
-    bytesProcessed = 1;
     if (buffer[0] != false)
     {
-        print("Incorrect Last Message Received\n");
-        if (bytesRead != bytesProcessed)
-        {
-            print("BytesRead {} not equal to BytesProcessed {} in receiveMessage.\n", bytesRead, bytesProcessed);
-        }
+        IPCErr(ErrorCategory::INCORRECT_BTC_LAST_MESSAGE)
     }
-}
 
-void IPCManagerCompiler::checkBytesReadEqualBytesProcessed(uint32_t bytesRead, uint32_t bytesProcessed)
-{
-    if (bytesRead != bytesProcessed)
+    if (constexpr uint32_t bytesProcessed = 1; bytesRead != bytesProcessed)
     {
-        print("BytesRead {} not equal to BytesProcessed {} in receiveMessage.\n", bytesRead, bytesProcessed);
+        return tl::unexpected(string{});
     }
+
+    return {};
 }
 
 IPCManagerCompiler::IPCManagerCompiler(const string &objFilePath) : pipeName(R"(\\.\pipe\)" + objFilePath)
 {
 }
 
-void IPCManagerCompiler::connectToBuildSystem()
+tl::expected<void, string> IPCManagerCompiler::connectToBuildSystem()
 {
     if (connectedToBuildSystem)
     {
-        return;
+        return {};
     }
 
-    hPipe = CreateFile(pipeName.data(), // pipe name
+    hPipe = CreateFileA(pipeName.data(), // pipe name
                        GENERIC_READ |   // read and write access
                            GENERIC_WRITE,
                        0,             // no sharing
@@ -64,63 +61,84 @@ void IPCManagerCompiler::connectToBuildSystem()
 
     if (hPipe == INVALID_HANDLE_VALUE)
     {
-        print("Could not open pipe {} to build system\n{}\n", pipeName, GetLastError());
+        return tl::unexpected(string{});
     }
 
     connectedToBuildSystem = true;
+    return {};
 }
 
-BTCModule IPCManagerCompiler::receiveBTCModule(const CTBModule &moduleName)
+tl::expected<BTCModule, string> IPCManagerCompiler::receiveBTCModule(const CTBModule &moduleName)
 {
-    connectToBuildSystem();
+    if (const auto &r = connectToBuildSystem(); !r)
+    {
+        IPCErr(r.error())
+    }
     vector<char> buffer = getBufferWithType(CTB::MODULE);
     writeString(buffer, moduleName.moduleName);
-    write(buffer);
+    if (const auto &r = write(buffer); !r)
+    {
+        IPCErr(r.error());
+    }
+
     return receiveMessage<BTCModule>();
 }
 
-BTCNonModule IPCManagerCompiler::receiveBTCNonModule(const CTBNonModule &nonModule)
+tl::expected<BTCNonModule, string> IPCManagerCompiler::receiveBTCNonModule(const CTBNonModule &nonModule)
 {
-    connectToBuildSystem();
+    if (const auto &r = connectToBuildSystem(); !r)
+    {
+        IPCErr(r.error())
+    }
     vector<char> buffer = getBufferWithType(CTB::NON_MODULE);
     buffer.emplace_back(nonModule.isHeaderUnit);
     writeString(buffer, nonModule.str);
-    write(buffer);
+    if (const auto &r = write(buffer); !r)
+    {
+        IPCErr(r.error())
+    }
     return receiveMessage<BTCNonModule>();
 }
 
-void IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage)
+tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage)
 {
-    connectToBuildSystem();
+    if (const auto &r = connectToBuildSystem(); !r)
+    {
+        IPCErr(r.error())
+    }
     vector<char> buffer = getBufferWithType(CTB::LAST_MESSAGE);
     buffer.emplace_back(lastMessage.exitStatus);
     writeVectorOfStrings(buffer, lastMessage.headerFiles);
     writeString(buffer, lastMessage.output);
     writeString(buffer, lastMessage.errorOutput);
     writeString(buffer, lastMessage.logicalName);
-    write(buffer);
+    if (const auto &r = write(buffer); !r)
+    {
+        IPCErr(r.error())
+    }
+    return {};
 }
 
-void IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage, const string &bmiFile,
-                                            const string &filePath)
+tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage,
+                                                                  const string &bmiFile, const string &filePath)
 {
-    const HANDLE hFile = CreateFile(filePath.c_str(), GENERIC_READ | GENERIC_WRITE,
+    const HANDLE hFile = CreateFileA(filePath.c_str(), GENERIC_READ | GENERIC_WRITE,
                                     0, // no sharing during setup
                                     nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (hFile == INVALID_HANDLE_VALUE)
     {
-        print("Could not create file {}.\n{}\n", filePath, GetLastError());
+        return tl::unexpected(string{});
     }
 
     LARGE_INTEGER fileSize;
     fileSize.QuadPart = bmiFile.size();
     // 3) Create a RW mapping of that file:
     const HANDLE hMap =
-        CreateFileMapping(hFile, nullptr, PAGE_READWRITE, fileSize.HighPart, fileSize.LowPart, filePath.c_str());
+        CreateFileMappingA(hFile, nullptr, PAGE_READWRITE, fileSize.HighPart, fileSize.LowPart, filePath.c_str());
     if (!hMap)
     {
         CloseHandle(hFile);
-        print("Could not create file mapping of the file {}.\n{}\n", filePath, GetLastError());
+        return tl::unexpected(string{});
     }
 
     void *pView = MapViewOfFile(hMap, FILE_MAP_WRITE, 0, 0, bmiFile.size());
@@ -128,7 +146,7 @@ void IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage, c
     {
         CloseHandle(hFile);
         CloseHandle(hMap);
-        print("Could not map view for the file mapping of the file {}.\n{}\n", filePath, GetLastError());
+        return tl::unexpected(string{});
     }
 
     memcpy(pView, bmiFile.c_str(), bmiFile.size());
@@ -138,33 +156,40 @@ void IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage, c
         UnmapViewOfFile(pView);
         CloseHandle(hFile);
         CloseHandle(hMap);
-        print("Could not flush the file mapping of file {}.\n{}\n", filePath, GetLastError());
+        return tl::unexpected(string{});
     }
 
     UnmapViewOfFile(pView);
-
     CloseHandle(hFile);
 
-    sendCTBLastMessage(lastMessage);
+    if (const auto &r = sendCTBLastMessage(lastMessage); !r)
+    {
+        IPCErr(r.error())
+    }
+
     if (lastMessage.exitStatus == EXIT_SUCCESS)
     {
-        receiveBTCLastMessage();
+        if (const auto &r = receiveBTCLastMessage(); !r)
+        {
+            IPCErr(r.error())
+        }
     }
 
     CloseHandle(hMap);
+    return {};
 }
 
-string_view IPCManagerCompiler::readSharedMemoryBMIFile(const BMIFile &file)
+tl::expected<string_view, string> IPCManagerCompiler::readSharedMemoryBMIFile(const BMIFile &file)
 {
     // 1) Open the existing file‐mapping object (must have been created by another process)
-    const HANDLE mapping = OpenFileMapping(FILE_MAP_READ,       // read‐only access
-                                           FALSE,               // do not inherit handle
+    const HANDLE mapping = OpenFileMappingA(FILE_MAP_READ,       // read‐only access
+                                           FALSE,               // do not inherit a handle
                                            file.filePath.data() // name of mapping
     );
 
     if (mapping == nullptr)
     {
-        print("Could not open file mapping of file {}.\n{}\n", file.filePath, GetLastError());
+        return tl::unexpected(string{});
     }
 
     // 2) Map a view of the file into our address space
@@ -177,14 +202,14 @@ string_view IPCManagerCompiler::readSharedMemoryBMIFile(const BMIFile &file)
 
     if (view == nullptr)
     {
-        print("Could not open view of file mapping of file {}.\n", file.filePath);
         CloseHandle(mapping);
+        return tl::unexpected(string{});
     }
 
     MemoryMappedBMIFile f;
     f.mapping = mapping;
     f.view = view;
     memoryMappedBMIFiles.emplace_back(std::move(f));
-    return {static_cast<char *>(view), file.fileSize};
+    return string_view{static_cast<char *>(view), file.fileSize};
 }
 } // namespace N2978

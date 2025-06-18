@@ -1,46 +1,51 @@
 #include "IPCManagerBS.hpp"
 #include "Manager.hpp"
 #include "Messages.hpp"
+#include "expected.hpp"
 
-#include "fmt/printf.h"
-#include <cstdio>
 #include <string>
 #include <strsafe.h>
 #include <tchar.h>
 #include <windows.h>
 
-using std::string, fmt::print;
+using std::string;
 
 namespace N2978
 {
 
-IPCManagerBS::IPCManagerBS(const string &objFilePath) : pipeName(R"(\\.\pipe\)" + objFilePath)
+tl::expected<IPCManagerBS, string> makeIPCManagerBS(string objFilePath)
 {
-    hPipe = CreateNamedPipe(pipeName.c_str(),                  // pipe name
-                            PIPE_ACCESS_DUPLEX |               // read/write access
-                                FILE_FLAG_FIRST_PIPE_INSTANCE, // overlapped mode
-                            PIPE_TYPE_MESSAGE |                // message-type pipe
-                                PIPE_READMODE_MESSAGE |        // message read mode
-                                PIPE_WAIT,                     // blocking mode
-                            1,                                 // unlimited instances
-                            BUFFERSIZE * sizeof(TCHAR),        // output buffer size
-                            BUFFERSIZE * sizeof(TCHAR),        // input buffer size
-                            PIPE_TIMEOUT,                      // client time-out
-                            nullptr);                          // default security attributes
+    objFilePath = R"(\\.\pipe\)" + objFilePath;
+    void *hPipe = CreateNamedPipeA(objFilePath.c_str(),               // pipe name
+                                  PIPE_ACCESS_DUPLEX |               // read/write access
+                                      FILE_FLAG_FIRST_PIPE_INSTANCE, // overlapped mode
+                                  PIPE_TYPE_MESSAGE |                // message-type pipe
+                                      PIPE_READMODE_MESSAGE |        // message read mode
+                                      PIPE_WAIT,                     // blocking mode
+                                  1,                                 // unlimited instances
+                                  BUFFERSIZE * sizeof(TCHAR),        // output buffer size
+                                  BUFFERSIZE * sizeof(TCHAR),        // input buffer size
+                                  PIPE_TIMEOUT,                      // client time-out
+                                  nullptr);                          // default security attributes
     if (hPipe == INVALID_HANDLE_VALUE)
     {
-        print("CreateNamedPipe failed with {}.\n", GetLastError());
+        return tl::unexpected(string{});
     }
+    return IPCManagerBS(hPipe);
 }
 
-void IPCManagerBS::connectToCompiler()
+IPCManagerBS::IPCManagerBS(void *hPipe_)
+{
+    hPipe = hPipe_;
+}
+
+tl::expected<void, string> IPCManagerBS::connectToCompiler()
 {
     if (connectedToCompiler)
     {
-        return;
+        return {};
     }
 
-    // ConnectNamedPipe should return zero.
     if (!ConnectNamedPipe(hPipe, nullptr))
     {
         switch (GetLastError())
@@ -51,19 +56,31 @@ void IPCManagerBS::connectToCompiler()
 
         // If an error occurs during the connect operation...
         default:
-            print("ConnectNamedPipe failed with {}.\n", GetLastError());
+            return tl::unexpected(string{});
         }
     }
     connectedToCompiler = true;
+    return {};
 }
 
-void IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType)
+tl::expected<void, string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType)
 {
-    connectToCompiler();
+    if (const auto &r = connectToCompiler(); !r)
+    {
+        IPCErr(r.error())
+    }
+
     // Read from the pipe.
     char buffer[BUFFERSIZE];
     uint32_t bytesRead;
-    read(buffer, bytesRead);
+    if (const auto &r = read(buffer); !r)
+    {
+        IPCErr(r.error())
+    }
+    else
+    {
+        bytesRead = *r;
+    }
 
     uint32_t bytesProcessed = 1;
 
@@ -73,60 +90,118 @@ void IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType)
 
     case CTB::MODULE: {
 
+        const auto &r = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        if (!r)
+        {
+            IPCErr(r.error())
+        }
+
         messageType = CTB::MODULE;
-        getInitializedObjectFromBuffer<CTBModule>(ctbBuffer).moduleName =
-            readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        getInitializedObjectFromBuffer<CTBModule>(ctbBuffer).moduleName = *r;
     }
 
     break;
 
     case CTB::NON_MODULE: {
 
+        const auto &r = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
+        if (!r)
+        {
+            return tl::unexpected(r.error());
+        }
+
+        const auto &r2 = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        if (!r2)
+        {
+            return tl::unexpected(r.error());
+        }
+
         messageType = CTB::NON_MODULE;
         auto &[isHeaderUnit, str] = getInitializedObjectFromBuffer<CTBNonModule>(ctbBuffer);
-        isHeaderUnit = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
-        str = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        isHeaderUnit = *r;
+        str = *r2;
     }
 
     break;
 
     case CTB::LAST_MESSAGE: {
 
+        const auto &exitStatusExpected = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
+        if (!exitStatusExpected)
+        {
+            IPCErr(exitStatusExpected.error())
+        }
+
+        const auto &headerFilesExpected = readVectorOfStringFromPipe(buffer, bytesRead, bytesProcessed);
+        if (!headerFilesExpected)
+        {
+            IPCErr(headerFilesExpected.error())
+        }
+
+        const auto &outputExpected = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        if (!outputExpected)
+        {
+            IPCErr(outputExpected.error())
+        }
+
+        const auto &errorOutputExpected = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        if (!errorOutputExpected)
+        {
+            IPCErr(errorOutputExpected.error())
+        }
+
+        const auto &logicalNameExpected = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        if (!logicalNameExpected)
+        {
+            IPCErr(logicalNameExpected.error())
+        }
+
+        const auto &fileSizeExpected = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
+        if (!fileSizeExpected)
+        {
+            IPCErr(fileSizeExpected.error())
+        }
+
         messageType = CTB::LAST_MESSAGE;
 
         auto &[exitStatus, headerFiles, output, errorOutput, logicalName, fileSize] =
             getInitializedObjectFromBuffer<CTBLastMessage>(ctbBuffer);
 
-        exitStatus = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
-        headerFiles = readVectorOfStringFromPipe(buffer, bytesRead, bytesProcessed);
-        output = readStringFromPipe(buffer, bytesRead, bytesProcessed);
-        errorOutput = readStringFromPipe(buffer, bytesRead, bytesProcessed);
-        logicalName = readStringFromPipe(buffer, bytesRead, bytesProcessed);
-        fileSize = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
+        exitStatus = *exitStatusExpected;
+        headerFiles = *headerFilesExpected;
+        output = *outputExpected;
+        errorOutput = *errorOutputExpected;
+        logicalName = *logicalNameExpected;
+        fileSize = *fileSizeExpected;
     }
     break;
 
     default:
 
-        print("Build-System received unknown message type on pipe {}.\n{}\n", pipeName, GetLastError());
+        IPCErr(ErrorCategory::UNKNOWN_CTB_TYPE)
     }
 
     if (bytesRead != bytesProcessed)
     {
-        print("BytesRead {} not equal to BytesProcessed {} in receiveMessage.\n{}\n", bytesRead, bytesProcessed,
-              GetLastError());
+        IPCErr(bytesRead, bytesProcessed)
     }
+
+    return {};
 }
 
-void IPCManagerBS::sendMessage(const BTCModule &moduleFile) const
+tl::expected<void, string> IPCManagerBS::sendMessage(const BTCModule &moduleFile) const
 {
     vector<char> buffer;
     writeMemoryMappedBMIFile(buffer, moduleFile.requested);
     writeVectorOfModuleDep(buffer, moduleFile.deps);
-    write(buffer);
+    if (const auto &r = write(buffer); !r)
+    {
+        return tl::unexpected(r.error());
+    }
+    return {};
 }
 
-void IPCManagerBS::sendMessage(const BTCNonModule &nonModule) const
+tl::expected<void, string> IPCManagerBS::sendMessage(const BTCNonModule &nonModule) const
 {
     vector<char> buffer;
     buffer.emplace_back(nonModule.isHeaderUnit);
@@ -134,27 +209,35 @@ void IPCManagerBS::sendMessage(const BTCNonModule &nonModule) const
     buffer.emplace_back(nonModule.angled);
     writeUInt32(buffer, nonModule.fileSize);
     writeVectorOfHuDep(buffer, nonModule.deps);
-    write(buffer);
+    if (const auto &r = write(buffer); !r)
+    {
+        return tl::unexpected(r.error());
+    }
+    return {};
 }
 
-void IPCManagerBS::sendMessage(const BTCLastMessage &) const
+tl::expected<void, string> IPCManagerBS::sendMessage(const BTCLastMessage &) const
 {
     vector<char> buffer;
     buffer.emplace_back(false);
-    write(buffer);
+    if (const auto &r = write(buffer); !r)
+    {
+        return tl::unexpected(r.error());
+    }
+    return {};
 }
 
-void *IPCManagerBS::createSharedMemoryBMIFile(const string &bmiFilePath)
+tl::expected<void *, string> IPCManagerBS::createSharedMemoryBMIFile(const string &bmiFilePath)
 {
     // 1) Open the existing file‐mapping object (must have been created by another process)
-    const HANDLE mapping = OpenFileMapping(FILE_MAP_READ,     // read‐only access
+    const HANDLE mapping = OpenFileMappingA(FILE_MAP_READ,     // read‐only access
                                            FALSE,             // do not inherit handle
                                            bmiFilePath.data() // name of mapping
     );
 
     if (mapping == nullptr)
     {
-        print("Could not open file mapping of file {}.\n{}\n", bmiFilePath, GetLastError());
+        return tl::unexpected(string{});
     }
 
     return mapping;
