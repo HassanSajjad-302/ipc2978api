@@ -1,16 +1,15 @@
 
 #include "IPCManagerCompiler.hpp"
 #include "Testing.hpp"
-#define FMT_THROW(ex) std::abort()
-
-#include "fmt/printf.h"
 #include <chrono>
 #include <filesystem>
 #include <random>
 #include <string>
 #include <thread>
+#include <print>
 
-using fmt::print;
+using namespace std;
+using namespace N2978;
 
 int main()
 {
@@ -23,7 +22,7 @@ int main()
             CTBModule ctbModule;
             ctbModule.moduleName = getRandomString();
 
-            BTCModule btcModule = manager.receiveBTCModule(ctbModule);
+            const BTCModule &btcModule = manager.receiveBTCModule(ctbModule).value();
             printMessage(ctbModule, true);
             printMessage(btcModule, false);
         }
@@ -33,7 +32,7 @@ int main()
             nonModule.isHeaderUnit = getRandomBool();
             nonModule.str = "3";
 
-            BTCNonModule btcNonModule = manager.receiveBTCNonModule(nonModule);
+            BTCNonModule btcNonModule = manager.receiveBTCNonModule(nonModule).value();
             printMessage(nonModule, true);
             printMessage(btcNonModule, false);
         }
@@ -46,7 +45,7 @@ int main()
     printMessage(ctbLastMessage, true);
     print("Received Last Message\n");
 
-    // This tests file sharing. Contents of the both outputs should be same.
+    // This tests file sharing. Contents of both outputs should be the same.
     CTBLastMessage ctbLastMessage2;
     ctbLastMessage2.exitStatus = EXIT_SUCCESS;
     string fileContent = getRandomString();

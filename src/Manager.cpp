@@ -2,7 +2,7 @@
 #include "Manager.hpp"
 #include "Messages.hpp"
 #include "expected.hpp"
-#include <windows.h>
+#include <Windows.h>
 
 namespace N2978
 {

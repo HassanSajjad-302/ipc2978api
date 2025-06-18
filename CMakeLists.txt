@@ -22,6 +22,12 @@ add_executable(CompilerTest tests/CompilerTest.cpp
 target_link_libraries(BuildSystemTest PRIVATE BuildSystem)
 target_link_libraries(CompilerTest PRIVATE Compiler)
 
-add_executable(Tests tests/test.cpp)
-target_link_libraries(Tests PUBLIC Compiler)
-target_link_libraries(Tests PUBLIC BuildSystem)
+add_executable(ClangTest tests/ClangTest.cpp tests/Testing.cpp)
+
+set_target_properties(BuildSystemTest PROPERTIES CXX_STANDARD 23)
+set_target_properties(CompilerTest PROPERTIES CXX_STANDARD 23)
+set_target_properties(ClangTest PROPERTIES CXX_STANDARD 23)
+
+target_link_libraries(ClangTest  BuildSystem)
+target_link_libraries(ClangTest Compiler)
+target_include_directories(ClangTest PUBLIC include)

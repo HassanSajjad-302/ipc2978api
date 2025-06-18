@@ -1,12 +1,12 @@
 #include "IPCManagerBS.hpp"
 #include "Testing.hpp"
 
-#include "fmt/printf.h"
-#include <Windows.h>
+#include <print>
 #include <chrono>
 #include <thread>
+#include <Windows.h>
 
-using fmt::print;
+using std::print;
 
 std::string_view readSharedMemoryBMIFile(const BMIFile &file)
 {
@@ -40,7 +40,7 @@ std::string_view readSharedMemoryBMIFile(const BMIFile &file)
 
 int main()
 {
-    IPCManagerBS manager("test");
+    const IPCManagerBS manager = makeIPCManagerBS("test").value();
     std::this_thread::sleep_for(std::chrono::seconds(10));
     char buffer[320];
 

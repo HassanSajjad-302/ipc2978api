@@ -29,7 +29,7 @@ class IPCManagerCompiler : public Manager
     tl::expected<void, string> receiveBTCLastMessage() const;
 
   public:
-    explicit IPCManagerCompiler(const string &objFilePath);
+    explicit IPCManagerCompiler(const string &objOrBMIFilePath);
     tl::expected<BTCModule, string> receiveBTCModule(const CTBModule &moduleName);
     tl::expected<BTCNonModule, string> receiveBTCNonModule(const CTBNonModule &nonModule);
     tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage);

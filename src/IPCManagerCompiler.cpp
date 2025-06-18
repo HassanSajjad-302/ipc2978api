@@ -4,7 +4,7 @@
 #include "Messages.hpp"
 
 #include <string>
-#include <windows.h>
+#include <Windows.h>
 
 using std::string;
 
@@ -37,7 +37,7 @@ tl::expected<void, string> IPCManagerCompiler::receiveBTCLastMessage() const
     return {};
 }
 
-IPCManagerCompiler::IPCManagerCompiler(const string &objFilePath) : pipeName(R"(\\.\pipe\)" + objFilePath)
+IPCManagerCompiler::IPCManagerCompiler(const string &objOrBMIFilePath) : pipeName(R"(\\.\pipe\)" + objOrBMIFilePath)
 {
 }
 

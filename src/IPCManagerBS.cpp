@@ -4,19 +4,17 @@
 #include "expected.hpp"
 
 #include <string>
-#include <strsafe.h>
-#include <tchar.h>
-#include <windows.h>
+#include <Windows.h>
 
 using std::string;
 
 namespace N2978
 {
 
-tl::expected<IPCManagerBS, string> makeIPCManagerBS(string objFilePath)
+tl::expected<IPCManagerBS, string> makeIPCManagerBS(string objOrCompilerFilePath)
 {
-    objFilePath = R"(\\.\pipe\)" + objFilePath;
-    void *hPipe = CreateNamedPipeA(objFilePath.c_str(),               // pipe name
+    objOrCompilerFilePath = R"(\\.\pipe\)" + objOrCompilerFilePath;
+    void *hPipe = CreateNamedPipeA(objOrCompilerFilePath.c_str(),               // pipe name
                                   PIPE_ACCESS_DUPLEX |               // read/write access
                                       FILE_FLAG_FIRST_PIPE_INSTANCE, // overlapped mode
                                   PIPE_TYPE_MESSAGE |                // message-type pipe
@@ -39,7 +37,7 @@ IPCManagerBS::IPCManagerBS(void *hPipe_)
     hPipe = hPipe_;
 }
 
-tl::expected<void, string> IPCManagerBS::connectToCompiler()
+tl::expected<void, string> IPCManagerBS::connectToCompiler() const
 {
     if (connectedToCompiler)
     {
@@ -59,11 +57,11 @@ tl::expected<void, string> IPCManagerBS::connectToCompiler()
             return tl::unexpected(string{});
         }
     }
-    connectedToCompiler = true;
+    const_cast<bool &>(connectedToCompiler) = true;
     return {};
 }
 
-tl::expected<void, string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType)
+tl::expected<void, string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType) const
 {
     if (const auto &r = connectToCompiler(); !r)
     {
