@@ -4,12 +4,13 @@
 
 #include <Windows.h>
 #include <filesystem>
+#include <fstream>
 #include <print>
+#include <thread>
 
 using namespace std::filesystem;
-
-using std::print;
 using namespace N2978;
+using namespace std;
 
 // Copied From Ninja code-base.
 /// Wraps a synchronous execution of a CL subprocess.
@@ -54,35 +55,15 @@ void Fatal(const char *msg, ...)
 #endif
 }
 
-string GetLastErrorString()
-{
-    DWORD err = GetLastError();
-
-    char *msg_buf;
-    FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr,
-                   err, MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT), (char *)&msg_buf, 0, nullptr);
-
-    if (msg_buf == nullptr)
-    {
-        char fallback_msg[128] = {0};
-        snprintf(fallback_msg, sizeof(fallback_msg), "GetLastError() = %d", err);
-        return fallback_msg;
-    }
-
-    string msg = msg_buf;
-    LocalFree(msg_buf);
-    return msg;
-}
-
 void Win32Fatal(const char *function, const char *hint = nullptr)
 {
     if (hint)
     {
-        Fatal("%s: %s (%s)", function, GetLastErrorString().c_str(), hint);
+        Fatal("%s: %s (%s)", function, getErrorString().c_str(), hint);
     }
     else
     {
-        Fatal("%s: %s", function, GetLastErrorString().c_str());
+        Fatal("%s: %s", function, getErrorString().c_str());
     }
 }
 
@@ -118,6 +99,16 @@ void CLWrapper::Run(const string &command) const
     }
 }
 
+bool isProcessAlive(HANDLE hProcess)
+{
+    DWORD exitCode;
+    if (GetExitCodeProcess(hProcess, &exitCode))
+    {
+        return exitCode == STILL_ACTIVE;
+    }
+    return false; // Error getting exit code
+}
+
 int printOutputAndClosePipes()
 {
 
@@ -147,11 +138,57 @@ int printOutputAndClosePipes()
         Win32Fatal("CloseHandle");
     }
 
+    print("{}", output);
     return exit_code;
 }
 
+void setupTest()
+{
+
+    const string mod = R"(export module mod;
+import mod2;
+
+export void func()
+{
+    EmptyClass2 a;
+    func2();
+    // does nothing
+}
+
+export struct EmptyClass
+{
+};)";
+
+    const string mod1 = R"(module;
+
+export module mod1;
+import mod2;)";
+
+    const string mod2 = R"(export module mod2;
+
+export void func2()
+{
+    // does nothing
+}
+
+export struct EmptyClass2
+{
+};)";
+
+    const string main = R"(import mod;
+import mod1;
+
 int main()
 {
+    func();
+    EmptyClass a;
+})";
+
+    ofstream("mod.cppm") << mod;
+    ofstream("mod1.cppm") << mod1;
+    ofstream("mod2.cppm") << mod2;
+    ofstream("main.cpp") << main;
+
     // compile main.cpp which imports B.cpp which imports A.cpp.
 
     if (system(R"(.\clang.exe -std=c++20 mod2.cppm -c -fmodule-output="mod2.pcm"  -fmodules-reduced-bmi -o  mod2.o)") !=
@@ -167,28 +204,45 @@ int main()
         print("could not run the second command command\n");
     }
 
+    if (system(
+            R"(.\clang.exe -std=c++20 mod1.cppm -c -fmodule-output="mod1.pcm"  -fmodules-reduced-bmi -o  mod1.o  -fmodule-file=mod2="./mod2.pcm")") !=
+        EXIT_SUCCESS)
+    {
+        print("could not run the second command command\n");
+    }
+}
+
+int main()
+{
+
+    setupTest();
+
     string current = current_path().generic_string() + '/';
     string mainFilePath = current + "main.o";
     string modFilePath = current + "mod.pcm";
     string mod1FilePath = current + "mod1.pcm";
     string mod2FilePath = current + "mod2.pcm";
 
-    bool first = true;
     if (const auto &r = makeIPCManagerBS(std::move(mainFilePath)); r)
     {
+        uint8_t messageCount = 0;
         const IPCManagerBS &manager = *r;
 
-        string compileCommand = R"(.\clang.exe -std=c++20 main.cpp  -o main.o -noScanIPC")";
+        string compileCommand =
+            R"(.\clang.exe -std=c++20 -c main.cpp -noScanIPC -o "C:/Projects/llvm-project/llvm/cmake-build-debug/bin/main.o")";
+        CLWrapper wrapper;
+        wrapper.Run(compileCommand);
 
-        bool loopExit = false;
         while (true)
         {
             CTB type;
             char buffer[320];
             if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
             {
+                string str = r2.error();
                 print("{}", "creating manager failed" + r2.error() + "\n");
             }
+
 
             switch (type)
             {
@@ -197,14 +251,9 @@ int main()
                 const auto &ctbModule = reinterpret_cast<CTBModule &>(buffer);
                 printMessage(ctbModule, false);
 
-                if (first)
+                if (!messageCount)
                 {
-                    first = false;
-                    if (ctbModule.moduleName != "mod")
-                    {
-                        print("Message Name not mod\n");
-                        exit(EXIT_FAILURE);
-                    }
+                    ++messageCount;
 
                     BMIFile mod;
                     mod.filePath = modFilePath;
@@ -213,23 +262,20 @@ int main()
                     BMIFile mod2;
                     mod2.filePath = mod2FilePath;
                     mod2.fileSize = 0;
+                    ModuleDep mod2Dep;
+                    mod2Dep.file = std::move(mod2);
+                    mod2Dep.logicalName = "mod2";
 
                     BTCModule b;
                     b.requested = std::move(mod);
-                    b.deps.emplace_back(std::move(mod2));
+                    b.deps.emplace_back(std::move(mod2Dep));
 
                     manager.sendMessage(b);
                     printMessage(b, true);
                 }
-                else
+                else if (messageCount == 1)
                 {
-                    loopExit = true;
-                    if (ctbModule.moduleName != "mod1")
-                    {
-                        print("Message Name not mod1\n");
-                        exit(EXIT_FAILURE);
-                    }
-
+                    ++messageCount;
                     BMIFile mod1;
                     mod1.filePath = mod1FilePath;
                     mod1.fileSize = 0;
@@ -253,7 +299,7 @@ int main()
                 print("Unexpected message received");
             }
 
-            if (loopExit)
+            if (messageCount == 2)
             {
                 break;
             }

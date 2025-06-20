@@ -90,7 +90,6 @@ struct ModuleDep
 struct BTCModule
 {
     BMIFile requested;
-    // duplicates not allowed.
     vector<ModuleDep> deps;
 };
 
@@ -106,7 +105,7 @@ struct BTCNonModule
 {
     bool isHeaderUnit = false;
     string filePath;
-    // if isHeaderUnit == false, following three are meaning-less.
+    // if isHeaderUnit == false, the following three are meaning-less.
     bool angled = false;
     // if isHeaderUnit == true, fileSize of the requested file.
     uint32_t fileSize;
