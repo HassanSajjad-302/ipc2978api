@@ -1,24 +1,35 @@
 #include "IPCManagerBS.hpp"
 #include "Testing.hpp"
 
-#include <print>
 #include <chrono>
+#include <filesystem>
+#include <iostream>
+#include <print>
 #include <thread>
+#ifdef _WIN32
 #include <Windows.h>
+#else
+#include <cstring>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
-using std::print;
+using std::print, std::string_view;
 
-std::string_view readSharedMemoryBMIFile(const BMIFile &file)
+tl::expected<string_view, string> readSharedMemoryBMIFile(const BMIFile &file)
 {
+#ifdef _WIN32
     // 1) Open the existing file‐mapping object (must have been created by another process)
-    const HANDLE mapping = OpenFileMapping(FILE_MAP_READ,       // read‐only access
-                                           FALSE,               // do not inherit handle
-                                           file.filePath.data() // name of mapping
+    const HANDLE mapping = OpenFileMappingA(FILE_MAP_READ,       // read‐only access
+                                            FALSE,               // do not inherit a handle
+                                            file.filePath.data() // name of mapping
     );
 
     if (mapping == nullptr)
     {
-        print("Could not open file mapping of file {}.\n", file.filePath);
+        return tl::unexpected(string{});
     }
 
     // 2) Map a view of the file into our address space
@@ -31,17 +42,44 @@ std::string_view readSharedMemoryBMIFile(const BMIFile &file)
 
     if (view == nullptr)
     {
-        print("Could not open view of file mapping of file {}.\n", file.filePath);
         CloseHandle(mapping);
+        return tl::unexpected(string{});
     }
 
-    return {static_cast<char *>(view), file.fileSize};
-}
+    MemoryMappedBMIFile f{};
+    f.mapping = mapping;
+    f.view = view;
+    return string_view{static_cast<char *>(view), file.fileSize};
+#else
+    const int fd = open(file.filePath.data(), O_RDONLY);
+    if (fd == -1)
+    {
+        return tl::unexpected(getErrorString());
+    }
+    void *mapping = mmap(nullptr, file.fileSize, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
 
+    if (close(fd) == -1)
+    {
+        return tl::unexpected(getErrorString());
+    }
+
+    if (mapping == MAP_FAILED)
+    {
+        return tl::unexpected(getErrorString());
+    }
+
+    MemoryMappedBMIFile f{};
+    f.mapping = mapping;
+    f.mappingSize = file.fileSize;
+    return string_view{static_cast<char *>(mapping), file.fileSize};
+#endif
+}
 int main()
 {
-    const IPCManagerBS manager = makeIPCManagerBS("test").value();
-    std::this_thread::sleep_for(std::chrono::seconds(10));
+    const IPCManagerBS &manager = makeIPCManagerBS((std::filesystem::current_path() / "test").string()).value();
+    // std::this_thread::sleep_for(std::chrono::seconds(10));
+    std::cout << "Listening";
+    fflush(stdout);
     char buffer[320];
 
     while (true)

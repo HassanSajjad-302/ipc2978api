@@ -12,7 +12,7 @@ string getRandomString()
     string random_string(length, '\0');
     for (int i = 0; i < length; ++i)
     {
-        random_string += characters[distribution(generator)];
+        random_string[i] = characters[distribution(generator)];
     }
 
     return random_string;

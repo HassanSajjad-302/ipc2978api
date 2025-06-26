@@ -3,17 +3,16 @@
 #include "Testing.hpp"
 #include <chrono>
 #include <filesystem>
+#include <print>
 #include <random>
 #include <string>
 #include <thread>
-#include <print>
 
 using namespace std;
 using namespace N2978;
-
 int main()
 {
-    IPCManagerCompiler manager("test");
+    const IPCManagerCompiler &manager = makeIPCManagerCompiler((filesystem::current_path() / "test").string()).value();
     std::uniform_int_distribution distribution(0, 20);
     for (uint64_t i = 0; i < distribution(generator); ++i)
     {

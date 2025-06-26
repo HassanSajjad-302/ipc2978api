@@ -9,41 +9,33 @@ using std::string_view;
 namespace N2978
 {
 
-struct MemoryMappedBMIFile
-{
-    void *mapping;
-    void *view;
-};
-
 // IPC Manager BuildSystem
-class IPCManagerCompiler : public Manager
+class IPCManagerCompiler : protected Manager
 {
-    string pipeName;
-    vector<MemoryMappedBMIFile> memoryMappedBMIFiles;
-    bool connectedToBuildSystem = false;
-
-    tl::expected<void, string> connectToBuildSystem();
-
-    template <typename T> tl::expected<T, string> receiveMessage();
+    template <typename T> tl::expected<T, string> receiveMessage() const;
     // This is not exposed. sendCTBLastMessage calls this.
     tl::expected<void, string> receiveBTCLastMessage() const;
 
   public:
-    explicit IPCManagerCompiler(const string &objOrBMIFilePath);
-    tl::expected<BTCModule, string> receiveBTCModule(const CTBModule &moduleName);
-    tl::expected<BTCNonModule, string> receiveBTCNonModule(const CTBNonModule &nonModule);
-    tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage);
+#ifdef _WIN32
+    explicit IPCManagerCompiler(void *hPipe_);
+#else
+    explicit IPCManagerCompiler(int fdSocket_);
+#endif
+    tl::expected<BTCModule, string> receiveBTCModule(const CTBModule &moduleName) const;
+    tl::expected<BTCNonModule, string> receiveBTCNonModule(const CTBNonModule &nonModule) const;
+    tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage) const;
     tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage, const string &bmiFile,
-                                                  const string &filePath);
-    tl::expected<string_view, string> readSharedMemoryBMIFile(const BMIFile &file);
+                                                  const string &filePath) const;
+    static tl::expected<string_view, string> readSharedMemoryBMIFile(const BMIFile &file);
 };
 
-template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage()
+template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage() const
 {
     // Read from the pipe.
     char buffer[BUFFERSIZE];
     uint32_t bytesRead;
-    if (const auto &r = read(buffer); !r)
+    if (const auto &r = readInternal(buffer); !r)
     {
         return tl::unexpected(r.error());
     }
@@ -73,7 +65,6 @@ template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage
         moduleFile.deps = *r2;
         if (bytesRead == bytesProcessed)
         {
-            memoryMappedBMIFiles.reserve(memoryMappedBMIFiles.size() + 1 + moduleFile.deps.size());
             return moduleFile;
         }
     }
@@ -118,10 +109,6 @@ template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage
 
         if (bytesRead == bytesProcessed)
         {
-            if (nonModule.fileSize != UINT32_MAX)
-            {
-                memoryMappedBMIFiles.reserve(memoryMappedBMIFiles.size() + 1 + nonModule.deps.size());
-            }
             return nonModule;
         }
     }
@@ -135,5 +122,6 @@ template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage
         IPCErr(bytesRead, bytesProcessed)
     }
 }
+tl::expected<IPCManagerCompiler, string> makeIPCManagerCompiler(const string& BMIIfHeaderUnitObjOtherwisePath);
 } // namespace N2978
 #endif // IPC_MANAGER_COMPILER_HPP

@@ -12,8 +12,10 @@ using std::string, std::vector;
 
 #define BUFFERSIZE 4096
 
+#ifdef _WIN32
 // The following variable is used in CreateNamedFunction.
 #define PIPE_TIMEOUT 5000
+#endif
 
 namespace tl
 {
@@ -46,10 +48,14 @@ inline string getErrorString(string err)
 class Manager
 {
   public:
+#ifdef _WIN32
     void *hPipe = nullptr;
+#else
+    int fdSocket = 0;
+#endif
 
-    tl::expected<uint32_t, string> read(char (&buffer)[BUFFERSIZE]) const;
-    tl::expected<void, string> write(const vector<char> &buffer) const;
+    tl::expected<uint32_t, string> readInternal(char (&buffer)[BUFFERSIZE]) const;
+    tl::expected<void, string> writeInternal(const vector<char> &buffer) const;
 
     static vector<char> getBufferWithType(CTB type);
     static void writeUInt32(vector<char> &buffer, uint32_t value);
@@ -95,6 +101,34 @@ template <typename T> T &getInitializedObjectFromBuffer(char (&buffer)[320])
     T &t = reinterpret_cast<T &>(buffer);
     construct_at(&t);
     return t;
+}
+
+struct MemoryMappedBMIFile
+{
+#ifdef _WIN32
+    void *mapping;
+    void *view;
+#else
+    void *mapping;
+    uint32_t mappingSize;
+#endif
+};
+
+inline std::string toString(uint64_t v)
+{
+    static auto lut = "0123456789abcdef";
+    std::string out;
+    out.resize(16);
+    for (int i = 0; i < 8; ++i)
+    {
+        // extract byte in big-endian order:
+        const auto byte = static_cast<uint8_t>(v >> ((7 - i) * 8));
+        // high nibble:
+        out[2 * i] = lut[byte >> 4];
+        // low nibble:
+        out[2 * i + 1] = lut[byte & 0xF];
+    }
+    return out;
 }
 
 } // namespace N2978

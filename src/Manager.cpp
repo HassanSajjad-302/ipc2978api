@@ -2,13 +2,21 @@
 #include "Manager.hpp"
 #include "Messages.hpp"
 #include "expected.hpp"
+
+#include <unistd.h>
+
+#ifdef _WIN32
 #include <Windows.h>
+#else
+#include <cstring>
+#endif
 
 namespace N2978
 {
 
 string getErrorString()
 {
+#ifdef _WIN32
     const DWORD err = GetLastError();
 
     char *msg_buf;
@@ -25,6 +33,9 @@ string getErrorString()
     string msg = msg_buf;
     LocalFree(msg_buf);
     return msg;
+#else
+    return {std::strerror(errno)};
+#endif
 }
 
 string getErrorString(const uint32_t bytesRead_, const uint32_t bytesProcessed_)
@@ -53,10 +64,11 @@ string getErrorString(const ErrorCategory errorCategory_)
     return errorString;
 }
 
-tl::expected<uint32_t, string> Manager::read(char (&buffer)[BUFFERSIZE]) const
+tl::expected<uint32_t, string> Manager::readInternal(char (&buffer)[BUFFERSIZE]) const
 {
     uint32_t bytesRead;
 
+#ifdef _WIN32
     const bool success = ReadFile(hPipe,               // pipe handle
                                   buffer,              // buffer to receive reply
                                   BUFFERSIZE,          // size of buffer
@@ -68,6 +80,14 @@ tl::expected<uint32_t, string> Manager::read(char (&buffer)[BUFFERSIZE]) const
         return tl::unexpected(string{});
     }
 
+#else
+    bytesRead = read(fdSocket, buffer, BUFFERSIZE);
+    if (bytesRead == -1)
+    {
+        return tl::unexpected(getErrorString());
+    }
+#endif
+
     if (!bytesRead)
     {
         IPCErr(ErrorCategory::READ_FILE_ZERO_BYTES_READ)
@@ -76,8 +96,9 @@ tl::expected<uint32_t, string> Manager::read(char (&buffer)[BUFFERSIZE]) const
     return bytesRead;
 }
 
-tl::expected<void, string> Manager::write(const vector<char> &buffer) const
+tl::expected<void, string> Manager::writeInternal(const vector<char> &buffer) const
 {
+#ifdef _WIN32
     const bool success = WriteFile(hPipe,         // pipe handle
                                    buffer.data(), // message
                                    buffer.size(), // message length
@@ -86,6 +107,13 @@ tl::expected<void, string> Manager::write(const vector<char> &buffer) const
     if (!success)
     {
         return tl::unexpected(string{});
+    }
+
+#endif
+
+    if (write(fdSocket, buffer.data(), buffer.size() == -1))
+    {
+        return tl::unexpected(getErrorString());
     }
 
     return {};
@@ -375,7 +403,7 @@ tl::expected<void, string> Manager::readNumberOfBytes(char *output, const uint32
         }
 
         bytesProcessed = 0;
-        if (const auto &r = read(buffer); r)
+        if (const auto &r = readInternal(buffer); r)
         {
             bytesRead = *r;
         }

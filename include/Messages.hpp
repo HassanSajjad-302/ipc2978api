@@ -2,6 +2,7 @@
 #define MESSAGES_HPP
 
 #include <string>
+#include <cstdint>
 #include <vector>
 
 using std::string, std::vector;

@@ -11,12 +11,14 @@ namespace N2978
 // IPC Manager BuildSystem
 class IPCManagerBS : public Manager
 {
-    friend tl::expected<IPCManagerBS, string> makeIPCManagerBS(string objOrCompilerFilePath);
+    friend tl::expected<IPCManagerBS, string> makeIPCManagerBS(const string& BMIIfHeaderUnitObjOtherwisePath);
     bool connectedToCompiler = false;
 
-    tl::expected<void, string> connectToCompiler() const;
-
+#ifdef _WIN32
     explicit IPCManagerBS(void *hPipe_);
+#else
+    explicit IPCManagerBS(int fdSocket_);
+#endif
 
   public:
     IPCManagerBS(const IPCManagerBS &) = default;
@@ -27,9 +29,10 @@ class IPCManagerBS : public Manager
     tl::expected<void, string> sendMessage(const BTCModule &moduleFile) const;
     tl::expected<void, string> sendMessage(const BTCNonModule &nonModule) const;
     tl::expected<void, string> sendMessage(const BTCLastMessage &lastMessage) const;
-    static tl::expected<void *, string> createSharedMemoryBMIFile(const string &bmiFilePath);
+    static tl::expected<MemoryMappedBMIFile, string> createSharedMemoryBMIFile(const BMIFile &bmiFile);
+    static tl::expected<void, string> deleteBMIFileMapping(const MemoryMappedBMIFile &memoryMappedBMIFile);
 };
 
-tl::expected<IPCManagerBS, string> makeIPCManagerBS(string objOrCompilerFilePath);
+tl::expected<IPCManagerBS, string> makeIPCManagerBS(const string& BMIIfHeaderUnitObjOtherwisePath);
 } // namespace N2978
 #endif // IPC_MANAGER_BS_HPP
