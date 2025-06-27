@@ -20,7 +20,7 @@ using std::string;
 namespace N2978
 {
 
-tl::expected<IPCManagerBS, string> makeIPCManagerBS(const string& BMIIfHeaderUnitObjOtherwisePath)
+tl::expected<IPCManagerBS, string> makeIPCManagerBS(const string &BMIIfHeaderUnitObjOtherwisePath)
 {
 #ifdef _WIN32
     objOrCompilerFilePath = R"(\\.\pipe\)" + objOrCompilerFilePath;
@@ -37,7 +37,7 @@ tl::expected<IPCManagerBS, string> makeIPCManagerBS(const string& BMIIfHeaderUni
                                    nullptr);                          // default security attributes
     if (hPipe == INVALID_HANDLE_VALUE)
     {
-        return tl::unexpected(string{});
+        return tl::unexpected(getErrorString());
     }
     return IPCManagerBS(hPipe);
 
@@ -61,7 +61,7 @@ tl::expected<IPCManagerBS, string> makeIPCManagerBS(const string& BMIIfHeaderUni
     // We use file hash to make a file path smaller, since there is a limit of NAME_MAX that is generally 108 bytes.
     // TODO
     // Have an option to receive this path in constructor to make it compatible with Android and IOS.
-    string prependDir = "/tmp/";
+    string prependDir = "/home/hassan/";
     const uint64_t hash = rapidhash(BMIIfHeaderUnitObjOtherwisePath.c_str(), BMIIfHeaderUnitObjOtherwisePath.size());
     prependDir.append(toString(hash));
     std::copy(prependDir.begin(), prependDir.end(), addr.sun_path);
@@ -70,7 +70,7 @@ tl::expected<IPCManagerBS, string> makeIPCManagerBS(const string& BMIIfHeaderUni
     unlink(prependDir.c_str());
 
     // Bind socket to the file system path
-    if (bind(fdSocket, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0)
+    if (bind(fdSocket, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == -1)
     {
         return tl::unexpected(getErrorString());
     }
@@ -104,28 +104,28 @@ IPCManagerBS::IPCManagerBS(const int fdSocket_)
 
 tl::expected<void, string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType) const
 {
-#ifdef _WIN32
     if (!connectedToCompiler)
     {
+#ifdef _WIN32
         if (!ConnectNamedPipe(hPipe, nullptr))
         {
             // Is the client already connected?
             if (GetLastError() != ERROR_PIPE_CONNECTED)
             {
-                return tl::unexpected(string{});
+                return tl::unexpected(getErrorString());
             }
         }
+#else
+        const int fd = accept(fdSocket, nullptr, nullptr);
+        if (fd == -1)
+        {
+            close(fdSocket);
+            return tl::unexpected(getErrorString());
+        }
+        const_cast<int &>(fdSocket) = fd;
+#endif
         const_cast<bool &>(connectedToCompiler) = true;
     }
-#else
-    const int fd = accept(fdSocket, nullptr, nullptr);
-    if (fd == -1)
-    {
-        close(fdSocket);
-        return tl::unexpected(string{});
-    }
-    const_cast<int &>(fdSocket) = fd;
-#endif
 
     // Read from the pipe.
     char buffer[BUFFERSIZE];
@@ -296,7 +296,7 @@ tl::expected<MemoryMappedBMIFile, string> IPCManagerBS::createSharedMemoryBMIFil
 
     if (sharedFile.mapping == nullptr)
     {
-        return tl::unexpected(string{});
+        return tl::unexpected(getErrorString());
     }
 
     return sharedFile;
@@ -327,7 +327,7 @@ tl::expected<void, string> IPCManagerBS::deleteBMIFileMapping(const MemoryMapped
 #else
     if (munmap(memoryMappedBMIFile.mapping, memoryMappedBMIFile.mappingSize) == -1)
     {
-        return tl::unexpected(string{});
+        return tl::unexpected(getErrorString());
     }
 #endif
     return {};

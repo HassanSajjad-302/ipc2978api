@@ -9,7 +9,7 @@ using std::string_view;
 namespace N2978
 {
 
-// IPC Manager BuildSystem
+// IPC Manager Compiler
 class IPCManagerCompiler : protected Manager
 {
     template <typename T> tl::expected<T, string> receiveMessage() const;

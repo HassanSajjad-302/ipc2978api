@@ -34,6 +34,7 @@ string getErrorString()
     LocalFree(msg_buf);
     return msg;
 #else
+    printf(std::strerror(errno));
     return {std::strerror(errno)};
 #endif
 }
@@ -77,7 +78,7 @@ tl::expected<uint32_t, string> Manager::readInternal(char (&buffer)[BUFFERSIZE])
 
     if (const uint32_t lastError = GetLastError(); !success && lastError != ERROR_MORE_DATA)
     {
-        return tl::unexpected(string{});
+        return tl::unexpected(getErrorString());
     }
 
 #else
@@ -96,6 +97,35 @@ tl::expected<uint32_t, string> Manager::readInternal(char (&buffer)[BUFFERSIZE])
     return bytesRead;
 }
 
+#ifndef _WIN32
+tl::expected<void, string> writeAll(const int fd, const char *buffer, const uint32_t count)
+{
+    uint32_t bytesWritten = 0;
+
+    while (bytesWritten != count)
+    {
+        const uint32_t result = write(fd, buffer + bytesWritten, count - bytesWritten);
+        if (result == -1)
+        {
+            if (errno == EINTR)
+            {
+                // Interrupted by signal: retry
+                continue;
+            }
+            return tl::unexpected(getErrorString());
+        }
+        if (result == 0)
+        {
+            // According to POSIX, write() returning 0 is only valid for count == 0
+            return tl::unexpected(getErrorString());
+        }
+        bytesWritten += result;
+    }
+
+    return {};
+}
+#endif
+
 tl::expected<void, string> Manager::writeInternal(const vector<char> &buffer) const
 {
 #ifdef _WIN32
@@ -106,16 +136,15 @@ tl::expected<void, string> Manager::writeInternal(const vector<char> &buffer) co
                                    nullptr);      // not overlapped
     if (!success)
     {
-        return tl::unexpected(string{});
+        return tl::unexpected(getErrorString());
     }
 
 #endif
 
-    if (write(fdSocket, buffer.data(), buffer.size() == -1))
+    if (const auto &r = writeAll(fdSocket, buffer.data(), buffer.size()); !r)
     {
-        return tl::unexpected(getErrorString());
+        return tl::unexpected(r.error());
     }
-
     return {};
 }
 

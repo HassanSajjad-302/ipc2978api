@@ -39,7 +39,7 @@ tl::expected<IPCManagerCompiler, string> makeIPCManagerCompiler(const string &BM
 
     if (hPipe == INVALID_HANDLE_VALUE)
     {
-        return tl::unexpected(string{});
+        return tl::unexpected(getErrorString());
     }
 
     return IPCManagerCompiler(hPipe);
@@ -47,7 +47,6 @@ tl::expected<IPCManagerCompiler, string> makeIPCManagerCompiler(const string &BM
 
     const int fdSocket = socket(AF_UNIX, SOCK_STREAM, 0);
 
-    // Create server socket
     if (fdSocket == -1)
     {
         return tl::unexpected(getErrorString());
@@ -60,12 +59,12 @@ tl::expected<IPCManagerCompiler, string> makeIPCManagerCompiler(const string &BM
     // We use file hash to make a file path smaller, since there is a limit of NAME_MAX that is generally 108 bytes.
     // TODO
     // Have an option to receive this path in constructor to make it compatible with Android and IOS.
-    string prependDir = "/tmp/";
+    string prependDir = "/home/hassan/";
     const uint64_t hash = rapidhash(BMIIfHeaderUnitObjOtherwisePath.c_str(), BMIIfHeaderUnitObjOtherwisePath.size());
     prependDir.append(toString(hash));
     std::copy(prependDir.begin(), prependDir.end(), addr.sun_path);
 
-    if (connect(fdSocket, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == -1)
+    if (!connect(fdSocket, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)))
     {
         return tl::unexpected(getErrorString());
     }
@@ -106,7 +105,7 @@ tl::expected<void, string> IPCManagerCompiler::receiveBTCLastMessage() const
 
     if (constexpr uint32_t bytesProcessed = 1; bytesRead != bytesProcessed)
     {
-        return tl::unexpected(string{});
+        return tl::unexpected(getErrorString());
     }
 
     return {};
@@ -160,7 +159,7 @@ tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastM
                                      nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (hFile == INVALID_HANDLE_VALUE)
     {
-        return tl::unexpected(string{});
+        return tl::unexpected(getErrorString());
     }
 
     LARGE_INTEGER fileSize;
@@ -171,7 +170,7 @@ tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastM
     if (!hMap)
     {
         CloseHandle(hFile);
-        return tl::unexpected(string{});
+        return tl::unexpected(getErrorString());
     }
 
     void *pView = MapViewOfFile(hMap, FILE_MAP_WRITE, 0, 0, bmiFile.size());
@@ -179,7 +178,7 @@ tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastM
     {
         CloseHandle(hFile);
         CloseHandle(hMap);
-        return tl::unexpected(string{});
+        return tl::unexpected(getErrorString());
     }
 
     memcpy(pView, bmiFile.c_str(), bmiFile.size());
@@ -189,7 +188,7 @@ tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastM
         UnmapViewOfFile(pView);
         CloseHandle(hFile);
         CloseHandle(hMap);
-        return tl::unexpected(string{});
+        return tl::unexpected(getErrorString());
     }
 
     UnmapViewOfFile(pView);
@@ -271,7 +270,7 @@ tl::expected<string_view, string> IPCManagerCompiler::readSharedMemoryBMIFile(co
 
     if (mapping == nullptr)
     {
-        return tl::unexpected(string{});
+        return tl::unexpected(getErrorString());
     }
 
     // 2) Map a view of the file into our address space
@@ -285,7 +284,7 @@ tl::expected<string_view, string> IPCManagerCompiler::readSharedMemoryBMIFile(co
     if (view == nullptr)
     {
         CloseHandle(mapping);
-        return tl::unexpected(string{});
+        return tl::unexpected(getErrorString());
     }
 
     MemoryMappedBMIFile f{};
