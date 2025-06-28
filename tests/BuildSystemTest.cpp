@@ -75,7 +75,14 @@ tl::expected<string_view, string> readSharedMemoryBMIFile(const BMIFile &file)
 }
 int main()
 {
-    const IPCManagerBS &manager = makeIPCManagerBS((std::filesystem::current_path() / "test").string()).value();
+    const auto &r = makeIPCManagerBS((std::filesystem::current_path() / "test").string());
+    if (!r)
+    {
+        print("{}\n", r.error());
+        exit(EXIT_FAILURE);
+    }
+
+    const IPCManagerBS &manager = r.value();
     // std::this_thread::sleep_for(std::chrono::seconds(10));
     std::cout << "Listening";
     fflush(stdout);
@@ -97,9 +104,9 @@ int main()
             file.fileSize = 0;
             BTCModule b;
             b.requested = std::move(file);
-            if (const auto &r = manager.sendMessage(b); !r)
+            if (const auto &r2  = manager.sendMessage(b); !r2)
             {
-                print("{}\n", r.error());
+                print("{}\n", r2.error());
                 exit(EXIT_FAILURE);
             }
             printMessage(b, true);
@@ -113,9 +120,9 @@ int main()
             BTCNonModule nonModule;
             nonModule.isHeaderUnit = getRandomBool();
             nonModule.filePath = getRandomString();
-            if (const auto &r = manager.sendMessage(nonModule); !r)
+            if (const auto &r2 = manager.sendMessage(nonModule); !r2)
             {
-                print("{}\n", r.error());
+                print("{}\n", r2.error());
                 exit(EXIT_FAILURE);
             }
             printMessage(nonModule, true);
@@ -129,9 +136,9 @@ int main()
             if (lastMessage.exitStatus == EXIT_SUCCESS)
             {
                 BTCLastMessage btcLastMessage;
-                if (const auto &r = manager.sendMessage(btcLastMessage); !r)
+                if (const auto &r2 = manager.sendMessage(btcLastMessage); !r2)
                 {
-                    print("{}\n", r.error());
+                    print("{}\n", r2.error());
                     exit(EXIT_FAILURE);
                 }
                 printMessage(btcLastMessage, true);
@@ -152,11 +159,11 @@ int main()
     printMessage(lastMessage, false);
     if (lastMessage.exitStatus == EXIT_SUCCESS)
     {
-        BTCLastMessage btcLastMessage;
+        const BTCLastMessage btcLastMessage;
 
-        if (const auto &r = manager.sendMessage(btcLastMessage); !r)
+        if (const auto &r2 = manager.sendMessage(btcLastMessage); !r2)
         {
-            print("", r.error());
+            print("", r2.error());
             exit(EXIT_FAILURE);
         }
         printMessage(btcLastMessage, true);

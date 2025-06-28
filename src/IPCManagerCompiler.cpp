@@ -59,7 +59,7 @@ tl::expected<IPCManagerCompiler, string> makeIPCManagerCompiler(const string &BM
     // We use file hash to make a file path smaller, since there is a limit of NAME_MAX that is generally 108 bytes.
     // TODO
     // Have an option to receive this path in constructor to make it compatible with Android and IOS.
-    string prependDir = "/home/hassan/";
+    string prependDir = "/tmp/";
     const uint64_t hash = rapidhash(BMIIfHeaderUnitObjOtherwisePath.c_str(), BMIIfHeaderUnitObjOtherwisePath.size());
     prependDir.append(toString(hash));
     std::copy(prependDir.begin(), prependDir.end(), addr.sun_path);
@@ -113,6 +113,8 @@ tl::expected<void, string> IPCManagerCompiler::receiveBTCLastMessage() const
 
 tl::expected<BTCModule, string> IPCManagerCompiler::receiveBTCModule(const CTBModule &moduleName) const
 {
+
+//raise(SIGTRAP); // At the location of the BP.
     vector<char> buffer = getBufferWithType(CTB::MODULE);
     writeString(buffer, moduleName.moduleName);
     if (const auto &r = writeInternal(buffer); !r)

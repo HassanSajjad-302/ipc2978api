@@ -61,7 +61,7 @@ tl::expected<IPCManagerBS, string> makeIPCManagerBS(const string &BMIIfHeaderUni
     // We use file hash to make a file path smaller, since there is a limit of NAME_MAX that is generally 108 bytes.
     // TODO
     // Have an option to receive this path in constructor to make it compatible with Android and IOS.
-    string prependDir = "/home/hassan/";
+    string prependDir = "/tmp/";
     const uint64_t hash = rapidhash(BMIIfHeaderUnitObjOtherwisePath.c_str(), BMIIfHeaderUnitObjOtherwisePath.size());
     prependDir.append(toString(hash));
     std::copy(prependDir.begin(), prependDir.end(), addr.sun_path);
@@ -132,6 +132,7 @@ tl::expected<void, string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], 
 #endif
         const_cast<bool &>(connectedToCompiler) = true;
     }
+//    raise(SIGTRAP); // At the location of the BP.
 
     // Read from the pipe.
     char buffer[BUFFERSIZE];

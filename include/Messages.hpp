@@ -4,6 +4,8 @@
 #include <string>
 #include <cstdint>
 #include <vector>
+#include <signal.h>
+
 
 using std::string, std::vector;
 
