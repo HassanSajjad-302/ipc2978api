@@ -4,7 +4,9 @@
 
 #include "Messages.hpp"
 #include <random>
+#include <string>
 
+using std::string;
 using namespace N2978;
 
 inline std::random_device rd;

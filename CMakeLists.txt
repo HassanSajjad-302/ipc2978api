@@ -16,17 +16,21 @@ target_include_directories(BuildSystem PUBLIC include)
 target_include_directories(Compiler PUBLIC include)
 
 
-add_executable(BuildSystemTest tests/BuildSystemTest.cpp
-        tests/Testing.cpp)
-add_executable(CompilerTest tests/CompilerTest.cpp
-        tests/Testing.cpp)
+add_library(fmt tests/fmt/src/format.cc tests/fmt/src/os.cc)
+target_include_directories(fmt PUBLIC tests/fmt/include)
 
-add_subdirectory(tests/fmt)
+add_library(Testing tests/Testing.cpp)
+target_include_directories(Testing PUBLIC include)
+target_link_libraries(Testing PUBLIC fmt)
 
-target_link_libraries(BuildSystemTest PUBLIC BuildSystem fmt::fmt)
-target_link_libraries(CompilerTest PUBLIC Compiler fmt::fmt)
+add_executable(BuildSystemTest tests/BuildSystemTest.cpp)
+add_executable(CompilerTest tests/CompilerTest.cpp)
 
-add_executable(ClangTest tests/ClangTest.cpp tests/Testing.cpp)
 
-target_link_libraries(ClangTest PRIVATE BuildSystem Compiler)
+target_link_libraries(BuildSystemTest PUBLIC BuildSystem Testing)
+target_link_libraries(CompilerTest PUBLIC Compiler Testing)
+
+add_executable(ClangTest tests/ClangTest.cpp)
+
+target_link_libraries(ClangTest PUBLIC BuildSystem Compiler Testing)
 target_include_directories(ClangTest PUBLIC include)

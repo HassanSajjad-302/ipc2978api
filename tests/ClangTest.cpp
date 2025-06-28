@@ -1,16 +1,17 @@
 
 #include "IPCManagerBS.hpp"
 #include "Testing.hpp"
+#include "fmt/printf.h"
 
 #include <Windows.h>
 #include <filesystem>
 #include <fstream>
-#include <print>
 #include <thread>
 
 using namespace std::filesystem;
 using namespace N2978;
 using namespace std;
+using fmt::print;
 
 // Copied From Ninja code-base.
 /// Wraps a synchronous execution of a CL subprocess.
@@ -138,7 +139,7 @@ int printOutputAndClosePipes()
         Win32Fatal("CloseHandle");
     }
 
-    print("{}", output);
+    fmt::print("{}", output);
     return exit_code;
 }
 

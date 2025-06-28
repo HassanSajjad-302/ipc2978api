@@ -20,21 +20,21 @@ using std::string;
 namespace N2978
 {
 
-tl::expected<IPCManagerBS, string> makeIPCManagerBS(const string &BMIIfHeaderUnitObjOtherwisePath)
+tl::expected<IPCManagerBS, string> makeIPCManagerBS(string BMIIfHeaderUnitObjOtherwisePath)
 {
 #ifdef _WIN32
-    objOrCompilerFilePath = R"(\\.\pipe\)" + objOrCompilerFilePath;
-    void *hPipe = CreateNamedPipeA(objOrCompilerFilePath.c_str(),     // pipe name
-                                   PIPE_ACCESS_DUPLEX |               // read/write access
-                                       FILE_FLAG_FIRST_PIPE_INSTANCE, // overlapped mode
-                                   PIPE_TYPE_MESSAGE |                // message-type pipe
-                                       PIPE_READMODE_MESSAGE |        // message read mode
-                                       PIPE_WAIT,                     // blocking mode
-                                   1,                                 // unlimited instances
-                                   BUFFERSIZE * sizeof(TCHAR),        // output buffer size
-                                   BUFFERSIZE * sizeof(TCHAR),        // input buffer size
-                                   PIPE_TIMEOUT,                      // client time-out
-                                   nullptr);                          // default security attributes
+    BMIIfHeaderUnitObjOtherwisePath = R"(\\.\pipe\)" + BMIIfHeaderUnitObjOtherwisePath;
+    void *hPipe = CreateNamedPipeA(BMIIfHeaderUnitObjOtherwisePath.c_str(), // pipe name
+                                   PIPE_ACCESS_DUPLEX |                     // read/write access
+                                       FILE_FLAG_FIRST_PIPE_INSTANCE,       // overlapped mode
+                                   PIPE_TYPE_MESSAGE |                      // message-type pipe
+                                       PIPE_READMODE_MESSAGE |              // message read mode
+                                       PIPE_WAIT,                           // blocking mode
+                                   1,                                       // unlimited instances
+                                   BUFFERSIZE * sizeof(TCHAR),              // output buffer size
+                                   BUFFERSIZE * sizeof(TCHAR),              // input buffer size
+                                   PIPE_TIMEOUT,                            // client time-out
+                                   nullptr);                                // default security attributes
     if (hPipe == INVALID_HANDLE_VALUE)
     {
         return tl::unexpected(getErrorString());
@@ -132,7 +132,7 @@ tl::expected<void, string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], 
 #endif
         const_cast<bool &>(connectedToCompiler) = true;
     }
-//    raise(SIGTRAP); // At the location of the BP.
+    //    raise(SIGTRAP); // At the location of the BP.
 
     // Read from the pipe.
     char buffer[BUFFERSIZE];
@@ -293,12 +293,12 @@ tl::expected<void, string> IPCManagerBS::sendMessage(const BTCLastMessage &) con
 
 tl::expected<MemoryMappedBMIFile, string> IPCManagerBS::createSharedMemoryBMIFile(const BMIFile &bmiFile)
 {
-    MemoryMappedBMIFile sharedFile;
+    MemoryMappedBMIFile sharedFile{};
 #ifdef _WIN32
     // 1) Open the existing file‐mapping object (must have been created by another process)
-    sharedFile.mapping = OpenFileMappingA(FILE_MAP_READ,             // read‐only access
-                                          FALSE,                     // do not inherit handle
-                                          sharedFile.filePath.data() // name of mapping
+    sharedFile.mapping = OpenFileMappingA(FILE_MAP_READ,           // read‐only access
+                                          FALSE,                   // do not inherit handle
+                                          bmiFile.filePath.c_str() // name of mapping
     );
 
     if (sharedFile.mapping == nullptr)

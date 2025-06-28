@@ -11,7 +11,7 @@ namespace N2978
 // IPC Manager BuildSystem
 class IPCManagerBS : public Manager
 {
-    friend tl::expected<IPCManagerBS, string> makeIPCManagerBS(const string& BMIIfHeaderUnitObjOtherwisePath);
+    friend tl::expected<IPCManagerBS, string> makeIPCManagerBS(string BMIIfHeaderUnitObjOtherwisePath);
     bool connectedToCompiler = false;
 
 #ifdef _WIN32
@@ -33,6 +33,6 @@ class IPCManagerBS : public Manager
     static tl::expected<void, string> deleteBMIFileMapping(const MemoryMappedBMIFile &memoryMappedBMIFile);
 };
 
-tl::expected<IPCManagerBS, string> makeIPCManagerBS(const string& BMIIfHeaderUnitObjOtherwisePath);
+tl::expected<IPCManagerBS, string> makeIPCManagerBS(string BMIIfHeaderUnitObjOtherwisePath);
 } // namespace N2978
 #endif // IPC_MANAGER_BS_HPP

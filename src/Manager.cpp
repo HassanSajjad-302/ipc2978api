@@ -3,12 +3,11 @@
 #include "Messages.hpp"
 #include "expected.hpp"
 
-#include <unistd.h>
-
 #ifdef _WIN32
 #include <Windows.h>
 #else
 #include <cstring>
+#include <unistd.h>
 #endif
 
 namespace N2978
@@ -137,13 +136,12 @@ tl::expected<void, string> Manager::writeInternal(const vector<char> &buffer) co
     {
         return tl::unexpected(getErrorString());
     }
-
-#endif
-
+#else
     if (const auto &r = writeAll(fdSocket, buffer.data(), buffer.size()); !r)
     {
         return tl::unexpected(r.error());
     }
+#endif
     return {};
 }
 

@@ -5,8 +5,6 @@
 #include "rapidhash.h"
 
 #include <string>
-#include <sys/socket.h>
-#include <sys/un.h>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -16,6 +14,8 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #endif
 
 using std::string;
@@ -26,7 +26,7 @@ namespace N2978
 tl::expected<IPCManagerCompiler, string> makeIPCManagerCompiler(const string &BMIIfHeaderUnitObjOtherwisePath)
 {
 #ifdef _WIN32
-    HANDLE hPipe = CreateFileA(pipeName.data(), // pipe name
+    HANDLE hPipe = CreateFileA(BMIIfHeaderUnitObjOtherwisePath.data(), // pipe name
                                GENERIC_READ |   // read and write access
                                    GENERIC_WRITE,
                                0,             // no sharing
