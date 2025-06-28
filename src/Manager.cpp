@@ -34,7 +34,6 @@ string getErrorString()
     LocalFree(msg_buf);
     return msg;
 #else
-    printf(std::strerror(errno));
     return {std::strerror(errno)};
 #endif
 }
@@ -158,7 +157,7 @@ vector<char> Manager::getBufferWithType(CTB type)
 void Manager::writeUInt32(vector<char> &buffer, const uint32_t value)
 {
     const auto ptr = reinterpret_cast<const char *>(&value);
-    buffer.insert(buffer.end(), ptr, ptr + sizeof(value));
+    buffer.insert(buffer.end(), ptr, ptr + 4);
 }
 
 void Manager::writeString(vector<char> &buffer, const string &str)

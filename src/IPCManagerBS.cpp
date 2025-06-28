@@ -102,6 +102,7 @@ IPCManagerBS::IPCManagerBS(const int fdSocket_)
 }
 #endif
 
+bool checked = false;
 tl::expected<void, string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType) const
 {
     if (!connectedToCompiler)
@@ -117,11 +118,16 @@ tl::expected<void, string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], 
         }
 #else
         const int fd = accept(fdSocket, nullptr, nullptr);
+        close(fdSocket);
         if (fd == -1)
         {
-            close(fdSocket);
             return tl::unexpected(getErrorString());
         }
+        if (checked)
+        {
+            bool breakpoint = true;
+        }
+        checked = true;
         const_cast<int &>(fdSocket) = fd;
 #endif
         const_cast<bool &>(connectedToCompiler) = true;

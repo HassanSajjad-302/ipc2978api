@@ -64,7 +64,7 @@ tl::expected<IPCManagerCompiler, string> makeIPCManagerCompiler(const string &BM
     prependDir.append(toString(hash));
     std::copy(prependDir.begin(), prependDir.end(), addr.sun_path);
 
-    if (!connect(fdSocket, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)))
+    if (connect(fdSocket, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == -1)
     {
         return tl::unexpected(getErrorString());
     }

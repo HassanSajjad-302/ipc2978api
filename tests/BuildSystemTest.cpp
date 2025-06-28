@@ -1,11 +1,10 @@
 #include "IPCManagerBS.hpp"
 #include "Testing.hpp"
+#include "fmt/printf.h"
 
 #include <chrono>
 #include <filesystem>
 #include <iostream>
-#include <print>
-#include <thread>
 #ifdef _WIN32
 #include <Windows.h>
 #else
@@ -16,7 +15,7 @@
 #include <unistd.h>
 #endif
 
-using std::print, std::string_view;
+using fmt::print, std::string_view;
 
 tl::expected<string_view, string> readSharedMemoryBMIFile(const BMIFile &file)
 {
@@ -98,7 +97,11 @@ int main()
             file.fileSize = 0;
             BTCModule b;
             b.requested = std::move(file);
-            manager.sendMessage(b);
+            if (const auto &r = manager.sendMessage(b); !r)
+            {
+                print("{}\n", r.error());
+                exit(EXIT_FAILURE);
+            }
             printMessage(b, true);
         }
 
@@ -110,7 +113,11 @@ int main()
             BTCNonModule nonModule;
             nonModule.isHeaderUnit = getRandomBool();
             nonModule.filePath = getRandomString();
-            manager.sendMessage(nonModule);
+            if (const auto &r = manager.sendMessage(nonModule); !r)
+            {
+                print("{}\n", r.error());
+                exit(EXIT_FAILURE);
+            }
             printMessage(nonModule, true);
         }
 
@@ -122,7 +129,11 @@ int main()
             if (lastMessage.exitStatus == EXIT_SUCCESS)
             {
                 BTCLastMessage btcLastMessage;
-                manager.sendMessage(btcLastMessage);
+                if (const auto &r = manager.sendMessage(btcLastMessage); !r)
+                {
+                    print("{}\n", r.error());
+                    exit(EXIT_FAILURE);
+                }
                 printMessage(btcLastMessage, true);
             }
             loopExit = true;
@@ -143,7 +154,11 @@ int main()
     {
         BTCLastMessage btcLastMessage;
 
-        manager.sendMessage(btcLastMessage);
+        if (const auto &r = manager.sendMessage(btcLastMessage); !r)
+        {
+            print("", r.error());
+            exit(EXIT_FAILURE);
+        }
         printMessage(btcLastMessage, true);
     }
 

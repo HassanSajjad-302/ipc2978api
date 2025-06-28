@@ -1,8 +1,8 @@
 
 #include "Testing.hpp"
-#include <print>
+#include "fmt/printf.h"
 
-using std::print;
+using fmt::print;
 string getRandomString()
 {
     const string characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";

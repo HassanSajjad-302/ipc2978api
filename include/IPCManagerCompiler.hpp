@@ -14,7 +14,7 @@ class IPCManagerCompiler : protected Manager
 {
     template <typename T> tl::expected<T, string> receiveMessage() const;
     // This is not exposed. sendCTBLastMessage calls this.
-    tl::expected<void, string> receiveBTCLastMessage() const;
+    [[nodiscard]] tl::expected<void, string> receiveBTCLastMessage() const;
 
   public:
 #ifdef _WIN32
@@ -22,10 +22,10 @@ class IPCManagerCompiler : protected Manager
 #else
     explicit IPCManagerCompiler(int fdSocket_);
 #endif
-    tl::expected<BTCModule, string> receiveBTCModule(const CTBModule &moduleName) const;
-    tl::expected<BTCNonModule, string> receiveBTCNonModule(const CTBNonModule &nonModule) const;
-    tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage) const;
-    tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage, const string &bmiFile,
+    [[nodiscard]] tl::expected<BTCModule, string> receiveBTCModule(const CTBModule &moduleName) const;
+    [[nodiscard]] tl::expected<BTCNonModule, string> receiveBTCNonModule(const CTBNonModule &nonModule) const;
+    [[nodiscard]] tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage) const;
+    [[nodiscard]] tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage, const string &bmiFile,
                                                   const string &filePath) const;
     static tl::expected<string_view, string> readSharedMemoryBMIFile(const BMIFile &file);
 };

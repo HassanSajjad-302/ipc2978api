@@ -3,11 +3,12 @@
 #include "Testing.hpp"
 #include <chrono>
 #include <filesystem>
-#include <print>
+#include "fmt/printf.h"
 #include <random>
 #include <string>
 #include <thread>
 
+using fmt::print;
 using namespace std;
 using namespace N2978;
 int main()
@@ -21,9 +22,16 @@ int main()
             CTBModule ctbModule;
             ctbModule.moduleName = getRandomString();
 
-            const BTCModule &btcModule = manager.receiveBTCModule(ctbModule).value();
-            printMessage(ctbModule, true);
-            printMessage(btcModule, false);
+            if (const auto &r = manager.receiveBTCModule(ctbModule); !r)
+            {
+                print("{}\n", r.error());
+                exit(EXIT_FAILURE);
+            }
+            else
+            {
+                printMessage(ctbModule, true);
+                printMessage(*r, false);
+            }
         }
         else
         {
@@ -31,15 +39,26 @@ int main()
             nonModule.isHeaderUnit = getRandomBool();
             nonModule.str = "3";
 
-            BTCNonModule btcNonModule = manager.receiveBTCNonModule(nonModule).value();
-            printMessage(nonModule, true);
-            printMessage(btcNonModule, false);
+            if (const auto &r = manager.receiveBTCNonModule(nonModule); !r)
+            {
+                print("{}\n", r.error());
+                exit(EXIT_FAILURE);
+            }
+            else
+            {
+                printMessage(nonModule, true);
+                printMessage(*r, false);
+            }
         }
     }
 
     CTBLastMessage ctbLastMessage;
     ctbLastMessage.exitStatus = EXIT_SUCCESS;
-    manager.sendCTBLastMessage(ctbLastMessage);
+    if (const auto &r = manager.sendCTBLastMessage(ctbLastMessage); !r)
+    {
+        print("{}\n", r.error());
+        exit(EXIT_FAILURE);
+    }
 
     printMessage(ctbLastMessage, true);
     print("Received Last Message\n");
@@ -50,8 +69,13 @@ int main()
     string fileContent = getRandomString();
     ctbLastMessage2.fileSize = fileContent.size();
     print("File Content:\n\n", fileContent);
-    manager.sendCTBLastMessage(ctbLastMessage2, fileContent,
-                               (std::filesystem::current_path() / "bmi.txt").generic_string());
+    if (const auto &r = manager.sendCTBLastMessage(ctbLastMessage2, fileContent,
+                                                   (std::filesystem::current_path() / "bmi.txt").generic_string());
+        !r)
+    {
+        print("{}\n", r.error());
+        exit(EXIT_FAILURE);
+    }
 
     printMessage(ctbLastMessage2, true);
     print("{}", fileContent);

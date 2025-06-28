@@ -3,6 +3,8 @@ project(named_pipes)
 
 set(CMAKE_CXX_STANDARD 17)
 
+#add_link_options(-fsanitize=thread -fno-omit-frame-pointer)
+#add_compile_options(-fno-exceptions -fno-rtti)
 
 add_library(BuildSystem src/IPCManagerBS.cpp
         src/Manager.cpp)
@@ -19,15 +21,12 @@ add_executable(BuildSystemTest tests/BuildSystemTest.cpp
 add_executable(CompilerTest tests/CompilerTest.cpp
         tests/Testing.cpp)
 
-target_link_libraries(BuildSystemTest PRIVATE BuildSystem)
-target_link_libraries(CompilerTest PRIVATE Compiler)
+add_subdirectory(tests/fmt)
+
+target_link_libraries(BuildSystemTest PUBLIC BuildSystem fmt::fmt)
+target_link_libraries(CompilerTest PUBLIC Compiler fmt::fmt)
 
 add_executable(ClangTest tests/ClangTest.cpp tests/Testing.cpp)
 
-set_target_properties(BuildSystemTest PROPERTIES CXX_STANDARD 23)
-set_target_properties(CompilerTest PROPERTIES CXX_STANDARD 23)
-set_target_properties(ClangTest PROPERTIES CXX_STANDARD 23)
-
-target_link_libraries(ClangTest  BuildSystem)
-target_link_libraries(ClangTest Compiler)
+target_link_libraries(ClangTest PRIVATE BuildSystem Compiler)
 target_include_directories(ClangTest PUBLIC include)

@@ -26,9 +26,9 @@ class IPCManagerBS : public Manager
     IPCManagerBS(IPCManagerBS &&) = default;
     IPCManagerBS &operator=(IPCManagerBS &&) = default;
     tl::expected<void, string> receiveMessage(char (&ctbBuffer)[320], CTB &messageType) const;
-    tl::expected<void, string> sendMessage(const BTCModule &moduleFile) const;
-    tl::expected<void, string> sendMessage(const BTCNonModule &nonModule) const;
-    tl::expected<void, string> sendMessage(const BTCLastMessage &lastMessage) const;
+    [[nodiscard]] tl::expected<void, string> sendMessage(const BTCModule &moduleFile) const;
+    [[nodiscard]] tl::expected<void, string> sendMessage(const BTCNonModule &nonModule) const;
+    [[nodiscard]] tl::expected<void, string> sendMessage(const BTCLastMessage &lastMessage) const;
     static tl::expected<MemoryMappedBMIFile, string> createSharedMemoryBMIFile(const BMIFile &bmiFile);
     static tl::expected<void, string> deleteBMIFileMapping(const MemoryMappedBMIFile &memoryMappedBMIFile);
 };
