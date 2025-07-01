@@ -100,7 +100,7 @@ tl::expected<void, string> IPCManagerCompiler::receiveBTCLastMessage() const
 
     if (buffer[0] != false)
     {
-        IPCErr(ErrorCategory::INCORRECT_BTC_LAST_MESSAGE)
+        return tl::unexpected(getErrorString(ErrorCategory::INCORRECT_BTC_LAST_MESSAGE));
     }
 
     if (constexpr uint32_t bytesProcessed = 1; bytesRead != bytesProcessed)
@@ -119,7 +119,7 @@ tl::expected<BTCModule, string> IPCManagerCompiler::receiveBTCModule(const CTBMo
     writeString(buffer, moduleName.moduleName);
     if (const auto &r = writeInternal(buffer); !r)
     {
-        IPCErr(r.error());
+        return tl::unexpected(r.error());
     }
 
     return receiveMessage<BTCModule>();
@@ -132,7 +132,7 @@ tl::expected<BTCNonModule, string> IPCManagerCompiler::receiveBTCNonModule(const
     writeString(buffer, nonModule.str);
     if (const auto &r = writeInternal(buffer); !r)
     {
-        IPCErr(r.error())
+        return tl::unexpected(r.error());
     }
     return receiveMessage<BTCNonModule>();
 }
@@ -147,7 +147,7 @@ tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastM
     writeString(buffer, lastMessage.logicalName);
     if (const auto &r = writeInternal(buffer); !r)
     {
-        IPCErr(r.error())
+        return tl::unexpected(r.error());
     }
     return {};
 }
@@ -198,14 +198,14 @@ tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastM
 
     if (const auto &r = sendCTBLastMessage(lastMessage); !r)
     {
-        IPCErr(r.error())
+        return tl::unexpected(r.error());
     }
 
     if (lastMessage.exitStatus == EXIT_SUCCESS)
     {
         if (const auto &r = receiveBTCLastMessage(); !r)
         {
-            IPCErr(r.error())
+            return tl::unexpected(r.error());
         }
     }
 
@@ -261,8 +261,9 @@ tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastM
     return {};
 }
 
-tl::expected<string_view, string> IPCManagerCompiler::readSharedMemoryBMIFile(const BMIFile &file)
+tl::expected<MemoryMappedBMIFile, string> IPCManagerCompiler::readSharedMemoryBMIFile(const BMIFile &file)
 {
+    MemoryMappedBMIFile f{};
 #ifdef _WIN32
     // 1) Open the existing file‐mapping object (must have been created by another process)
     const HANDLE mapping = OpenFileMappingA(FILE_MAP_READ,       // read‐only access
@@ -289,10 +290,9 @@ tl::expected<string_view, string> IPCManagerCompiler::readSharedMemoryBMIFile(co
         return tl::unexpected(getErrorString());
     }
 
-    MemoryMappedBMIFile f{};
     f.mapping = mapping;
     f.view = view;
-    return string_view{static_cast<char *>(view), file.fileSize};
+    f.file = {static_cast<char *>(view), file.fileSize};
 #else
     const int fd = open(file.filePath.data(), O_RDONLY);
     if (fd == -1)
@@ -314,7 +314,8 @@ tl::expected<string_view, string> IPCManagerCompiler::readSharedMemoryBMIFile(co
     MemoryMappedBMIFile f{};
     f.mapping = mapping;
     f.mappingSize = file.fileSize;
-    return string_view{static_cast<char *>(mapping), file.fileSize};
+    f.file = {static_cast<char *>(mapping), file.fileSize};
 #endif
+    return f;
 }
 } // namespace N2978

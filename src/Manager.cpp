@@ -89,7 +89,7 @@ tl::expected<uint32_t, string> Manager::readInternal(char (&buffer)[BUFFERSIZE])
 
     if (!bytesRead)
     {
-        IPCErr(ErrorCategory::READ_FILE_ZERO_BYTES_READ)
+        return tl::unexpected(getErrorString(ErrorCategory::READ_FILE_ZERO_BYTES_READ));
     }
 
     return bytesRead;
@@ -217,6 +217,23 @@ void Manager::writeVectorOfHuDep(vector<char> &buffer, const vector<HuDep> &deps
     {
         writeHuDep(buffer, dep);
     }
+}
+
+tl::expected<void, string> Manager::closeBMIFileMapping(const MemoryMappedBMIFile &memoryMappedBMIFile)
+{
+#ifdef _WIN32
+    if (memoryMappedBMIFile.view)
+    {
+        CloseHandle(memoryMappedBMIFile.view);
+    }
+    CloseHandle(memoryMappedBMIFile.mapping);
+#else
+    if (munmap(memoryMappedBMIFile.mapping, memoryMappedBMIFile.mappingSize) == -1)
+    {
+        return tl::unexpected(getErrorString());
+    }
+#endif
+    return {};
 }
 
 tl::expected<bool, string> Manager::readBoolFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,

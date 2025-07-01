@@ -27,7 +27,7 @@ class IPCManagerCompiler : protected Manager
     [[nodiscard]] tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage) const;
     [[nodiscard]] tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage, const string &bmiFile,
                                                   const string &filePath) const;
-    static tl::expected<string_view, string> readSharedMemoryBMIFile(const BMIFile &file);
+    static tl::expected<MemoryMappedBMIFile, string> readSharedMemoryBMIFile(const BMIFile &file);
 };
 
 template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage() const
@@ -119,7 +119,7 @@ template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage
 
     if (bytesRead != bytesProcessed)
     {
-        IPCErr(bytesRead, bytesProcessed)
+        return tl::unexpected(getErrorString(bytesRead, bytesProcessed));
     }
 }
 [[nodiscard]] tl::expected<IPCManagerCompiler, string> makeIPCManagerCompiler(const string& BMIIfHeaderUnitObjOtherwisePath);

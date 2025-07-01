@@ -139,7 +139,7 @@ tl::expected<void, string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], 
     uint32_t bytesRead;
     if (const auto &r = readInternal(buffer); !r)
     {
-        IPCErr(r.error())
+        return tl::unexpected(r.error());
     }
     else
     {
@@ -157,7 +157,7 @@ tl::expected<void, string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], 
         const auto &r = readStringFromPipe(buffer, bytesRead, bytesProcessed);
         if (!r)
         {
-            IPCErr(r.error())
+            return tl::unexpected(r.error());
         }
 
         messageType = CTB::MODULE;
@@ -193,37 +193,37 @@ tl::expected<void, string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], 
         const auto &exitStatusExpected = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
         if (!exitStatusExpected)
         {
-            IPCErr(exitStatusExpected.error())
+            return tl::unexpected(exitStatusExpected.error());
         }
 
         const auto &headerFilesExpected = readVectorOfStringFromPipe(buffer, bytesRead, bytesProcessed);
         if (!headerFilesExpected)
         {
-            IPCErr(headerFilesExpected.error())
+            return tl::unexpected(headerFilesExpected.error());
         }
 
         const auto &outputExpected = readStringFromPipe(buffer, bytesRead, bytesProcessed);
         if (!outputExpected)
         {
-            IPCErr(outputExpected.error())
+            return tl::unexpected(outputExpected.error());
         }
 
         const auto &errorOutputExpected = readStringFromPipe(buffer, bytesRead, bytesProcessed);
         if (!errorOutputExpected)
         {
-            IPCErr(errorOutputExpected.error())
+            return tl::unexpected(errorOutputExpected.error());
         }
 
         const auto &logicalNameExpected = readStringFromPipe(buffer, bytesRead, bytesProcessed);
         if (!logicalNameExpected)
         {
-            IPCErr(logicalNameExpected.error())
+            return tl::unexpected(logicalNameExpected.error());
         }
 
         const auto &fileSizeExpected = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
         if (!fileSizeExpected)
         {
-            IPCErr(fileSizeExpected.error())
+            return tl::unexpected(fileSizeExpected.error());
         }
 
         messageType = CTB::LAST_MESSAGE;
@@ -242,12 +242,12 @@ tl::expected<void, string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], 
 
     default:
 
-        IPCErr(ErrorCategory::UNKNOWN_CTB_TYPE)
+        return tl::unexpected(getErrorString(ErrorCategory::UNKNOWN_CTB_TYPE));
     }
 
     if (bytesRead != bytesProcessed)
     {
-        IPCErr(bytesRead, bytesProcessed)
+        return tl::unexpected(getErrorString(bytesRead, bytesProcessed));
     }
 
     return {};
@@ -327,16 +327,4 @@ tl::expected<MemoryMappedBMIFile, string> IPCManagerBS::createSharedMemoryBMIFil
 #endif
 }
 
-tl::expected<void, string> IPCManagerBS::deleteBMIFileMapping(const MemoryMappedBMIFile &memoryMappedBMIFile)
-{
-#ifdef _WIN32
-    CloseHandle(memoryMappedBMIFile.mapping);
-#else
-    if (munmap(memoryMappedBMIFile.mapping, memoryMappedBMIFile.mappingSize) == -1)
-    {
-        return tl::unexpected(getErrorString());
-    }
-#endif
-    return {};
-}
 } // namespace N2978

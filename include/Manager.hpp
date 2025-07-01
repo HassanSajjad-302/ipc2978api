@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-using std::string, std::vector;
+using std::string, std::vector, std::string_view;
 
 #define BUFFERSIZE 4096
 
@@ -43,7 +43,18 @@ inline string getErrorString(string err)
 {
     return err;
 }
-#define IPCErr(...) return tl::unexpected(getErrorString(__VA_ARGS__));
+
+struct MemoryMappedBMIFile
+{
+    string_view file;
+#ifdef _WIN32
+    void *mapping;
+    void *view;
+#else
+    void *mapping;
+    uint32_t mappingSize;
+#endif
+};
 
 class Manager
 {
@@ -67,6 +78,7 @@ class Manager
     static void writeVectorOfMemoryMappedBMIFiles(vector<char> &buffer, const vector<BMIFile> &files);
     static void writeVectorOfModuleDep(vector<char> &buffer, const vector<ModuleDep> &deps);
     static void writeVectorOfHuDep(vector<char> &buffer, const vector<HuDep> &deps);
+    static tl::expected<void, string> closeBMIFileMapping(const MemoryMappedBMIFile &memoryMappedBMIFile);
 
     tl::expected<bool, string> readBoolFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                                                 uint32_t &bytesProcessed) const;
@@ -103,18 +115,7 @@ template <typename T> T &getInitializedObjectFromBuffer(char (&buffer)[320])
     return t;
 }
 
-struct MemoryMappedBMIFile
-{
-#ifdef _WIN32
-    void *mapping;
-    void *view;
-#else
-    void *mapping;
-    uint32_t mappingSize;
-#endif
-};
-
-inline std::string toString(uint64_t v)
+inline std::string toString(const uint64_t v)
 {
     static auto lut = "0123456789abcdef";
     std::string out;

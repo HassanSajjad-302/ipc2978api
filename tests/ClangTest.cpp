@@ -1,19 +1,38 @@
+//===- unittests/IPC2978/IPC2978Test.cpp - Tests IPC2978 Support -===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
 
+// The following line is uncommented by clang/lib/IPC2978/setup.py for clang/unittests/IPC2978/IPC2978.cpp
+
+// #define IS_THIS_CLANG_REPO
+
+#ifdef IS_THIS_CLANG_REPO
+#include "clang/IPC2978/IPCManagerBS.hpp"
+#include "gtest/gtest.h"
+template <typename T> void printMessage(const T &, bool)
+{
+}
+#else
 #include "IPCManagerBS.hpp"
 #include "Testing.hpp"
 #include "fmt/printf.h"
+#endif
 
 #include <Windows.h>
 #include <filesystem>
 #include <fstream>
-#include <thread>
 
 using namespace std::filesystem;
 using namespace N2978;
 using namespace std;
-using fmt::print;
 
-// Copied From Ninja code-base.
+// This code is used for launching process and using pipes to get stdout and stderr since the return ofstdout and stderr
+// is not implemented in CTBLastMessage yet.
+// Copied From HMake codebase which copied from Ninja code-base with some changes.
 /// Wraps a synchronous execution of a CL subprocess.
 struct CLWrapper
 {
@@ -30,57 +49,24 @@ struct CLWrapper
 
     /// Start a process and gather its raw output.  Returns its exit code.
     /// Crashes (calls Fatal()) on error.
-    void Run(const std::string &command) const;
+    tl::expected<void, string> Run(const std::string &command) const;
 
     void *env_block_;
 };
 
-// TODO
-//  Error should throw and not exit
-void Fatal(const char *msg, ...)
-{
-    va_list ap;
-    fprintf(stderr, "ninja: fatal: ");
-    va_start(ap, msg);
-    vfprintf(stderr, msg, ap);
-    va_end(ap);
-    fprintf(stderr, "\n");
-#ifdef _WIN32
-    // On Windows, some tools may inject extra threads.
-    // exit() may block on locks held by those threads, so forcibly exit.
-    fflush(stderr);
-    fflush(stdout);
-    ExitProcess(1);
-#else
-    exit(1);
-#endif
-}
-
-void Win32Fatal(const char *function, const char *hint = nullptr)
-{
-    if (hint)
-    {
-        Fatal("%s: %s (%s)", function, getErrorString().c_str(), hint);
-    }
-    else
-    {
-        Fatal("%s: %s", function, getErrorString().c_str());
-    }
-}
-
 HANDLE stdout_read, stdout_write;
 PROCESS_INFORMATION process_info = {};
-void CLWrapper::Run(const string &command) const
+tl::expected<void, string> CLWrapper::Run(const string &command) const
 {
     SECURITY_ATTRIBUTES security_attributes = {};
     security_attributes.nLength = sizeof(SECURITY_ATTRIBUTES);
     security_attributes.bInheritHandle = TRUE;
 
     if (!CreatePipe(&stdout_read, &stdout_write, &security_attributes, 0))
-        Win32Fatal("CreatePipe");
+        return tl::unexpected("CreatePipe" + getErrorString());
 
     if (!SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0))
-        Win32Fatal("SetHandleInformation");
+        return tl::unexpected("SetHandleInformation" + getErrorString());
 
     STARTUPINFOA startup_info = {};
     startup_info.cb = sizeof(STARTUPINFOA);
@@ -91,12 +77,12 @@ void CLWrapper::Run(const string &command) const
     if (!CreateProcessA(nullptr, (char *)command.c_str(), nullptr, nullptr,
                         /* inherit handles */ TRUE, 0, env_block_, nullptr, &startup_info, &process_info))
     {
-        Win32Fatal("CreateProcess");
+        return tl::unexpected("CreateProcess" + getErrorString());
     }
 
     if (!CloseHandle(stdout_write))
     {
-        Win32Fatal("CloseHandle");
+        return tl::unexpected("CloseHandle" + getErrorString());
     }
 }
 
@@ -110,7 +96,7 @@ bool isProcessAlive(HANDLE hProcess)
     return false; // Error getting exit code
 }
 
-int printOutputAndClosePipes()
+tl::expected<int, string> printOutputAndClosePipes()
 {
 
     string output;
@@ -122,28 +108,30 @@ int printOutputAndClosePipes()
         read_len = 0;
         if (!::ReadFile(stdout_read, buf, sizeof(buf), &read_len, nullptr) && GetLastError() != ERROR_BROKEN_PIPE)
         {
-            Win32Fatal("ReadFile");
+            return tl::unexpected("ReadFile" + getErrorString());
         }
         output.append(buf, read_len);
     }
 
     // Wait for it to exit and grab its exit code.
     if (WaitForSingleObject(process_info.hProcess, INFINITE) == WAIT_FAILED)
-        Win32Fatal("WaitForSingleObject");
+        return tl::unexpected("WaitForSingleObject" + getErrorString());
     DWORD exit_code = 0;
     if (!GetExitCodeProcess(process_info.hProcess, &exit_code))
-        Win32Fatal("GetExitCodeProcess");
+        return tl::unexpected("GetExitCodeProcess" + getErrorString());
 
     if (!CloseHandle(stdout_read) || !CloseHandle(process_info.hProcess) || !CloseHandle(process_info.hThread))
     {
-        Win32Fatal("CloseHandle");
+        return tl::unexpected("CloseHandle" + getErrorString());
     }
 
+#ifndef IS_THIS_CLANG_REPO
     fmt::print("{}", output);
+#endif
     return exit_code;
 }
 
-void setupTest()
+[[nodiscard]] tl::expected<void, string> setupTest()
 {
 
     const string mod = R"(export module mod;
@@ -192,37 +180,42 @@ int main()
 
     // compile main.cpp which imports B.cpp which imports A.cpp.
 
-    if (system(R"(.\clang.exe -std=c++20 mod2.cppm -c -fmodule-output="mod2.pcm"  -fmodules-reduced-bmi -o  mod2.o)") !=
+    if (system(
+            R"(.\clang.exe -std=c++20 mod2.cppm -c -fmodule-output="mod2 .pcm"  -fmodules-reduced-bmi -o  "mod2 .o")") !=
         EXIT_SUCCESS)
     {
-        print("could not run the first command\n");
+        return tl::unexpected("could not run the first command\n");
     }
 
     if (system(
-            R"(.\clang.exe -std=c++20 mod.cppm -c -fmodule-output="mod.pcm"  -fmodules-reduced-bmi -o  mod.o  -fmodule-file=mod2="./mod2.pcm")") !=
+            R"(.\clang.exe -std=c++20 mod.cppm -c -fmodule-output="mod .pcm"  -fmodules-reduced-bmi -o  "mod .o"  -fmodule-file=mod2="./mod2 .pcm")") !=
         EXIT_SUCCESS)
     {
-        print("could not run the second command command\n");
+        return tl::unexpected("could not run the second command\n");
     }
 
     if (system(
-            R"(.\clang.exe -std=c++20 mod1.cppm -c -fmodule-output="mod1.pcm"  -fmodules-reduced-bmi -o  mod1.o  -fmodule-file=mod2="./mod2.pcm")") !=
+            R"(.\clang.exe -std=c++20 mod1.cppm -c -fmodule-output="mod1 .pcm"  -fmodules-reduced-bmi -o  "mod1 .o"  -fmodule-file=mod2="./mod2 .pcm")") !=
         EXIT_SUCCESS)
     {
-        print("could not run the second command command\n");
+        tl::unexpected("could not run the second command\n");
     }
+    return {};
 }
 
-int main()
+tl::expected<int, string> runTest()
 {
 
-    setupTest();
+    if (const auto &r = setupTest(); !r)
+    {
+        return tl::unexpected(r.error());
+    }
 
     string current = current_path().generic_string() + '/';
-    string mainFilePath = current + "main.o";
-    string modFilePath = current + "mod.pcm";
-    string mod1FilePath = current + "mod1.pcm";
-    string mod2FilePath = current + "mod2.pcm";
+    string mainFilePath = current + "main .o";
+    string modFilePath = current + "mod .pcm";
+    string mod1FilePath = current + "mod1 .pcm";
+    string mod2FilePath = current + "mod2 .pcm";
 
     if (const auto &r = makeIPCManagerBS(std::move(mainFilePath)); r)
     {
@@ -230,7 +223,7 @@ int main()
         const IPCManagerBS &manager = *r;
 
         string compileCommand =
-            R"(.\clang.exe -std=c++20 -c main.cpp -noScanIPC -o "C:/Projects/llvm-project/llvm/cmake-build-debug/bin/main.o")";
+            R"(.\clang.exe -std=c++20 -c main.cpp -noScanIPC -o "C:/Projects/llvm-project/llvm/cmake-build-debug/bin/main .o")";
         CLWrapper wrapper;
         wrapper.Run(compileCommand);
 
@@ -241,9 +234,8 @@ int main()
             if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
             {
                 string str = r2.error();
-                print("{}", "creating manager failed" + r2.error() + "\n");
+                return tl::unexpected("manager receive message failed" + r2.error() + "\n");
             }
-
 
             switch (type)
             {
@@ -271,7 +263,10 @@ int main()
                     b.requested = std::move(mod);
                     b.deps.emplace_back(std::move(mod2Dep));
 
-                    manager.sendMessage(b);
+                    if (const auto &r2 = manager.sendMessage(b); !r2)
+                    {
+                        return tl::unexpected(r2.error());
+                    }
                     printMessage(b, true);
                 }
                 else if (messageCount == 1)
@@ -284,7 +279,10 @@ int main()
                     BTCModule b;
                     b.requested = std::move(mod1);
 
-                    manager.sendMessage(b);
+                    if (const auto &r2 = manager.sendMessage(b); !r2)
+                    {
+                        return tl::unexpected(r2.error());
+                    }
                     printMessage(b, true);
                 }
             }
@@ -297,7 +295,7 @@ int main()
             case CTB::LAST_MESSAGE: {
             }
 
-                print("Unexpected message received");
+                return tl::unexpected("Unexpected message received");
             }
 
             if (messageCount == 2)
@@ -308,8 +306,28 @@ int main()
     }
     else
     {
-        print("{}", "creating manager failed" + r.error() + "\n");
+        return tl::unexpected("creating manager failed" + r.error() + "\n");
     }
 
     return printOutputAndClosePipes();
 }
+
+#ifdef IS_THIS_CLANG_REPO
+TEST(IPC2978Test, IPC2978Test)
+{
+    if (const auto &r = runTest(); !r)
+    {
+        FAIL() << r.error();
+    }
+}
+#else
+int main()
+{
+    if (const auto &r = runTest(); !r)
+    {
+        fmt::print("{}\n", r.error());
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
+#endif
