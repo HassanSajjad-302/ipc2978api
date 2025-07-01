@@ -30,8 +30,8 @@ using namespace std::filesystem;
 using namespace N2978;
 using namespace std;
 
-// This code is used for launching process and using pipes to get stdout and stderr since the return ofstdout and stderr
-// is not implemented in CTBLastMessage yet.
+// This code is used for launching process and using pipes to get stdout and stderr since the return of stdout and
+// stderr is not implemented in CTBLastMessage yet.
 // Copied From HMake codebase which copied from Ninja code-base with some changes.
 /// Wraps a synchronous execution of a CL subprocess.
 struct CLWrapper
@@ -49,7 +49,7 @@ struct CLWrapper
 
     /// Start a process and gather its raw output.  Returns its exit code.
     /// Crashes (calls Fatal()) on error.
-    tl::expected<void, string> Run(const std::string &command) const;
+    [[nodiscard]] tl::expected<void, string> Run(const std::string &command) const;
 
     void *env_block_;
 };
@@ -74,7 +74,7 @@ tl::expected<void, string> CLWrapper::Run(const string &command) const
     startup_info.hStdOutput = stdout_write;
     startup_info.dwFlags |= STARTF_USESTDHANDLES;
 
-    if (!CreateProcessA(nullptr, (char *)command.c_str(), nullptr, nullptr,
+    if (!CreateProcessA(nullptr, const_cast<char *>(command.c_str()), nullptr, nullptr,
                         /* inherit handles */ TRUE, 0, env_block_, nullptr, &startup_info, &process_info))
     {
         return tl::unexpected("CreateProcess" + getErrorString());
@@ -225,7 +225,10 @@ tl::expected<int, string> runTest()
         string compileCommand =
             R"(.\clang.exe -std=c++20 -c main.cpp -noScanIPC -o "C:/Projects/llvm-project/llvm/cmake-build-debug/bin/main .o")";
         CLWrapper wrapper;
-        wrapper.Run(compileCommand);
+        if (const auto &r2 = wrapper.Run(compileCommand); !r2)
+        {
+            return tl::unexpected(r2.error());
+        }
 
         while (true)
         {
