@@ -178,7 +178,7 @@ int main()
     BMIFile file;
     file.filePath = (std::filesystem::current_path() / "bmi.txt").generic_string();
     file.fileSize = lastMessage.fileSize;
-    if (const auto &r2 =  IPCManagerCompiler::readSharedMemoryBMIFile(file); !r2)
+    if (const auto &r2 = IPCManagerCompiler::readSharedMemoryBMIFile(file); !r2)
     {
         exitFailure(r2.error());
     }
