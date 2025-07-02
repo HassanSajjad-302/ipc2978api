@@ -23,9 +23,10 @@ using std::string;
 namespace N2978
 {
 
-tl::expected<IPCManagerCompiler, string> makeIPCManagerCompiler(const string &BMIIfHeaderUnitObjOtherwisePath)
+tl::expected<IPCManagerCompiler, string> makeIPCManagerCompiler(string BMIIfHeaderUnitObjOtherwisePath)
 {
 #ifdef _WIN32
+    BMIIfHeaderUnitObjOtherwisePath = R"(\\.\pipe\)" + BMIIfHeaderUnitObjOtherwisePath;
     HANDLE hPipe = CreateFileA(BMIIfHeaderUnitObjOtherwisePath.data(), // pipe name
                                GENERIC_READ |   // read and write access
                                    GENERIC_WRITE,
@@ -98,14 +99,14 @@ tl::expected<void, string> IPCManagerCompiler::receiveBTCLastMessage() const
         bytesRead = *r;
     }
 
-    if (buffer[0] != false)
+    if (buffer[0] != true)
     {
         return tl::unexpected(getErrorString(ErrorCategory::INCORRECT_BTC_LAST_MESSAGE));
     }
 
     if (constexpr uint32_t bytesProcessed = 1; bytesRead != bytesProcessed)
     {
-        return tl::unexpected(getErrorString());
+        return tl::unexpected(getErrorString(bytesRead, bytesProcessed));
     }
 
     return {};
@@ -145,6 +146,7 @@ tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastM
     writeString(buffer, lastMessage.output);
     writeString(buffer, lastMessage.errorOutput);
     writeString(buffer, lastMessage.logicalName);
+    writeUInt32(buffer, lastMessage.fileSize);
     if (const auto &r = writeInternal(buffer); !r)
     {
         return tl::unexpected(r.error());

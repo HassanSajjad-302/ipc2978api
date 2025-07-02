@@ -55,8 +55,8 @@ void printMessage(const CTBLastMessage &lastMessage, const bool sent)
 {
     printSendingOrReceiving(sent);
     print("CTBLastMessage\n\n");
-    print("ExitStatus: {}\n\n", lastMessage.exitStatus);
-    if (lastMessage.exitStatus)
+    print("ExitStatus: {}\n\n", !lastMessage.exitStatus);
+    if (!lastMessage.exitStatus)
     {
         print("HeaderFiles Size: {}\n\n", lastMessage.headerFiles.size());
         for (uint32_t i = 0; i < lastMessage.headerFiles.size(); i++)

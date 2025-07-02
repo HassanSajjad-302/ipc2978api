@@ -122,6 +122,6 @@ template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage
         return tl::unexpected(getErrorString(bytesRead, bytesProcessed));
     }
 }
-[[nodiscard]] tl::expected<IPCManagerCompiler, string> makeIPCManagerCompiler(const string& BMIIfHeaderUnitObjOtherwisePath);
+[[nodiscard]] tl::expected<IPCManagerCompiler, string> makeIPCManagerCompiler(string BMIIfHeaderUnitObjOtherwisePath);
 } // namespace N2978
 #endif // IPC_MANAGER_COMPILER_HPP

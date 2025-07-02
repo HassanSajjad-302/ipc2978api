@@ -1,9 +1,9 @@
 
 #include "IPCManagerCompiler.hpp"
 #include "Testing.hpp"
+#include "fmt/printf.h"
 #include <chrono>
 #include <filesystem>
-#include "fmt/printf.h"
 #include <random>
 #include <string>
 #include <thread>
@@ -11,13 +11,21 @@
 using fmt::print;
 using namespace std;
 using namespace N2978;
+
+void exitFailure(const string &r)
+{
+
+    print(stderr, "{}\n", r);
+    print("Test Failed\n");
+    exit(EXIT_FAILURE);
+}
+
 int main()
 {
     const auto &r = makeIPCManagerCompiler((filesystem::current_path() / "test").string());
     if (!r)
     {
-        print("{}\n", r.error());
-        exit(EXIT_FAILURE);
+        exitFailure(r.error());
     }
     const IPCManagerCompiler &manager = r.value();
     std::uniform_int_distribution distribution(0, 20);
@@ -30,8 +38,7 @@ int main()
 
             if (const auto &r2 = manager.receiveBTCModule(ctbModule); !r2)
             {
-                print("{}\n", r2.error());
-                exit(EXIT_FAILURE);
+                exitFailure(r2.error());
             }
             else
             {
@@ -47,8 +54,7 @@ int main()
 
             if (const auto &r2 = manager.receiveBTCNonModule(nonModule); !r2)
             {
-                print("{}\n", r2.error());
-                exit(EXIT_FAILURE);
+                exitFailure(r2.error());
             }
             else
             {
@@ -62,28 +68,24 @@ int main()
     ctbLastMessage.exitStatus = EXIT_SUCCESS;
     if (const auto &r2 = manager.sendCTBLastMessage(ctbLastMessage); !r2)
     {
-        print("{}\n", r2.error());
-        exit(EXIT_FAILURE);
+        exitFailure(r2.error());
     }
 
     printMessage(ctbLastMessage, true);
-    print("Received Last Message\n");
 
     // This tests file sharing. Contents of both outputs should be the same.
-    CTBLastMessage ctbLastMessage2;
-    ctbLastMessage2.exitStatus = EXIT_SUCCESS;
+    CTBLastMessage lastMessageWithSharedFile;
+    lastMessageWithSharedFile.exitStatus = EXIT_SUCCESS;
     string fileContent = getRandomString();
-    ctbLastMessage2.fileSize = fileContent.size();
+    lastMessageWithSharedFile.fileSize = fileContent.size();
     print("File Content:\n\n", fileContent);
-    if (const auto &r2 = manager.sendCTBLastMessage(ctbLastMessage2, fileContent,
-                                                   (std::filesystem::current_path() / "bmi.txt").generic_string());
+    if (const auto &r2 = manager.sendCTBLastMessage(lastMessageWithSharedFile, fileContent,
+                                                    (std::filesystem::current_path() / "bmi.txt").generic_string());
         !r2)
     {
-        print("{}\n", r2.error());
-        exit(EXIT_FAILURE);
+        exitFailure(r.error());
     }
 
-    printMessage(ctbLastMessage2, true);
-    print("{}", fileContent);
+    printMessage(lastMessageWithSharedFile, true);
     print("Received Last Message\n");
 }

@@ -27,7 +27,7 @@ add_executable(BuildSystemTest tests/BuildSystemTest.cpp)
 add_executable(CompilerTest tests/CompilerTest.cpp)
 
 
-target_link_libraries(BuildSystemTest PUBLIC BuildSystem Testing)
+target_link_libraries(BuildSystemTest PUBLIC BuildSystem Compiler Testing)
 target_link_libraries(CompilerTest PUBLIC Compiler Testing)
 
 add_executable(ClangTest tests/ClangTest.cpp)

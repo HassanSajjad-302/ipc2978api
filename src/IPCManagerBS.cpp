@@ -283,7 +283,7 @@ tl::expected<void, string> IPCManagerBS::sendMessage(const BTCNonModule &nonModu
 tl::expected<void, string> IPCManagerBS::sendMessage(const BTCLastMessage &) const
 {
     vector<char> buffer;
-    buffer.emplace_back(false);
+    buffer.emplace_back(true);
     if (const auto &r = writeInternal(buffer); !r)
     {
         return tl::unexpected(r.error());

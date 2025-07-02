@@ -1,10 +1,12 @@
 #include "IPCManagerBS.hpp"
+#include "IPCManagerCompiler.hpp"
 #include "Testing.hpp"
 #include "fmt/printf.h"
 
 #include <chrono>
 #include <filesystem>
 #include <iostream>
+#include <thread>
 #ifdef _WIN32
 #include <Windows.h>
 #else
@@ -73,26 +75,39 @@ tl::expected<string_view, string> readSharedMemoryBMIFile(const BMIFile &file)
     return string_view{static_cast<char *>(mapping), file.fileSize};
 #endif
 }
+
+void exitFailure(const string &r)
+{
+
+    print(stderr, "{}\n", r);
+    print("Test Failed\n");
+    exit(EXIT_FAILURE);
+}
+
 int main()
 {
     const auto &r = makeIPCManagerBS((std::filesystem::current_path() / "test").string());
     if (!r)
     {
-        print("{}\n", r.error());
-        exit(EXIT_FAILURE);
+        exitFailure(r.error());
     }
 
     const IPCManagerBS &manager = r.value();
-    // std::this_thread::sleep_for(std::chrono::seconds(10));
+    std::this_thread::sleep_for(std::chrono::seconds(2));
     std::cout << "Listening";
     fflush(stdout);
     char buffer[320];
 
+    CTB type;
     while (true)
     {
         bool loopExit = false;
-        CTB type;
-        manager.receiveMessage(buffer, type);
+
+        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+        {
+            exitFailure(r2.error());
+        }
+
         switch (type)
         {
 
@@ -104,10 +119,9 @@ int main()
             file.fileSize = 0;
             BTCModule b;
             b.requested = std::move(file);
-            if (const auto &r2  = manager.sendMessage(b); !r2)
+            if (const auto &r2 = manager.sendMessage(b); !r2)
             {
-                print("{}\n", r2.error());
-                exit(EXIT_FAILURE);
+                exitFailure(r2.error());
             }
             printMessage(b, true);
         }
@@ -122,8 +136,7 @@ int main()
             nonModule.filePath = getRandomString();
             if (const auto &r2 = manager.sendMessage(nonModule); !r2)
             {
-                print("{}\n", r2.error());
-                exit(EXIT_FAILURE);
+                exitFailure(r2.error());
             }
             printMessage(nonModule, true);
         }
@@ -138,8 +151,7 @@ int main()
                 BTCLastMessage btcLastMessage;
                 if (const auto &r2 = manager.sendMessage(btcLastMessage); !r2)
                 {
-                    print("{}\n", r2.error());
-                    exit(EXIT_FAILURE);
+                    exitFailure(r.error());
                 }
                 printMessage(btcLastMessage, true);
             }
@@ -155,16 +167,32 @@ int main()
         }
     }
 
+    if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+    {
+        exitFailure(r2.error());
+    }
+
     const auto &lastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
     printMessage(lastMessage, false);
+    print("FileContents\n");
+    BMIFile file;
+    file.filePath = (std::filesystem::current_path() / "bmi.txt").generic_string();
+    file.fileSize = lastMessage.fileSize;
+    if (const auto &r2 =  IPCManagerCompiler::readSharedMemoryBMIFile(file); !r2)
+    {
+        exitFailure(r2.error());
+    }
+    else
+    {
+        print("File Content:\n\n", r2.value().file);
+    }
     if (lastMessage.exitStatus == EXIT_SUCCESS)
     {
-        const BTCLastMessage btcLastMessage;
+        constexpr BTCLastMessage btcLastMessage;
 
         if (const auto &r2 = manager.sendMessage(btcLastMessage); !r2)
         {
-            print("", r2.error());
-            exit(EXIT_FAILURE);
+            exitFailure(r2.error());
         }
         printMessage(btcLastMessage, true);
     }
