@@ -278,7 +278,7 @@ tl::expected<string, string> Manager::readStringFromPipe(char (&buffer)[BUFFERSI
 }
 
 tl::expected<BMIFile, string> Manager::readProcessMappingOfBMIFileFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
-                                                                       uint32_t &bytesProcessed) const
+                                                                           uint32_t &bytesProcessed) const
 {
     const auto &r = readStringFromPipe(buffer, bytesRead, bytesProcessed);
     if (!r)

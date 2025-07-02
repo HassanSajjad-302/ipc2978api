@@ -90,5 +90,5 @@ int main()
     printMessage(lastMessageWithSharedFile, true);
     print("File Content: {}\n\n", fileContent.data());
 
-    print("Received Last Message\n");
+    print("BTCLastMessage has been received\n");
 }

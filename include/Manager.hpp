@@ -87,7 +87,7 @@ class Manager
     tl::expected<string, string> readStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                                                     uint32_t &bytesProcessed) const;
     tl::expected<BMIFile, string> readProcessMappingOfBMIFileFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
-                                                                  uint32_t &bytesProcessed) const;
+                                                                      uint32_t &bytesProcessed) const;
     tl::expected<vector<string>, string> readVectorOfStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                                                                     uint32_t &bytesProcessed) const;
     tl::expected<ModuleDep, string> readModuleDepFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
