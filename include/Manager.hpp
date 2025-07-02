@@ -44,7 +44,7 @@ inline string getErrorString(string err)
     return err;
 }
 
-struct MemoryMappedBMIFile
+struct ProcessMappingOfBMIFile
 {
     string_view file;
 #ifdef _WIN32
@@ -71,14 +71,14 @@ class Manager
     static vector<char> getBufferWithType(CTB type);
     static void writeUInt32(vector<char> &buffer, uint32_t value);
     static void writeString(vector<char> &buffer, const string &str);
-    static void writeMemoryMappedBMIFile(vector<char> &buffer, const BMIFile &file);
+    static void writeProcessMappingOfBMIFile(vector<char> &buffer, const BMIFile &file);
     static void writeModuleDep(vector<char> &buffer, const ModuleDep &dep);
     static void writeHuDep(vector<char> &buffer, const HuDep &dep);
     static void writeVectorOfStrings(vector<char> &buffer, const vector<string> &strs);
-    static void writeVectorOfMemoryMappedBMIFiles(vector<char> &buffer, const vector<BMIFile> &files);
+    static void writeVectorOfProcessMappingOfBMIFiles(vector<char> &buffer, const vector<BMIFile> &files);
     static void writeVectorOfModuleDep(vector<char> &buffer, const vector<ModuleDep> &deps);
     static void writeVectorOfHuDep(vector<char> &buffer, const vector<HuDep> &deps);
-    static tl::expected<void, string> closeBMIFileMapping(const MemoryMappedBMIFile &memoryMappedBMIFile);
+    static tl::expected<void, string> closeBMIFileMapping(const ProcessMappingOfBMIFile &processMappingOfBMIFile);
 
     tl::expected<bool, string> readBoolFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                                                 uint32_t &bytesProcessed) const;
@@ -86,7 +86,7 @@ class Manager
                                                       uint32_t &bytesProcessed) const;
     tl::expected<string, string> readStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                                                     uint32_t &bytesProcessed) const;
-    tl::expected<BMIFile, string> readMemoryMappedBMIFileFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
+    tl::expected<BMIFile, string> readProcessMappingOfBMIFileFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                                                                   uint32_t &bytesProcessed) const;
     tl::expected<vector<string>, string> readVectorOfStringFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                                                                     uint32_t &bytesProcessed) const;

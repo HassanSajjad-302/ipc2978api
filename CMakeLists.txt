@@ -3,8 +3,17 @@ project(named_pipes)
 
 set(CMAKE_CXX_STANDARD 17)
 
-#add_link_options(-fsanitize=thread -fno-omit-frame-pointer)
-#add_compile_options(-fno-exceptions -fno-rtti)
+if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" OR "${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
+    add_link_options(-fsanitize=thread -fno-omit-frame-pointer)
+    add_compile_options(-fno-exceptions -fno-rtti)
+elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "MSVC")
+    if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+        add_compile_options(/fsanitize=address)
+    endif ()
+    string(REGEX REPLACE "/GR" "/GR-" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    string(REGEX REPLACE "/EHsc" "/EHs-c-" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    add_definitions(-D_HAS_EXCEPTIONS=0) # for STL
+endif ()
 
 add_library(BuildSystem src/IPCManagerBS.cpp
         src/Manager.cpp)

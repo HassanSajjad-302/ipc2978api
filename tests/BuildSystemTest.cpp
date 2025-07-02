@@ -47,7 +47,7 @@ tl::expected<string_view, string> readSharedMemoryBMIFile(const BMIFile &file)
         return tl::unexpected(string{});
     }
 
-    MemoryMappedBMIFile f{};
+    ProcessMappingOfBMIFile f{};
     f.mapping = mapping;
     f.view = view;
     return string_view{static_cast<char *>(view), file.fileSize};
@@ -69,7 +69,7 @@ tl::expected<string_view, string> readSharedMemoryBMIFile(const BMIFile &file)
         return tl::unexpected(getErrorString());
     }
 
-    MemoryMappedBMIFile f{};
+    ProcessMappingOfBMIFile f{};
     f.mapping = mapping;
     f.mappingSize = file.fileSize;
     return string_view{static_cast<char *>(mapping), file.fileSize};
@@ -145,16 +145,8 @@ int main()
 
         case CTB::LAST_MESSAGE: {
             const auto &lastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
+            print("First ");
             printMessage(lastMessage, false);
-            if (lastMessage.exitStatus == EXIT_SUCCESS)
-            {
-                BTCLastMessage btcLastMessage;
-                if (const auto &r2 = manager.sendMessage(btcLastMessage); !r2)
-                {
-                    exitFailure(r.error());
-                }
-                printMessage(btcLastMessage, true);
-            }
             loopExit = true;
         }
 
@@ -173,19 +165,42 @@ int main()
     }
 
     const auto &lastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
+    print("Second ");
     printMessage(lastMessage, false);
-    print("FileContents\n");
+
+    // We have received a message for memory mapped BMI File. We will first create the server memory mapping. And then
+    // close that mapping. And then create the client memory mapping, print out the file contents. And then close that
+    // mapping. And then finally send the BTCLastMessage. This makes code coverage 100%.
+
     BMIFile file;
     file.filePath = (std::filesystem::current_path() / "bmi.txt").generic_string();
     file.fileSize = lastMessage.fileSize;
+    if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(file); !r2)
+    {
+        exitFailure(r2.error());
+    }
+    else
+    {
+        if (const auto &r3 = Manager::closeBMIFileMapping(r2.value()); !r3)
+        {
+            exitFailure(r3.error());
+        }
+    }
+
     if (const auto &r2 = IPCManagerCompiler::readSharedMemoryBMIFile(file); !r2)
     {
         exitFailure(r2.error());
     }
     else
     {
-        print("File Content:\n\n", r2.value().file);
+        auto &processMappingOfBMIFile = r2.value();
+        print("File Content: {}\n\n", processMappingOfBMIFile.file.data());
+        if (const auto &r3 = Manager::closeBMIFileMapping(r2.value()); !r3)
+        {
+            exitFailure(r3.error());
+        }
     }
+
     if (lastMessage.exitStatus == EXIT_SUCCESS)
     {
         constexpr BTCLastMessage btcLastMessage;
@@ -194,8 +209,7 @@ int main()
         {
             exitFailure(r2.error());
         }
+        print("Reply to Second CTBLastMessage ");
         printMessage(btcLastMessage, true);
     }
-
-    print("Exiting");
 }

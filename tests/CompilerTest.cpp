@@ -71,6 +71,7 @@ int main()
         exitFailure(r2.error());
     }
 
+    print("First ");
     printMessage(ctbLastMessage, true);
 
     // This tests file sharing. Contents of both outputs should be the same.
@@ -78,7 +79,7 @@ int main()
     lastMessageWithSharedFile.exitStatus = EXIT_SUCCESS;
     string fileContent = getRandomString();
     lastMessageWithSharedFile.fileSize = fileContent.size();
-    print("File Content:\n\n", fileContent);
+    print("Second ");
     if (const auto &r2 = manager.sendCTBLastMessage(lastMessageWithSharedFile, fileContent,
                                                     (std::filesystem::current_path() / "bmi.txt").generic_string());
         !r2)
@@ -87,5 +88,7 @@ int main()
     }
 
     printMessage(lastMessageWithSharedFile, true);
+    print("File Content: {}\n\n", fileContent.data());
+
     print("Received Last Message\n");
 }

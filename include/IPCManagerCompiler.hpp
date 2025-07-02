@@ -27,7 +27,7 @@ class IPCManagerCompiler : protected Manager
     [[nodiscard]] tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage) const;
     [[nodiscard]] tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage, const string &bmiFile,
                                                   const string &filePath) const;
-    static tl::expected<MemoryMappedBMIFile, string> readSharedMemoryBMIFile(const BMIFile &file);
+    static tl::expected<ProcessMappingOfBMIFile, string> readSharedMemoryBMIFile(const BMIFile &file);
 };
 
 template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage() const
@@ -48,7 +48,7 @@ template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage
 
     if constexpr (std::is_same_v<T, BTCModule>)
     {
-        const auto &r = readMemoryMappedBMIFileFromPipe(buffer, bytesRead, bytesProcessed);
+        const auto &r = readProcessMappingOfBMIFileFromPipe(buffer, bytesRead, bytesProcessed);
         if (!r)
         {
             return tl::unexpected(r.error());

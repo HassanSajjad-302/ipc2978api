@@ -256,7 +256,7 @@ tl::expected<void, string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], 
 tl::expected<void, string> IPCManagerBS::sendMessage(const BTCModule &moduleFile) const
 {
     vector<char> buffer;
-    writeMemoryMappedBMIFile(buffer, moduleFile.requested);
+    writeProcessMappingOfBMIFile(buffer, moduleFile.requested);
     writeVectorOfModuleDep(buffer, moduleFile.deps);
     if (const auto &r = writeInternal(buffer); !r)
     {
@@ -291,9 +291,9 @@ tl::expected<void, string> IPCManagerBS::sendMessage(const BTCLastMessage &) con
     return {};
 }
 
-tl::expected<MemoryMappedBMIFile, string> IPCManagerBS::createSharedMemoryBMIFile(const BMIFile &bmiFile)
+tl::expected<ProcessMappingOfBMIFile, string> IPCManagerBS::createSharedMemoryBMIFile(const BMIFile &bmiFile)
 {
-    MemoryMappedBMIFile sharedFile{};
+    ProcessMappingOfBMIFile sharedFile{};
 #ifdef _WIN32
     // 1) Open the existing file‐mapping object (must have been created by another process)
     sharedFile.mapping = OpenFileMappingA(FILE_MAP_READ,           // read‐only access

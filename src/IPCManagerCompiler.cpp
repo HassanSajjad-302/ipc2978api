@@ -99,7 +99,7 @@ tl::expected<void, string> IPCManagerCompiler::receiveBTCLastMessage() const
         bytesRead = *r;
     }
 
-    if (buffer[0] != true)
+    if (buffer[0] != static_cast<char>(true))
     {
         return tl::unexpected(getErrorString(ErrorCategory::INCORRECT_BTC_LAST_MESSAGE));
     }
@@ -263,9 +263,9 @@ tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastM
     return {};
 }
 
-tl::expected<MemoryMappedBMIFile, string> IPCManagerCompiler::readSharedMemoryBMIFile(const BMIFile &file)
+tl::expected<ProcessMappingOfBMIFile, string> IPCManagerCompiler::readSharedMemoryBMIFile(const BMIFile &file)
 {
-    MemoryMappedBMIFile f{};
+    ProcessMappingOfBMIFile f{};
 #ifdef _WIN32
     // 1) Open the existing file‐mapping object (must have been created by another process)
     const HANDLE mapping = OpenFileMappingA(FILE_MAP_READ,       // read‐only access
@@ -313,7 +313,7 @@ tl::expected<MemoryMappedBMIFile, string> IPCManagerCompiler::readSharedMemoryBM
         return tl::unexpected(getErrorString());
     }
 
-    MemoryMappedBMIFile f{};
+    ProcessMappingOfBMIFile f{};
     f.mapping = mapping;
     f.mappingSize = file.fileSize;
     f.file = {static_cast<char *>(mapping), file.fileSize};

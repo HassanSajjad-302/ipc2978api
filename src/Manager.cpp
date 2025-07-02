@@ -164,7 +164,7 @@ void Manager::writeString(vector<char> &buffer, const string &str)
     buffer.insert(buffer.end(), str.begin(), str.end()); // Insert all characters
 }
 
-void Manager::writeMemoryMappedBMIFile(vector<char> &buffer, const BMIFile &file)
+void Manager::writeProcessMappingOfBMIFile(vector<char> &buffer, const BMIFile &file)
 {
     writeString(buffer, file.filePath);
     writeUInt32(buffer, file.fileSize);
@@ -172,13 +172,13 @@ void Manager::writeMemoryMappedBMIFile(vector<char> &buffer, const BMIFile &file
 
 void Manager::writeModuleDep(vector<char> &buffer, const ModuleDep &dep)
 {
-    writeMemoryMappedBMIFile(buffer, dep.file);
+    writeProcessMappingOfBMIFile(buffer, dep.file);
     writeString(buffer, dep.logicalName);
 }
 
 void Manager::writeHuDep(vector<char> &buffer, const HuDep &dep)
 {
-    writeMemoryMappedBMIFile(buffer, dep.file);
+    writeProcessMappingOfBMIFile(buffer, dep.file);
     writeString(buffer, dep.logicalName);
     buffer.emplace_back(dep.angled);
 }
@@ -192,12 +192,12 @@ void Manager::writeVectorOfStrings(vector<char> &buffer, const vector<string> &s
     }
 }
 
-void Manager::writeVectorOfMemoryMappedBMIFiles(vector<char> &buffer, const vector<BMIFile> &files)
+void Manager::writeVectorOfProcessMappingOfBMIFiles(vector<char> &buffer, const vector<BMIFile> &files)
 {
     writeUInt32(buffer, files.size());
     for (const BMIFile &file : files)
     {
-        writeMemoryMappedBMIFile(buffer, file);
+        writeProcessMappingOfBMIFile(buffer, file);
     }
 }
 
@@ -219,16 +219,16 @@ void Manager::writeVectorOfHuDep(vector<char> &buffer, const vector<HuDep> &deps
     }
 }
 
-tl::expected<void, string> Manager::closeBMIFileMapping(const MemoryMappedBMIFile &memoryMappedBMIFile)
+tl::expected<void, string> Manager::closeBMIFileMapping(const ProcessMappingOfBMIFile &processMappingOfBMIFile)
 {
 #ifdef _WIN32
-    if (memoryMappedBMIFile.view)
+    if (processMappingOfBMIFile.view)
     {
-        CloseHandle(memoryMappedBMIFile.view);
+        CloseHandle(processMappingOfBMIFile.view);
     }
-    CloseHandle(memoryMappedBMIFile.mapping);
+    CloseHandle(processMappingOfBMIFile.mapping);
 #else
-    if (munmap(memoryMappedBMIFile.mapping, memoryMappedBMIFile.mappingSize) == -1)
+    if (munmap(processMappingOfBMIFile.mapping, processMappingOfBMIFile.mappingSize) == -1)
     {
         return tl::unexpected(getErrorString());
     }
@@ -277,7 +277,7 @@ tl::expected<string, string> Manager::readStringFromPipe(char (&buffer)[BUFFERSI
     return str;
 }
 
-tl::expected<BMIFile, string> Manager::readMemoryMappedBMIFileFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
+tl::expected<BMIFile, string> Manager::readProcessMappingOfBMIFileFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
                                                                        uint32_t &bytesProcessed) const
 {
     const auto &r = readStringFromPipe(buffer, bytesRead, bytesProcessed);
@@ -375,7 +375,7 @@ tl::expected<vector<ModuleDep>, string> Manager::readVectorOfModuleDepFromPipe(c
 tl::expected<HuDep, string> Manager::readHuDepFromPipe(char (&buffer)[4096], uint32_t &bytesRead,
                                                        uint32_t &bytesProcessed) const
 {
-    const auto &r = readMemoryMappedBMIFileFromPipe(buffer, bytesRead, bytesProcessed);
+    const auto &r = readProcessMappingOfBMIFileFromPipe(buffer, bytesRead, bytesProcessed);
     if (!r)
     {
         return tl::unexpected(r.error());
