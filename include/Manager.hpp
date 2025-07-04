@@ -115,7 +115,7 @@ template <typename T> T &getInitializedObjectFromBuffer(char (&buffer)[320])
     return t;
 }
 
-inline std::string toString(const uint64_t v)
+inline std::string to16charHexString(const uint64_t v)
 {
     static auto lut = "0123456789abcdef";
     std::string out;

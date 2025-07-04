@@ -84,6 +84,7 @@ tl::expected<void, string> CLWrapper::Run(const string &command) const
     {
         return tl::unexpected("CloseHandle" + getErrorString());
     }
+    return {};
 }
 
 bool isProcessAlive(HANDLE hProcess)
@@ -181,21 +182,21 @@ int main()
     // compile main.cpp which imports B.cpp which imports A.cpp.
 
     if (system(
-            R"(.\clang.exe -std=c++20 mod2.cppm -c -fmodule-output="mod2 .pcm"  -fmodules-reduced-bmi -o  "mod2 .o")") !=
+            R"(.\clang++.exe -std=c++20 mod2.cppm -c -fmodule-output="mod2 .pcm"  -fmodules-reduced-bmi -o  "mod2 .o")") !=
         EXIT_SUCCESS)
     {
         return tl::unexpected("could not run the first command\n");
     }
 
     if (system(
-            R"(.\clang.exe -std=c++20 mod.cppm -c -fmodule-output="mod .pcm"  -fmodules-reduced-bmi -o  "mod .o"  -fmodule-file=mod2="./mod2 .pcm")") !=
+            R"(.\clang++.exe -std=c++20 mod.cppm -c -fmodule-output="mod .pcm"  -fmodules-reduced-bmi -o  "mod .o"  -fmodule-file=mod2="./mod2 .pcm")") !=
         EXIT_SUCCESS)
     {
         return tl::unexpected("could not run the second command\n");
     }
 
     if (system(
-            R"(.\clang.exe -std=c++20 mod1.cppm -c -fmodule-output="mod1 .pcm"  -fmodules-reduced-bmi -o  "mod1 .o"  -fmodule-file=mod2="./mod2 .pcm")") !=
+            R"(.\clang++.exe -std=c++20 mod1.cppm -c -fmodule-output="mod1 .pcm"  -fmodules-reduced-bmi -o  "mod1 .o"  -fmodule-file=mod2="./mod2 .pcm")") !=
         EXIT_SUCCESS)
     {
         tl::unexpected("could not run the second command\n");
@@ -223,7 +224,7 @@ tl::expected<int, string> runTest()
         const IPCManagerBS &manager = *r;
 
         string compileCommand =
-            R"(.\clang.exe -std=c++20 -c main.cpp -noScanIPC -o "C:/Projects/llvm-project/llvm/cmake-build-debug/bin/main .o")";
+            R"(.\clang++.exe -std=c++20 -c main.cpp -noScanIPC -o "C:/Projects/llvm-project/llvm/cmake-build-debug/bin/main .o")";
         CLWrapper wrapper;
         if (const auto &r2 = wrapper.Run(compileCommand); !r2)
         {
@@ -318,9 +319,17 @@ tl::expected<int, string> runTest()
 #ifdef IS_THIS_CLANG_REPO
 TEST(IPC2978Test, IPC2978Test)
 {
+    const path p = current_path();
+    current_path(LLVM_TOOLS_BINARY_DIR);
+    const auto &r = runTest();
+    current_path(p);
     if (const auto &r = runTest(); !r)
     {
         FAIL() << r.error();
+    }
+    if (!exists(current_path() / "main.o"))
+    {
+        FAIL() << "main.o not found\n";
     }
 }
 #else

@@ -63,7 +63,7 @@ tl::expected<IPCManagerBS, string> makeIPCManagerBS(string BMIIfHeaderUnitObjOth
     // Have an option to receive this path in constructor to make it compatible with Android and IOS.
     string prependDir = "/tmp/";
     const uint64_t hash = rapidhash(BMIIfHeaderUnitObjOtherwisePath.c_str(), BMIIfHeaderUnitObjOtherwisePath.size());
-    prependDir.append(toString(hash));
+    prependDir.append(to16charHexString(hash));
     std::copy(prependDir.begin(), prependDir.end(), addr.sun_path);
 
     // Remove any existing socket
