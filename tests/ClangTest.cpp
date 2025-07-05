@@ -37,6 +37,12 @@ using namespace N2978;
 using namespace std;
 
 #ifdef _WIN32
+#define CLANG_CMD ".\\clang.exe"
+#else
+#define CLANG_CMD "./clang"
+#endif
+
+#ifdef _WIN32
 HANDLE stdout_read, stdout_write;
 PROCESS_INFORMATION process_info = {};
 tl::expected<void, string> Run(const string &command)
@@ -172,8 +178,8 @@ tl::expected<int, string> printOutputAndClosePipes()
     char buffer[4096];
     while (true)
     {
-        const uint64_t readSize = read(stdout_pipe[0], buffer, sizeof(buffer) - 1);
-        if (readSize)
+      if (const uint64_t readSize =
+              read(stdout_pipe[0], buffer, sizeof(buffer) - 1))
         {
             output.append(buffer, readSize);
         }
@@ -185,8 +191,8 @@ tl::expected<int, string> printOutputAndClosePipes()
 
     while (true)
     {
-        const uint64_t readSize = read(stderr_pipe[0], buffer, sizeof(buffer) - 1);
-        if (readSize)
+      if (const uint64_t readSize =
+              read(stderr_pipe[0], buffer, sizeof(buffer) - 1))
         {
             output.append(buffer, readSize);
         }
@@ -257,21 +263,21 @@ int main()
     // compile main.cpp which imports B.cpp which imports A.cpp.
 
     if (system(
-            R"(.\clang++.exe -std=c++20 mod2.cppm -c -fmodule-output="mod2 .pcm"  -fmodules-reduced-bmi -o  "mod2 .o")") !=
+            CLANG_CMD R"( -std=c++20 mod2.cppm -c -fmodule-output="mod2 .pcm"  -fmodules-reduced-bmi -o  "mod2 .o")") !=
         EXIT_SUCCESS)
     {
         return tl::unexpected("could not run the first command\n");
     }
 
     if (system(
-            R"(.\clang++.exe -std=c++20 mod.cppm -c -fmodule-output="mod .pcm"  -fmodules-reduced-bmi -o  "mod .o"  -fmodule-file=mod2="./mod2 .pcm")") !=
+            CLANG_CMD R"( -std=c++20 mod.cppm -c -fmodule-output="mod .pcm"  -fmodules-reduced-bmi -o  "mod .o"  -fmodule-file=mod2="./mod2 .pcm")") !=
         EXIT_SUCCESS)
     {
         return tl::unexpected("could not run the second command\n");
     }
 
     if (system(
-            R"(.\clang++.exe -std=c++20 mod1.cppm -c -fmodule-output="mod1 .pcm"  -fmodules-reduced-bmi -o  "mod1 .o"  -fmodule-file=mod2="./mod2 .pcm")") !=
+            CLANG_CMD R"( -std=c++20 mod1.cppm -c -fmodule-output="mod1 .pcm"  -fmodules-reduced-bmi -o  "mod1 .o"  -fmodule-file=mod2="./mod2 .pcm")") !=
         EXIT_SUCCESS)
     {
         tl::unexpected("could not run the second command\n");
@@ -299,7 +305,7 @@ tl::expected<int, string> runTest()
         const IPCManagerBS &manager = *r;
 
         string compileCommand =
-            R"(.\clang++.exe -std=c++20 -c main.cpp -noScanIPC -o "C:/Projects/llvm-project/llvm/cmake-build-debug/bin/main .o")";
+            CLANG_CMD R"( -std=c++20 -c main.cpp -noScanIPC -o "C:/Projects/llvm-project/llvm/cmake-build-debug/bin/main .o")";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -393,9 +399,20 @@ tl::expected<int, string> runTest()
 #ifdef IS_THIS_CLANG_REPO
 TEST(IPC2978Test, IPC2978Test)
 {
-    if (const auto &r = runTest(); !r)
+    const path p = current_path();
+    current_path(LLVM_TOOLS_BINARY_DIR);
+    const path mainFilePath = (LLVM_TOOLS_BINARY_DIR / path("main .o")).lexically_normal();
+    remove(mainFilePath);
+
+    const auto &r = runTest();
+    current_path(p);
+    if (!r)
     {
         FAIL() << r.error();
+    }
+    if (!exists(mainFilePath))
+    {
+        FAIL() << "main.o not found\n";
     }
 }
 #else
