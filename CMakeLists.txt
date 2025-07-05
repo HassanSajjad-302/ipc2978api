@@ -15,14 +15,14 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "MSVC")
     add_definitions(-D_HAS_EXCEPTIONS=0) # for STL
 endif ()
 
-add_library(BuildSystem src/IPCManagerBS.cpp
-        src/Manager.cpp)
-
 add_library(Compiler src/IPCManagerCompiler.cpp
         src/Manager.cpp)
 
-target_include_directories(BuildSystem PUBLIC include)
+add_library(BuildSystem src/IPCManagerBS.cpp
+        src/Manager.cpp)
+
 target_include_directories(Compiler PUBLIC include)
+target_include_directories(BuildSystem PUBLIC include)
 
 
 add_library(fmt tests/fmt/src/format.cc tests/fmt/src/os.cc)
@@ -32,12 +32,13 @@ add_library(Testing tests/Testing.cpp)
 target_include_directories(Testing PUBLIC include)
 target_link_libraries(Testing PUBLIC fmt)
 
-add_executable(BuildSystemTest tests/BuildSystemTest.cpp)
 add_executable(CompilerTest tests/CompilerTest.cpp)
+add_executable(BuildSystemTest tests/BuildSystemTest.cpp)
 
 
-target_link_libraries(BuildSystemTest PUBLIC BuildSystem Compiler Testing)
 target_link_libraries(CompilerTest PUBLIC Compiler Testing)
+target_link_libraries(BuildSystemTest PUBLIC BuildSystem Compiler Testing)
+add_dependencies(BuildSystemTest CompilerTest)
 
 add_executable(ClangTest tests/ClangTest.cpp)
 

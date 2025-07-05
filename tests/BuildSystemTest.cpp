@@ -2,11 +2,11 @@
 #include "IPCManagerCompiler.hpp"
 #include "Testing.hpp"
 #include "fmt/printf.h"
-
 #include <chrono>
 #include <filesystem>
 #include <iostream>
 #include <thread>
+
 #ifdef _WIN32
 #include <Windows.h>
 #else
@@ -76,15 +76,45 @@ tl::expected<string_view, string> readSharedMemoryBMIFile(const BMIFile &file)
 #endif
 }
 
-void exitFailure(const string &r)
-{
+bool first = true;
+std::thread *thr;
 
-    print(stderr, "{}\n", r);
+void exitFailure(const string &str)
+{
+    print(stderr, "{}\n", str);
     print("Test Failed\n");
     exit(EXIT_FAILURE);
 }
 
-int main()
+void listenForCompiler()
+{
+    if (first)
+    {
+        // We launch CompilerTest and then sleep. By the time we wake up, CompilerTest has already reached its blocking
+        // call.
+        thr = new std::thread([] {
+            if (system("./CompilerTest") != EXIT_SUCCESS)
+            {
+                exitFailure("Error running ClientTest first time");
+            }
+        });
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+    }
+    else
+    {
+        // We launch a new thread. This thread sleeps before executing the CompilerTest. By the time it executes
+        // CompilerTest, the BuildSystemTest has already reached its blocking call.
+        thr = new std::thread([] {
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+            if (system("./CompilerTest") != EXIT_SUCCESS)
+            {
+                exitFailure("Error running ClientTest second time");
+            }
+        });
+    }
+}
+
+int runTest()
 {
     const auto &r = makeIPCManagerBS((std::filesystem::current_path() / "test").string());
     if (!r)
@@ -93,8 +123,7 @@ int main()
     }
 
     const IPCManagerBS &manager = r.value();
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-    std::cout << "Listening";
+    listenForCompiler();
     fflush(stdout);
     char buffer[320];
 
@@ -212,4 +241,14 @@ int main()
         print("Reply to Second CTBLastMessage ");
         printMessage(btcLastMessage, true);
     }
+    return EXIT_SUCCESS;
+}
+
+int main()
+{
+    runTest();
+    thr->join();
+    first = false;
+    runTest();
+    thr->join();
 }

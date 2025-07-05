@@ -246,14 +246,14 @@ tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastM
 
     if (const auto &r = sendCTBLastMessage(lastMessage); !r)
     {
-        IPCErr(r.error())
+        return tl::unexpected(r.error());
     }
 
     if (lastMessage.exitStatus == EXIT_SUCCESS)
     {
         if (const auto &r = receiveBTCLastMessage(); !r)
         {
-            IPCErr(r.error())
+        return tl::unexpected(r.error());
         }
     }
 
@@ -313,7 +313,6 @@ tl::expected<ProcessMappingOfBMIFile, string> IPCManagerCompiler::readSharedMemo
         return tl::unexpected(getErrorString());
     }
 
-    ProcessMappingOfBMIFile f{};
     f.mapping = mapping;
     f.mappingSize = file.fileSize;
     f.file = {static_cast<char *>(mapping), file.fileSize};

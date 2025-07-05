@@ -8,6 +8,7 @@
 #else
 #include <cstring>
 #include <unistd.h>
+#include <sys/mman.h>
 #endif
 
 namespace N2978
