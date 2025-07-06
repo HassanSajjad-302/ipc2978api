@@ -224,7 +224,7 @@ int runTest()
     {
         auto &processMappingOfBMIFile = r2.value();
         print("File Content: {}\n\n", processMappingOfBMIFile.file.data());
-        if (const auto &r3 = IPCManagerCompiler::closeBMIFileMapping(r2.value()); !r3)
+        if (const auto &r3 = Manager::closeBMIFileMapping(r2.value()); !r3)
         {
             exitFailure(r3.error());
         }

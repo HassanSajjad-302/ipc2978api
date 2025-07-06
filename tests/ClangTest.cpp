@@ -304,8 +304,9 @@ tl::expected<int, string> runTest()
         uint8_t messageCount = 0;
         const IPCManagerBS &manager = *r;
 
+        string objFile = (current_path() / "main .o").generic_string() + "\"";
         string compileCommand =
-            CLANG_CMD R"( -std=c++20 -c main.cpp -noScanIPC -o "C:/Projects/llvm-project/llvm/cmake-build-debug/bin/main .o")";
+            CLANG_CMD R"( -std=c++20 -c main.cpp -noScanIPC -o ")" + objFile;
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
