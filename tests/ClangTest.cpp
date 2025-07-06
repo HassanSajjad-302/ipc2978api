@@ -167,7 +167,7 @@ tl::expected<void, string> Run(const string &command)
 
 tl::expected<int, string> printOutputAndClosePipes()
 {
- if (waitpid(pid, &procStatus, 0) == -1)
+ if (waitpid(procId, &procStatus, 0) == -1)
     {
         return tl::unexpected("waitpid" + getErrorString());
     }
@@ -304,8 +304,6 @@ tl::expected<int, string> runTest()
 
         string objFile = (current_path() / "main .o").generic_string() + "\"";
         string compileCommand = CLANG_CMD R"( -std=c++20 -c main.cpp -noScanIPC -o ")" + objFile;
-        fmt::print(compileCommand);
-        fflush(stdout);
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
