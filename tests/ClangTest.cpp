@@ -124,7 +124,7 @@ tl::expected<int, string> printOutputAndClosePipes()
 
 int stdout_pipe[2], stderr_pipe[2];
 int procStatus;
-
+int procId;
 /// Start a process and gather its raw output.  Returns its exit code.
 /// Crashes (calls Fatal()) on error.
 tl::expected<void, string> Run(const string &command)
@@ -135,51 +135,48 @@ tl::expected<void, string> Run(const string &command)
         return tl::unexpected("pipe" + getErrorString());
     }
 
-    if (const pid_t pid = fork(); pid == -1)
+    if (procId = fork(); procId == -1)
     {
         return tl::unexpected("fork" + getErrorString());
     }
-    else
+
+    if (procId == 0)
     {
-        if (pid == 0)
-        {
-            // Child process
+        // Child process
 
-            // Redirect stdout and stderr to the pipes
-            dup2(stdout_pipe[1], STDOUT_FILENO); // Redirect stdout to stdout_pipe
-            dup2(stderr_pipe[1], STDERR_FILENO); // Redirect stderr to stderr_pipe
+        // Redirect stdout and stderr to the pipes
+        dup2(stdout_pipe[1], STDOUT_FILENO); // Redirect stdout to stdout_pipe
+        dup2(stderr_pipe[1], STDERR_FILENO); // Redirect stderr to stderr_pipe
 
-            // Close unused pipe ends
-            close(stdout_pipe[0]);
-            close(stderr_pipe[0]);
-            close(stdout_pipe[1]);
-            close(stderr_pipe[1]);
-
-            // Execute a command (e.g., "ls" or any other)
-            exit(WEXITSTATUS(system(command.c_str())));
-        }
-
-        // Parent process
         // Close unused pipe ends
+        close(stdout_pipe[0]);
+        close(stderr_pipe[0]);
         close(stdout_pipe[1]);
         close(stderr_pipe[1]);
 
-        if (waitpid(pid, &procStatus, 0) == -1)
-        {
-            return tl::unexpected("waitpid" + getErrorString());
-        }
+        // Execute a command (e.g., "ls" or any other)
+        exit(WEXITSTATUS(system(command.c_str())));
     }
+
+    // Parent process
+    // Close unused pipe ends
+    close(stdout_pipe[1]);
+    close(stderr_pipe[1]);
     return {};
 }
 
 tl::expected<int, string> printOutputAndClosePipes()
 {
+ if (waitpid(pid, &procStatus, 0) == -1)
+    {
+        return tl::unexpected("waitpid" + getErrorString());
+    }
+
     string output;
     char buffer[4096];
     while (true)
     {
-      if (const uint64_t readSize =
-              read(stdout_pipe[0], buffer, sizeof(buffer) - 1))
+        if (const uint64_t readSize = read(stdout_pipe[0], buffer, sizeof(buffer) - 1))
         {
             output.append(buffer, readSize);
         }
@@ -191,8 +188,7 @@ tl::expected<int, string> printOutputAndClosePipes()
 
     while (true)
     {
-      if (const uint64_t readSize =
-              read(stderr_pipe[0], buffer, sizeof(buffer) - 1))
+        if (const uint64_t readSize = read(stderr_pipe[0], buffer, sizeof(buffer) - 1))
         {
             output.append(buffer, readSize);
         }
@@ -262,22 +258,24 @@ int main()
 
     // compile main.cpp which imports B.cpp which imports A.cpp.
 
-    if (system(
-            CLANG_CMD R"( -std=c++20 mod2.cppm -c -fmodule-output="mod2 .pcm"  -fmodules-reduced-bmi -o  "mod2 .o")") !=
+    if (system(CLANG_CMD
+               R"( -std=c++20 mod2.cppm -c -fmodule-output="mod2 .pcm"  -fmodules-reduced-bmi -o  "mod2 .o")") !=
         EXIT_SUCCESS)
     {
         return tl::unexpected("could not run the first command\n");
     }
 
     if (system(
-            CLANG_CMD R"( -std=c++20 mod.cppm -c -fmodule-output="mod .pcm"  -fmodules-reduced-bmi -o  "mod .o"  -fmodule-file=mod2="./mod2 .pcm")") !=
+            CLANG_CMD
+            R"( -std=c++20 mod.cppm -c -fmodule-output="mod .pcm"  -fmodules-reduced-bmi -o  "mod .o"  -fmodule-file=mod2="./mod2 .pcm")") !=
         EXIT_SUCCESS)
     {
         return tl::unexpected("could not run the second command\n");
     }
 
     if (system(
-            CLANG_CMD R"( -std=c++20 mod1.cppm -c -fmodule-output="mod1 .pcm"  -fmodules-reduced-bmi -o  "mod1 .o"  -fmodule-file=mod2="./mod2 .pcm")") !=
+            CLANG_CMD
+            R"( -std=c++20 mod1.cppm -c -fmodule-output="mod1 .pcm"  -fmodules-reduced-bmi -o  "mod1 .o"  -fmodule-file=mod2="./mod2 .pcm")") !=
         EXIT_SUCCESS)
     {
         tl::unexpected("could not run the second command\n");
@@ -305,8 +303,9 @@ tl::expected<int, string> runTest()
         const IPCManagerBS &manager = *r;
 
         string objFile = (current_path() / "main .o").generic_string() + "\"";
-        string compileCommand =
-            CLANG_CMD R"( -std=c++20 -c main.cpp -noScanIPC -o ")" + objFile;
+        string compileCommand = CLANG_CMD R"( -std=c++20 -c main.cpp -noScanIPC -o ")" + objFile;
+        fmt::print(compileCommand);
+        fflush(stdout);
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
