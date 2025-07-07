@@ -67,90 +67,22 @@ tl::expected<void, string> Run(const string &command)
 }
 #else
 
-int stdout_pipe[2], stderr_pipe[2];
 int procStatus;
 int procId;
 /// Start a process and gather its raw output.  Returns its exit code.
 /// Crashes (calls Fatal()) on error.
 tl::expected<void, string> Run(const string &command)
 {
-    // Create pipes for stdout and stderr
-    if (pipe(stdout_pipe) == -1 || pipe(stderr_pipe) == -1)
-    {
-        return tl::unexpected("pipe" + getErrorString());
-    }
-
     if (procId = fork(); procId == -1)
     {
         return tl::unexpected("fork" + getErrorString());
     }
-
     if (procId == 0)
     {
         // Child process
-
-        // Redirect stdout and stderr to the pipes
-        dup2(stdout_pipe[1], STDOUT_FILENO); // Redirect stdout to stdout_pipe
-        dup2(stderr_pipe[1], STDERR_FILENO); // Redirect stderr to stderr_pipe
-
-        // Close unused pipe ends
-        close(stdout_pipe[0]);
-        close(stderr_pipe[0]);
-        close(stdout_pipe[1]);
-        close(stderr_pipe[1]);
-
-        // Execute a command (e.g., "ls" or any other)
         exit(WEXITSTATUS(system(command.c_str())));
     }
-
-    // Parent process
-    // Close unused pipe ends
-    close(stdout_pipe[1]);
-    close(stderr_pipe[1]);
     return {};
-}
-
-tl::expected<int, string> printOutputAndClosePipes()
-{
-    if (waitpid(procId, &procStatus, 0) == -1)
-    {
-        return tl::unexpected("waitpid" + getErrorString());
-    }
-
-    string output;
-    char buffer[4096];
-    while (true)
-    {
-        if (const uint64_t readSize = read(stdout_pipe[0], buffer, sizeof(buffer) - 1))
-        {
-            output.append(buffer, readSize);
-        }
-        else
-        {
-            break;
-        }
-    }
-
-    while (true)
-    {
-        if (const uint64_t readSize = read(stderr_pipe[0], buffer, sizeof(buffer) - 1))
-        {
-            output.append(buffer, readSize);
-        }
-        else
-        {
-            break;
-        }
-    }
-
-    // Close the read ends of the pipes
-    close(stdout_pipe[0]);
-    close(stderr_pipe[0]);
-
-#ifndef IS_THIS_CLANG_REPO
-    fmt::print("{}", output);
-#endif
-    return WEXITSTATUS(procStatus);
 }
 #endif
 
@@ -340,6 +272,11 @@ tl::expected<int, string> runTest()
     if (WaitForSingleObject(pi.hProcess, INFINITE) == WAIT_FAILED)
     {
         return tl::unexpected("WaitForSingleObject" + getErrorString());
+    }
+#else
+    if (waitpid(procId, &procStatus, 0) == -1)
+    {
+        return tl::unexpected("waitpid" + getErrorString());
     }
 #endif
 
