@@ -12,10 +12,10 @@
 #include <cstring>
 #include <fcntl.h>
 #include <sys/mman.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
+#include <unistd.h>
 #endif
 
 using std::string;
@@ -28,7 +28,7 @@ tl::expected<IPCManagerCompiler, string> makeIPCManagerCompiler(string BMIIfHead
 #ifdef _WIN32
     BMIIfHeaderUnitObjOtherwisePath = R"(\\.\pipe\)" + BMIIfHeaderUnitObjOtherwisePath;
     HANDLE hPipe = CreateFileA(BMIIfHeaderUnitObjOtherwisePath.data(), // pipe name
-                               GENERIC_READ |   // read and write access
+                               GENERIC_READ |                          // read and write access
                                    GENERIC_WRITE,
                                0,             // no sharing
                                nullptr,       // default security attributes
@@ -115,7 +115,7 @@ tl::expected<void, string> IPCManagerCompiler::receiveBTCLastMessage() const
 tl::expected<BTCModule, string> IPCManagerCompiler::receiveBTCModule(const CTBModule &moduleName) const
 {
 
-//raise(SIGTRAP); // At the location of the BP.
+    // raise(SIGTRAP); // At the location of the BP.
     vector<char> buffer = getBufferWithType(CTB::MODULE);
     writeString(buffer, moduleName.moduleName);
     if (const auto &r = writeInternal(buffer); !r)
@@ -253,7 +253,7 @@ tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastM
     {
         if (const auto &r = receiveBTCLastMessage(); !r)
         {
-        return tl::unexpected(r.error());
+            return tl::unexpected(r.error());
         }
     }
 

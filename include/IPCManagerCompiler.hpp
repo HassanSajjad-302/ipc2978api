@@ -25,8 +25,8 @@ class IPCManagerCompiler : protected Manager
     [[nodiscard]] tl::expected<BTCModule, string> receiveBTCModule(const CTBModule &moduleName) const;
     [[nodiscard]] tl::expected<BTCNonModule, string> receiveBTCNonModule(const CTBNonModule &nonModule) const;
     [[nodiscard]] tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage) const;
-    [[nodiscard]] tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage, const string &bmiFile,
-                                                  const string &filePath) const;
+    [[nodiscard]] tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage,
+                                                                const string &bmiFile, const string &filePath) const;
     static tl::expected<ProcessMappingOfBMIFile, string> readSharedMemoryBMIFile(const BMIFile &file);
 };
 

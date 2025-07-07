@@ -1,11 +1,10 @@
 #ifndef MESSAGES_HPP
 #define MESSAGES_HPP
 
-#include <string>
 #include <cstdint>
-#include <vector>
 #include <signal.h>
-
+#include <string>
+#include <vector>
 
 using std::string, std::vector;
 

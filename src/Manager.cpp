@@ -7,8 +7,8 @@
 #include <Windows.h>
 #else
 #include <cstring>
-#include <unistd.h>
 #include <sys/mman.h>
+#include <unistd.h>
 #endif
 
 namespace N2978

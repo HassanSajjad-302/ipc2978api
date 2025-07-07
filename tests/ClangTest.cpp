@@ -167,7 +167,7 @@ tl::expected<void, string> Run(const string &command)
 
 tl::expected<int, string> printOutputAndClosePipes()
 {
- if (waitpid(procId, &procStatus, 0) == -1)
+    if (waitpid(procId, &procStatus, 0) == -1)
     {
         return tl::unexpected("waitpid" + getErrorString());
     }
