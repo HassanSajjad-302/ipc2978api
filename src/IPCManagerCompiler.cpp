@@ -320,7 +320,8 @@ tl::expected<ProcessMappingOfBMIFile, string> IPCManagerCompiler::readSharedMemo
     return f;
 }
 
-tl::expected<void, string> IPCManagerCompiler::closeBMIFileMapping(const ProcessMappingOfBMIFile &processMappingOfBMIFile)
+tl::expected<void, string> IPCManagerCompiler::closeBMIFileMapping(
+    const ProcessMappingOfBMIFile &processMappingOfBMIFile)
 {
 #ifdef _WIN32
     UnmapViewOfFile(processMappingOfBMIFile.view);
