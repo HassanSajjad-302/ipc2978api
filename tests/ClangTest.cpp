@@ -42,84 +42,29 @@ using namespace std;
 #define CLANG_CMD "./clang"
 #endif
 
+namespace
+{
 #ifdef _WIN32
-HANDLE stdout_read, stdout_write;
-PROCESS_INFORMATION process_info = {};
+PROCESS_INFORMATION pi;
 tl::expected<void, string> Run(const string &command)
 {
-    SECURITY_ATTRIBUTES security_attributes = {};
-    security_attributes.nLength = sizeof(SECURITY_ATTRIBUTES);
-    security_attributes.bInheritHandle = TRUE;
-
-    if (!CreatePipe(&stdout_read, &stdout_write, &security_attributes, 0))
-        return tl::unexpected("CreatePipe" + getErrorString());
-
-    if (!SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0))
-        return tl::unexpected("SetHandleInformation" + getErrorString());
-
-    STARTUPINFOA startup_info = {};
-    startup_info.cb = sizeof(STARTUPINFOA);
-    startup_info.hStdError = stdout_write;
-    startup_info.hStdOutput = stdout_write;
-    startup_info.dwFlags |= STARTF_USESTDHANDLES;
-
-    if (!CreateProcessA(nullptr, const_cast<char *>(command.c_str()), nullptr, nullptr,
-                        /* inherit handles */ TRUE, 0, nullptr, nullptr, &startup_info, &process_info))
+    STARTUPINFOA si = {sizeof(si)};
+    if (!CreateProcessA(nullptr,                             // lpApplicationName
+                        const_cast<char *>(command.c_str()), // lpCommandLine
+                        nullptr,                             // lpProcessAttributes
+                        nullptr,                             // lpThreadAttributes
+                        FALSE,                               // bInheritHandles
+                        0,                                   // dwCreationFlags
+                        nullptr,                             // lpEnvironment
+                        nullptr,                             // lpCurrentDirectory
+                        &si,                                 // lpStartupInfo
+                        &pi                                  // lpProcessInformation
+                        ))
     {
         return tl::unexpected("CreateProcess" + getErrorString());
     }
-
-    if (!CloseHandle(stdout_write))
-    {
-        return tl::unexpected("CloseHandle" + getErrorString());
-    }
+    return {};
 }
-
-bool isProcessAlive(HANDLE hProcess)
-{
-    DWORD exitCode;
-    if (GetExitCodeProcess(hProcess, &exitCode))
-    {
-        return exitCode == STILL_ACTIVE;
-    }
-    return false; // Error getting exit code
-}
-
-tl::expected<int, string> printOutputAndClosePipes()
-{
-
-    string output;
-    // Read all output of the subprocess.
-    DWORD read_len = 1;
-    while (read_len)
-    {
-        char buf[64 << 10];
-        read_len = 0;
-        if (!::ReadFile(stdout_read, buf, sizeof(buf), &read_len, nullptr) && GetLastError() != ERROR_BROKEN_PIPE)
-        {
-            return tl::unexpected("ReadFile" + getErrorString());
-        }
-        output.append(buf, read_len);
-    }
-
-    // Wait for it to exit and grab its exit code.
-    if (WaitForSingleObject(process_info.hProcess, INFINITE) == WAIT_FAILED)
-        return tl::unexpected("WaitForSingleObject" + getErrorString());
-    DWORD exit_code = 0;
-    if (!GetExitCodeProcess(process_info.hProcess, &exit_code))
-        return tl::unexpected("GetExitCodeProcess" + getErrorString());
-
-    if (!CloseHandle(stdout_read) || !CloseHandle(process_info.hProcess) || !CloseHandle(process_info.hThread))
-    {
-        return tl::unexpected("CloseHandle" + getErrorString());
-    }
-
-#ifndef IS_THIS_CLANG_REPO
-    fmt::print("{}", output);
-#endif
-    return exit_code;
-}
-
 #else
 
 int stdout_pipe[2], stderr_pipe[2];
@@ -391,9 +336,16 @@ tl::expected<int, string> runTest()
         return tl::unexpected("creating manager failed" + r.error() + "\n");
     }
 
-    return printOutputAndClosePipes();
-}
+#ifdef _WIN32
+    if (WaitForSingleObject(pi.hProcess, INFINITE) == WAIT_FAILED)
+    {
+        return tl::unexpected("WaitForSingleObject" + getErrorString());
+    }
+#endif
 
+    return {};
+}
+} // namespace
 #ifdef IS_THIS_CLANG_REPO
 TEST(IPC2978Test, IPC2978Test)
 {
@@ -416,9 +368,15 @@ TEST(IPC2978Test, IPC2978Test)
 #else
 int main()
 {
+    remove(path("main .o"));
     if (const auto &r = runTest(); !r)
     {
         fmt::print("{}\n", r.error());
+        return EXIT_FAILURE;
+    }
+    if (!exists(path("main .o")))
+    {
+        fmt::print("main.o not found\n");
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
