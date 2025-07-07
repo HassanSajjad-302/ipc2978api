@@ -15,7 +15,7 @@ using namespace N2978;
 void exitFailure(const string &r)
 {
 
-    print(stderr, "{}\n", r);
+    fmt::println(r);
     print("Test Failed\n");
     exit(EXIT_FAILURE);
 }

@@ -30,6 +30,7 @@ class IPCManagerBS : public Manager
     [[nodiscard]] tl::expected<void, string> sendMessage(const BTCNonModule &nonModule) const;
     [[nodiscard]] tl::expected<void, string> sendMessage(const BTCLastMessage &lastMessage) const;
     static tl::expected<ProcessMappingOfBMIFile, string> createSharedMemoryBMIFile(const BMIFile &bmiFile);
+    static tl::expected<void, string> closeBMIFileMapping(const ProcessMappingOfBMIFile &processMappingOfBMIFile);
 };
 
 tl::expected<IPCManagerBS, string> makeIPCManagerBS(string BMIIfHeaderUnitObjOtherwisePath);

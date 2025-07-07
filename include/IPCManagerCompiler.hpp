@@ -28,6 +28,7 @@ class IPCManagerCompiler : protected Manager
     [[nodiscard]] tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage,
                                                                 const string &bmiFile, const string &filePath) const;
     static tl::expected<ProcessMappingOfBMIFile, string> readSharedMemoryBMIFile(const BMIFile &file);
+    static tl::expected<void, string> closeBMIFileMapping(const ProcessMappingOfBMIFile &processMappingOfBMIFile);
 };
 
 template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage() const

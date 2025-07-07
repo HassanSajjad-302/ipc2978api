@@ -86,6 +86,12 @@ void exitFailure(const string &str)
     exit(EXIT_FAILURE);
 }
 
+#ifdef _WIN32
+#define COMPILER_TEST ".\\CompilerTest.exe"
+#else
+#define COMPILER_TEST "./CompilerTest"
+#endif
+
 void listenForCompiler()
 {
     if (first)
@@ -93,7 +99,7 @@ void listenForCompiler()
         // We launch CompilerTest and then sleep. By the time we wake up, CompilerTest has already reached its blocking
         // call.
         thr = new std::thread([] {
-            if (system("./CompilerTest") != EXIT_SUCCESS)
+            if (system(COMPILER_TEST " > test1.txt") != EXIT_SUCCESS)
             {
                 exitFailure("Error running ClientTest first time");
             }
@@ -106,7 +112,7 @@ void listenForCompiler()
         // CompilerTest, the BuildSystemTest has already reached its blocking call.
         thr = new std::thread([] {
             std::this_thread::sleep_for(std::chrono::seconds(2));
-            if (system("./CompilerTest") != EXIT_SUCCESS)
+            if (system(COMPILER_TEST " > test2.txt") != EXIT_SUCCESS)
             {
                 exitFailure("Error running ClientTest second time");
             }
@@ -224,7 +230,7 @@ int runTest()
     {
         auto &processMappingOfBMIFile = r2.value();
         print("File Content: {}\n\n", processMappingOfBMIFile.file.data());
-        if (const auto &r3 = Manager::closeBMIFileMapping(r2.value()); !r3)
+        if (const auto &r3 = IPCManagerCompiler::closeBMIFileMapping(r2.value()); !r3)
         {
             exitFailure(r3.error());
         }
@@ -241,6 +247,7 @@ int runTest()
         print("Reply to Second CTBLastMessage ");
         printMessage(btcLastMessage, true);
     }
+    manager.closeConnection();
     return EXIT_SUCCESS;
 }
 

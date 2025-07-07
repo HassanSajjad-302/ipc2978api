@@ -65,6 +65,8 @@ class Manager
     int fdSocket = 0;
 #endif
 
+    void closeConnection() const;
+
     tl::expected<uint32_t, string> readInternal(char (&buffer)[BUFFERSIZE]) const;
     tl::expected<void, string> writeInternal(const vector<char> &buffer) const;
 
@@ -78,7 +80,6 @@ class Manager
     static void writeVectorOfProcessMappingOfBMIFiles(vector<char> &buffer, const vector<BMIFile> &files);
     static void writeVectorOfModuleDep(vector<char> &buffer, const vector<ModuleDep> &deps);
     static void writeVectorOfHuDep(vector<char> &buffer, const vector<HuDep> &deps);
-    static tl::expected<void, string> closeBMIFileMapping(const ProcessMappingOfBMIFile &processMappingOfBMIFile);
 
     tl::expected<bool, string> readBoolFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                                                 uint32_t &bytesProcessed) const;

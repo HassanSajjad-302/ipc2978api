@@ -64,7 +64,7 @@ tl::expected<void, string> Run(const string &command)
     startup_info.dwFlags |= STARTF_USESTDHANDLES;
 
     if (!CreateProcessA(nullptr, const_cast<char *>(command.c_str()), nullptr, nullptr,
-                        /* inherit handles */ TRUE, 0, env_block_, nullptr, &startup_info, &process_info))
+                        /* inherit handles */ TRUE, 0, nullptr, nullptr, &startup_info, &process_info))
     {
         return tl::unexpected("CreateProcess" + getErrorString());
     }

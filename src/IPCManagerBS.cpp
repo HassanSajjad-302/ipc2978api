@@ -327,4 +327,17 @@ tl::expected<ProcessMappingOfBMIFile, string> IPCManagerBS::createSharedMemoryBM
 #endif
 }
 
+tl::expected<void, string> IPCManagerBS::closeBMIFileMapping(const ProcessMappingOfBMIFile &processMappingOfBMIFile)
+{
+#ifdef _WIN32
+    CloseHandle(processMappingOfBMIFile.mapping);
+#else
+    if (munmap(processMappingOfBMIFile.mapping, processMappingOfBMIFile.mappingSize) == -1)
+    {
+        return tl::unexpected(getErrorString());
+    }
+#endif
+    return {};
+}
+
 } // namespace N2978

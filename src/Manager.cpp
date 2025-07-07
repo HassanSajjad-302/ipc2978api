@@ -64,6 +64,15 @@ string getErrorString(const ErrorCategory errorCategory_)
     return errorString;
 }
 
+void Manager::closeConnection() const
+{
+#ifdef _WIN32
+    CloseHandle(hPipe);
+#else
+    close(const_cast<int &>(fdSocket));
+#endif
+}
+
 tl::expected<uint32_t, string> Manager::readInternal(char (&buffer)[BUFFERSIZE]) const
 {
     uint32_t bytesRead;
@@ -218,23 +227,6 @@ void Manager::writeVectorOfHuDep(vector<char> &buffer, const vector<HuDep> &deps
     {
         writeHuDep(buffer, dep);
     }
-}
-
-tl::expected<void, string> Manager::closeBMIFileMapping(const ProcessMappingOfBMIFile &processMappingOfBMIFile)
-{
-#ifdef _WIN32
-    if (processMappingOfBMIFile.view)
-    {
-        CloseHandle(processMappingOfBMIFile.view);
-    }
-    CloseHandle(processMappingOfBMIFile.mapping);
-#else
-    if (munmap(processMappingOfBMIFile.mapping, processMappingOfBMIFile.mappingSize) == -1)
-    {
-        return tl::unexpected(getErrorString());
-    }
-#endif
-    return {};
 }
 
 tl::expected<bool, string> Manager::readBoolFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,

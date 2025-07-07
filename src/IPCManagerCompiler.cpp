@@ -319,4 +319,19 @@ tl::expected<ProcessMappingOfBMIFile, string> IPCManagerCompiler::readSharedMemo
 #endif
     return f;
 }
+
+tl::expected<void, string> IPCManagerCompiler::closeBMIFileMapping(const ProcessMappingOfBMIFile &processMappingOfBMIFile)
+{
+#ifdef _WIN32
+    UnmapViewOfFile(processMappingOfBMIFile.view);
+    CloseHandle(processMappingOfBMIFile.mapping);
+#else
+    if (munmap(processMappingOfBMIFile.mapping, processMappingOfBMIFile.mappingSize) == -1)
+    {
+        return tl::unexpected(getErrorString());
+    }
+#endif
+    return {};
+}
+
 } // namespace N2978
