@@ -64,15 +64,6 @@ string getErrorString(const ErrorCategory errorCategory_)
     return errorString;
 }
 
-void Manager::closeConnection() const
-{
-#ifdef _WIN32
-    CloseHandle(hPipe);
-#else
-    close(const_cast<int &>(fdSocket));
-#endif
-}
-
 tl::expected<uint32_t, string> Manager::readInternal(char (&buffer)[BUFFERSIZE]) const
 {
     uint32_t bytesRead;

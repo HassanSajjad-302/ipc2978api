@@ -65,8 +65,6 @@ class Manager
     int fdSocket = 0;
 #endif
 
-    void closeConnection() const;
-
     tl::expected<uint32_t, string> readInternal(char (&buffer)[BUFFERSIZE]) const;
     tl::expected<void, string> writeInternal(const vector<char> &buffer) const;
 

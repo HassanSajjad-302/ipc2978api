@@ -9,7 +9,7 @@ namespace N2978
 {
 
 // IPC Manager BuildSystem
-class IPCManagerBS : public Manager
+class IPCManagerBS : Manager
 {
     friend tl::expected<IPCManagerBS, string> makeIPCManagerBS(string BMIIfHeaderUnitObjOtherwisePath);
     bool connectedToCompiler = false;
@@ -31,6 +31,7 @@ class IPCManagerBS : public Manager
     [[nodiscard]] tl::expected<void, string> sendMessage(const BTCLastMessage &lastMessage) const;
     static tl::expected<ProcessMappingOfBMIFile, string> createSharedMemoryBMIFile(const BMIFile &bmiFile);
     static tl::expected<void, string> closeBMIFileMapping(const ProcessMappingOfBMIFile &processMappingOfBMIFile);
+    void closeConnection() const;
 };
 
 tl::expected<IPCManagerBS, string> makeIPCManagerBS(string BMIIfHeaderUnitObjOtherwisePath);

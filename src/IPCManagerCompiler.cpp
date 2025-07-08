@@ -335,4 +335,13 @@ tl::expected<void, string> IPCManagerCompiler::closeBMIFileMapping(
     return {};
 }
 
+void IPCManagerCompiler::closeConnection() const
+{
+#ifdef _WIN32
+    CloseHandle(hPipe);
+#else
+    close(fdSocket);
+#endif
+}
+
 } // namespace N2978

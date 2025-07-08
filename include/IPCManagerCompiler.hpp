@@ -10,7 +10,7 @@ namespace N2978
 {
 
 // IPC Manager Compiler
-class IPCManagerCompiler : protected Manager
+class IPCManagerCompiler : Manager
 {
     template <typename T> tl::expected<T, string> receiveMessage() const;
     // This is not exposed. sendCTBLastMessage calls this.
@@ -29,6 +29,7 @@ class IPCManagerCompiler : protected Manager
                                                                 const string &bmiFile, const string &filePath) const;
     static tl::expected<ProcessMappingOfBMIFile, string> readSharedMemoryBMIFile(const BMIFile &file);
     static tl::expected<void, string> closeBMIFileMapping(const ProcessMappingOfBMIFile &processMappingOfBMIFile);
+    void closeConnection() const;
 };
 
 template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage() const

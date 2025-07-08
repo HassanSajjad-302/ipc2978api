@@ -340,4 +340,13 @@ tl::expected<void, string> IPCManagerBS::closeBMIFileMapping(const ProcessMappin
     return {};
 }
 
+void IPCManagerBS::closeConnection() const
+{
+#ifdef _WIN32
+    CloseHandle(hPipe);
+#else
+    close(fdSocket);
+#endif
+}
+
 } // namespace N2978
