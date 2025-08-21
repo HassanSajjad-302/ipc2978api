@@ -12,6 +12,7 @@ namespace N2978
 // IPC Manager Compiler
 class IPCManagerCompiler : Manager
 {
+    CTBLastMessage lastMessage{};
     template <typename T> tl::expected<T, string> receiveMessage() const;
     // This is not exposed. sendCTBLastMessage calls this.
     [[nodiscard]] tl::expected<void, string> receiveBTCLastMessage() const;
@@ -105,7 +106,7 @@ template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage
         BTCNonModule nonModule;
         nonModule.isHeaderUnit = *r;
         nonModule.filePath = *r2;
-        nonModule.angled = *r3;
+        nonModule.user = *r3;
         nonModule.fileSize = *r4;
         nonModule.deps = *r5;
 
@@ -123,7 +124,13 @@ template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage
     {
         return tl::unexpected(getErrorString(bytesRead, bytesProcessed));
     }
+    string str = __FILE__;
+    str += ':';
+    str += __LINE__;
+    return tl::unexpected(getErrorString("N2978 IPC API internal error" + str));
 }
 [[nodiscard]] tl::expected<IPCManagerCompiler, string> makeIPCManagerCompiler(string BMIIfHeaderUnitObjOtherwisePath);
+inline IPCManagerCompiler *managerCompiler;
+inline CTBLastMessage lastMessage;
 } // namespace N2978
 #endif // IPC_MANAGER_COMPILER_HPP

@@ -98,7 +98,7 @@ void printMessage(const BTCNonModule &nonModule, const bool sent)
         print("Deps[{}] FilePath: {}\n\n", i, nonModule.deps[i].file.filePath);
         print("Deps[{}] FileSize: {}\n\n", i, nonModule.deps[i].file.fileSize);
         print("Deps[{}] LogicalName: {}\n\n", i, nonModule.deps[i].logicalName);
-        print("Deps[{}] Angled: {}\n\n", i, nonModule.deps[i].angled);
+        print("Deps[{}] User: {}\n\n", i, nonModule.deps[i].user);
     }
 }
 

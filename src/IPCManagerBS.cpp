@@ -239,10 +239,6 @@ tl::expected<void, string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], 
         fileSize = *fileSizeExpected;
     }
     break;
-
-    default:
-
-        return tl::unexpected(getErrorString(ErrorCategory::UNKNOWN_CTB_TYPE));
     }
 
     if (bytesRead != bytesProcessed)
@@ -270,7 +266,7 @@ tl::expected<void, string> IPCManagerBS::sendMessage(const BTCNonModule &nonModu
     vector<char> buffer;
     buffer.emplace_back(nonModule.isHeaderUnit);
     writeString(buffer, nonModule.filePath);
-    buffer.emplace_back(nonModule.angled);
+    buffer.emplace_back(nonModule.user);
     writeUInt32(buffer, nonModule.fileSize);
     writeVectorOfHuDep(buffer, nonModule.deps);
     if (const auto &r = writeInternal(buffer); !r)

@@ -26,7 +26,7 @@ string getErrorString()
     if (msg_buf == nullptr)
     {
         char fallback_msg[128] = {};
-        snprintf(fallback_msg, sizeof(fallback_msg), "GetLastError() = %d", err);
+        snprintf(fallback_msg, sizeof(fallback_msg), "GetLastError() = %ld", err);
         return fallback_msg;
     }
 
@@ -58,6 +58,12 @@ string getErrorString(const ErrorCategory errorCategory_)
         break;
     case ErrorCategory::UNKNOWN_CTB_TYPE:
         errorString = "Error: Unknown CTB message received.";
+        break;
+    case ErrorCategory::NONE:
+        string str = __FILE__;
+        str += ':';
+        str += __LINE__;
+        errorString = "N2978 IPC API internal error" + str;
         break;
     }
 
@@ -181,7 +187,7 @@ void Manager::writeHuDep(vector<char> &buffer, const HuDep &dep)
 {
     writeProcessMappingOfBMIFile(buffer, dep.file);
     writeString(buffer, dep.logicalName);
-    buffer.emplace_back(dep.angled);
+    buffer.emplace_back(dep.user);
 }
 
 void Manager::writeVectorOfStrings(vector<char> &buffer, const vector<string> &strs)
@@ -380,7 +386,7 @@ tl::expected<HuDep, string> Manager::readHuDepFromPipe(char (&buffer)[4096], uin
     HuDep huDep;
     huDep.file = *r;
     huDep.logicalName = *r2;
-    huDep.angled = *r3;
+    huDep.user = *r3;
     return huDep;
 }
 

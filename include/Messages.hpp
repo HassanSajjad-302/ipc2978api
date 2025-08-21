@@ -99,7 +99,7 @@ struct HuDep
 {
     BMIFile file;
     string logicalName;
-    bool angled = false;
+    bool user = true;
 };
 
 // Reply for CTBNonModule
@@ -108,7 +108,8 @@ struct BTCNonModule
     bool isHeaderUnit = false;
     string filePath;
     // if isHeaderUnit == false, the following three are meaning-less.
-    bool angled = false;
+    // whether header-unit / header-file belongs to user or system directory.
+    bool user = true;
     // if isHeaderUnit == true, fileSize of the requested file.
     uint32_t fileSize;
     vector<HuDep> deps;

@@ -48,7 +48,8 @@ namespace
 PROCESS_INFORMATION pi;
 tl::expected<void, string> Run(const string &command)
 {
-    STARTUPINFOA si = {sizeof(si)};
+    STARTUPINFOA si;
+    si.cb = sizeof(si);
     if (!CreateProcessA(nullptr,                             // lpApplicationName
                         const_cast<char *>(command.c_str()), // lpCommandLine
                         nullptr,                             // lpProcessAttributes
@@ -86,10 +87,30 @@ tl::expected<void, string> Run(const string &command)
 }
 #endif
 
+// Creates all the input files (source files + pcm files) that are needed for the test.
 [[nodiscard]] tl::expected<void, string> setupTest()
 {
 
-    const string mod = R"(export module mod;
+    const string mod2 = R"(
+export module mod2;
+
+export void func2()
+{
+    // does nothing
+}
+
+export struct EmptyClass2
+{
+};)";
+
+    const string mod1 = R"(
+module;
+
+export module mod1;
+import mod2;)";
+
+    const string mod = R"(
+export module mod;
 import mod2;
 
 export void func()
@@ -103,23 +124,10 @@ export struct EmptyClass
 {
 };)";
 
-    const string mod1 = R"(module;
-
-export module mod1;
-import mod2;)";
-
-    const string mod2 = R"(export module mod2;
-
-export void func2()
-{
-    // does nothing
-}
-
-export struct EmptyClass2
-{
-};)";
-
-    const string main = R"(import mod;
+    // main depends on mod and mod1. mod and mod1 both depend on mod2. compiler should only send 2 messages for mod and
+    // mod1. mod2 is received with mod. Build-system won't send the mod2 again with mod1.
+    const string main = R"(
+import mod;
 import mod1;
 
 int main()
@@ -132,8 +140,6 @@ int main()
     ofstream("mod1.cppm") << mod1;
     ofstream("mod2.cppm") << mod2;
     ofstream("main.cpp") << main;
-
-    // compile main.cpp which imports B.cpp which imports A.cpp.
 
     if (system(CLANG_CMD
                R"( -std=c++20 mod2.cppm -c -fmodule-output="mod2 .pcm"  -fmodules-reduced-bmi -o  "mod2 .o")") !=
@@ -174,6 +180,102 @@ tl::expected<int, string> runTest()
     string mod1FilePath = current + "mod1 .pcm";
     string mod2FilePath = current + "mod2 .pcm";
 
+    // compiling mod.cppm
+    if (const auto &r = makeIPCManagerBS(std::move(modFilePath)); r)
+    {
+        uint8_t messageCount = 0;
+        const IPCManagerBS &manager = *r;
+
+        string objFile = (current_path() / "mod .o").generic_string() + "\"";
+        string compileCommand = CLANG_CMD R"( -std=c++20 -c mod.cppm -noScanIPC -o ")" + objFile;
+        if (const auto &r2 = Run(compileCommand); !r2)
+        {
+            return tl::unexpected(r2.error());
+        }
+
+        while (true)
+        {
+            CTB type;
+            char buffer[320];
+            if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+            {
+                string str = r2.error();
+                return tl::unexpected("manager receive message failed" + r2.error() + "\n");
+            }
+
+            switch (type)
+            {
+
+            case CTB::MODULE: {
+                const auto &ctbModule = reinterpret_cast<CTBModule &>(buffer);
+                printMessage(ctbModule, false);
+
+                if (!messageCount)
+                {
+                    ++messageCount;
+
+                    BMIFile mod;
+                    mod.filePath = modFilePath;
+                    mod.fileSize = 0;
+
+                    BMIFile mod2;
+                    mod2.filePath = mod2FilePath;
+                    mod2.fileSize = 0;
+                    ModuleDep mod2Dep;
+                    mod2Dep.file = std::move(mod2);
+                    mod2Dep.logicalName = "mod2";
+
+                    BTCModule b;
+                    b.requested = std::move(mod);
+                    b.deps.emplace_back(std::move(mod2Dep));
+
+                    if (const auto &r2 = manager.sendMessage(b); !r2)
+                    {
+                        return tl::unexpected(r2.error());
+                    }
+                    printMessage(b, true);
+                }
+                else if (messageCount == 1)
+                {
+                    ++messageCount;
+                    BMIFile mod1;
+                    mod1.filePath = mod1FilePath;
+                    mod1.fileSize = 0;
+
+                    BTCModule b;
+                    b.requested = std::move(mod1);
+
+                    if (const auto &r2 = manager.sendMessage(b); !r2)
+                    {
+                        return tl::unexpected(r2.error());
+                    }
+                    printMessage(b, true);
+                }
+            }
+
+            break;
+
+            case CTB::NON_MODULE: {
+            }
+
+            case CTB::LAST_MESSAGE: {
+            }
+
+                return tl::unexpected("Unexpected message received");
+            }
+
+            if (messageCount == 2)
+            {
+                break;
+            }
+        }
+    }
+    else
+    {
+        return tl::unexpected("creating manager failed" + r.error() + "\n");
+    }
+
+    // compiling main.cpp
     if (const auto &r = makeIPCManagerBS(std::move(mainFilePath)); r)
     {
         uint8_t messageCount = 0;
