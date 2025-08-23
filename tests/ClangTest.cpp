@@ -120,6 +120,14 @@ module A:C; // partition module implementation unit
 char const* WorldImpl() { return "World"; }
 )";
 
+    // B.cpp
+    const string bDotCpp = R"(
+export module B;
+import A;
+
+char const* BWorld() { return World(); }
+)";
+
     // main.cpp
     const string mainDotCpp = R"(
 import A;
@@ -128,6 +136,7 @@ import <iostream>;
 int main()
 {
     std::cout << Hello() << ' ' << World() << '\n';
+    std::cout << BWorld() << '\n';
     // WorldImpl(); // ERROR: WorldImpl() is not visible.
 }
 )";
@@ -135,6 +144,7 @@ int main()
     ofstream("A.cpp") << aDotCpp;
     ofstream("A-B.cpp") << aBDotCPP;
     ofstream("A-C.cpp") << aCDotCPP;
+    ofstream("B.cpp") << bDotCpp;
     ofstream("main.cpp") << mainDotCpp;
 
     return {};
@@ -159,6 +169,9 @@ tl::expected<int, string> runTest()
     string aBObj = (current_path() / "A-B .o").generic_string();
     string aBPcm = (current_path() / "A-B .pcm").generic_string();
     string aObj = (current_path() / "A .o").generic_string();
+    string aPcm = (current_path() / "A .pcm").generic_string();
+    string bObj = (current_path() / "B .o").generic_string();
+    string bPcm = (current_path() / "B .pcm").generic_string();
 
     // compiling A-C.cpp
     {
@@ -250,7 +263,9 @@ tl::expected<int, string> runTest()
 
         const IPCManagerBS &manager = *r;
 
-        string compileCommand = CLANG_CMD R"( -noScanIPC -std=c++20 -c A.cpp -o ")" + aObj + "\"";
+        string compileCommand =
+            CLANG_CMD R"( -noScanIPC -std=c++20 -fmodules-reduced-bmi -c -xc++-module A.cpp -fmodule-output=")" +
+            aPcm + "\" -o \"" + aObj + "\"";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -305,6 +320,77 @@ tl::expected<int, string> runTest()
         printMessage(ctbLastMessage, false);
     }
 
+    // compiling B.cpp
+    {
+        const auto &r = makeIPCManagerBS(bObj);
+        if (!r)
+        {
+            return tl::unexpected("creating manager failed" + r.error() + "\n");
+        }
+
+        const IPCManagerBS &manager = *r;
+
+        string compileCommand =
+            CLANG_CMD R"( -noScanIPC -std=c++20 -fmodules-reduced-bmi -c -xc++-module B.cpp -fmodule-output=")" +
+            bPcm + "\" -o \"" + bObj + "\"";
+        if (const auto &r2 = Run(compileCommand); !r2)
+        {
+            return tl::unexpected(r2.error());
+        }
+
+        CTB type;
+        char buffer[320];
+        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
+        }
+
+        if (type != CTB::MODULE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+
+        const auto &ctbModule = reinterpret_cast<CTBModule &>(buffer);
+
+        if (ctbModule.moduleName != "A")
+        {
+            return tl::unexpected("wrong logical name received while compiling B.cpp");
+        }
+        printMessage(ctbModule, false);
+
+        BTCModule btcMod;
+        btcMod.requested.filePath = aPcm;
+        ModuleDep modDep;
+        modDep.file.filePath = aCPcm;
+        modDep.logicalName = "A:C";
+        btcMod.deps.emplace_back(std::move(modDep));
+
+        ModuleDep modDep2;
+        modDep2.file.filePath = aBPcm;
+        modDep2.logicalName = "A:B";
+        btcMod.deps.emplace_back(std::move(modDep2));
+
+        if (const auto &r2 = manager.sendMessage(std::move(btcMod)); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
+        }
+
+        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
+        }
+
+        if (type != CTB::LAST_MESSAGE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+
+        const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
+        printMessage(ctbLastMessage, false);
+    }
     BMIFile mod;
     mod.filePath = modFilePath;
     mod.fileSize = 0;
