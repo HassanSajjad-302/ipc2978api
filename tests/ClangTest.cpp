@@ -629,7 +629,6 @@ tl::expected<int, string> runTest()
         manager.closeConnection();
     }
 
-
     // compiling O.hpp with include-translation. BTCNonModule for N.hpp will be sent with
     // isHeaderUnit = true and its filePath = nPcm.
     {
@@ -668,8 +667,8 @@ tl::expected<int, string> runTest()
         }
 
         BTCNonModule nonModMPcm;
-        nonModMPcm.isHeaderUnit = true;
-        nonModMPcm.filePath = nPcm;
+        nonModMPcm.isHeaderUnit = false;
+        nonModMPcm.filePath = mHpp;
         if (const auto &r2 = manager.sendMessage(std::move(nonModMPcm)); !r2)
         {
             string str = r2.error();
