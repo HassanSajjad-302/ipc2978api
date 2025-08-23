@@ -12,12 +12,12 @@ namespace N2978
 // IPC Manager Compiler
 class IPCManagerCompiler : Manager
 {
-    CTBLastMessage lastMessage{};
     template <typename T> tl::expected<T, string> receiveMessage() const;
     // This is not exposed. sendCTBLastMessage calls this.
     [[nodiscard]] tl::expected<void, string> receiveBTCLastMessage() const;
 
   public:
+    CTBLastMessage lastMessage{};
 #ifdef _WIN32
     explicit IPCManagerCompiler(void *hPipe_);
 #else

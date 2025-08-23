@@ -236,7 +236,7 @@ int runTest()
         }
     }
 
-    if (lastMessage.exitStatus == EXIT_SUCCESS)
+    if (lastMessage.errorOccurred == EXIT_SUCCESS)
     {
         constexpr BTCLastMessage btcLastMessage;
 

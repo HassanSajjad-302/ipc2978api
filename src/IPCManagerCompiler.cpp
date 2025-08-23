@@ -141,7 +141,7 @@ tl::expected<BTCNonModule, string> IPCManagerCompiler::receiveBTCNonModule(const
 tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage) const
 {
     vector<char> buffer = getBufferWithType(CTB::LAST_MESSAGE);
-    buffer.emplace_back(lastMessage.exitStatus);
+    buffer.emplace_back(lastMessage.errorOccurred);
     writeVectorOfStrings(buffer, lastMessage.headerFiles);
     writeString(buffer, lastMessage.output);
     writeString(buffer, lastMessage.errorOutput);
@@ -203,7 +203,7 @@ tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastM
         return tl::unexpected(r.error());
     }
 
-    if (lastMessage.exitStatus == EXIT_SUCCESS)
+    if (lastMessage.errorOccurred == EXIT_SUCCESS)
     {
         if (const auto &r = receiveBTCLastMessage(); !r)
         {
@@ -249,7 +249,7 @@ tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastM
         return tl::unexpected(r.error());
     }
 
-    if (lastMessage.exitStatus == EXIT_SUCCESS)
+    if (lastMessage.errorOccurred == EXIT_SUCCESS)
     {
         if (const auto &r = receiveBTCLastMessage(); !r)
         {

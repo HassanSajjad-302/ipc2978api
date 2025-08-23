@@ -65,7 +65,7 @@ int main()
     }
 
     CTBLastMessage ctbLastMessage;
-    ctbLastMessage.exitStatus = EXIT_SUCCESS;
+    ctbLastMessage.errorOccurred = EXIT_SUCCESS;
     if (const auto &r2 = manager.sendCTBLastMessage(ctbLastMessage); !r2)
     {
         exitFailure(r2.error());
@@ -76,7 +76,7 @@ int main()
 
     // This tests file sharing. Contents of both outputs should be the same.
     CTBLastMessage lastMessageWithSharedFile;
-    lastMessageWithSharedFile.exitStatus = EXIT_SUCCESS;
+    lastMessageWithSharedFile.errorOccurred = EXIT_SUCCESS;
     string fileContent = getRandomString();
     lastMessageWithSharedFile.fileSize = fileContent.size();
     print("Second ");

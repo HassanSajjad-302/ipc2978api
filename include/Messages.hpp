@@ -47,7 +47,7 @@ struct CTBNonModule
 struct CTBLastMessage
 {
     // Whether the compilation succeeded or failed.
-    bool exitStatus = false;
+    bool errorOccurred = false;
     // Following fields are meaningless if the compilation failed.
     // header-includes discovered during compilation.
     vector<string> headerFiles;

@@ -120,6 +120,83 @@ module A:C; // partition module implementation unit
 char const* WorldImpl() { return "World"; }
 )";
 
+    // M.hpp, N.hpp and O.hpp are to be used as header-units, header-files
+    // while X.hpp, Y.hpp and Z.hpp are to be used as big-hu by include Big.hpp
+
+    // M.hpp
+    const string mDotHpp = R"(
+// this file can not be included without first defining M_HEADER_FILE
+// this is to demonstrate difference between header-file and header-unit.
+// as macros don't seep into header-units
+
+#ifdef M_HEADER_FILE
+inline int m = 5;
+#else
+fail compilation
+#endif
+)";
+
+    // N.hpp
+    const string nDotHpp = R"(
+// should work just fine as macro should not seep in here while inclusion.
+
+#ifdef N_HEADER_FILE
+fail compilation
+#else
+#define M_HEADER_FILE
+#include "M.hpp"
+inline int n = 5 + m;
+#endif
+
+// COMMAND_MACRO should be defined while compiling this.
+// however, it should still be fine if it is not defined while compiling
+// a file consuming this
+
+#ifndef COMMAND_MACRO
+fail compilation
+#endif
+)";
+
+    // O.hpp
+    const string oDotHpp = R"(
+// TRANSLATING should be defined if /translateInclude is being used.
+// "O.hpp" should still be treated as header-file.
+
+#define M_HEADER_FILE
+#include "M.hpp"
+#ifdef TRANSLATING
+#include "N.hpp"
+#else
+import "N.hpp";
+#endif
+
+inline int o = n + m + 5;
+)";
+
+    // X.hpp
+    const string xDotHpp = R"(
+inline int x = 5;
+)";
+
+    // Y.hpp
+    const string yDotHpp = R"(
+#include "X.hpp"
+inline int y = x + 5;
+)";
+
+    // Z.hpp
+    const string zDotHpp = R"(
+#include "Y.hpp"
+inline int z = x + y + 5;
+)";
+
+    // Big.hpp
+    const string bigDotHpp = R"(
+#include "X.hpp"
+#include "Y.hpp"
+#include "Z.hpp"
+)";
+
     // B.cpp
     const string bDotCpp = R"(
 export module B;
@@ -145,6 +222,9 @@ int main()
     ofstream("A-B.cpp") << aBDotCPP;
     ofstream("A-C.cpp") << aCDotCPP;
     ofstream("B.cpp") << bDotCpp;
+    ofstream("M.hpp") << mDotHpp;
+    ofstream("N.hpp") << nDotHpp;
+    ofstream("O.hpp") << oDotHpp;
     ofstream("main.cpp") << mainDotCpp;
 
     return {};
@@ -172,6 +252,7 @@ tl::expected<int, string> runTest()
     string aPcm = (current_path() / "A .pcm").generic_string();
     string bObj = (current_path() / "B .o").generic_string();
     string bPcm = (current_path() / "B .pcm").generic_string();
+    string nPcm = (current_path() / "N .pcm").generic_string();
 
     // compiling A-C.cpp
     {
@@ -264,8 +345,8 @@ tl::expected<int, string> runTest()
         const IPCManagerBS &manager = *r;
 
         string compileCommand =
-            CLANG_CMD R"( -noScanIPC -std=c++20 -fmodules-reduced-bmi -c -xc++-module A.cpp -fmodule-output=")" +
-            aPcm + "\" -o \"" + aObj + "\"";
+            CLANG_CMD R"( -noScanIPC -std=c++20 -fmodules-reduced-bmi -c -xc++-module A.cpp -fmodule-output=")" + aPcm +
+            "\" -o \"" + aObj + "\"";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -331,8 +412,8 @@ tl::expected<int, string> runTest()
         const IPCManagerBS &manager = *r;
 
         string compileCommand =
-            CLANG_CMD R"( -noScanIPC -std=c++20 -fmodules-reduced-bmi -c -xc++-module B.cpp -fmodule-output=")" +
-            bPcm + "\" -o \"" + bObj + "\"";
+            CLANG_CMD R"( -noScanIPC -std=c++20 -fmodules-reduced-bmi -c -xc++-module B.cpp -fmodule-output=")" + bPcm +
+            "\" -o \"" + bObj + "\"";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -391,6 +472,44 @@ tl::expected<int, string> runTest()
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
     }
+
+    // compiling N.hpp
+    {
+        const auto &r = makeIPCManagerBS(nPcm);
+        if (!r)
+        {
+            return tl::unexpected("creating manager failed" + r.error() + "\n");
+        }
+
+        const IPCManagerBS &manager = *r;
+
+        string compileCommand =
+            CLANG_CMD R"( -noScanIPC -std=c++20 -DCOMMAND_MACRO -fmodule-header=user -xc++-header N.hpp -o ")" + nPcm +
+            "\"";
+        if (const auto &r2 = Run(compileCommand); !r2)
+        {
+            return tl::unexpected(r2.error());
+        }
+
+        CTB type;
+        char buffer[320];
+        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
+        }
+
+        if (type != CTB::LAST_MESSAGE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+
+        const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
+        printMessage(ctbLastMessage, false);
+    }
+
+    fflush(stdout);
+
     BMIFile mod;
     mod.filePath = modFilePath;
     mod.fileSize = 0;
