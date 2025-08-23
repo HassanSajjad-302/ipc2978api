@@ -175,19 +175,28 @@ inline int o = n + m + 5;
 
     // X.hpp
     const string xDotHpp = R"(
+#ifndef X_HPP
+#define X_HPP
 inline int x = 5;
+#endif
 )";
 
     // Y.hpp
     const string yDotHpp = R"(
+#ifndef Y_HPP
+#define Y_HPP
 #include "X.hpp"
 inline int y = x + 5;
+#endif
 )";
 
     // Z.hpp
     const string zDotHpp = R"(
+#ifndef Z_HPP
+#define Z_HPP
 #include "Y.hpp"
 inline int z = x + y + 5;
+#endif
 )";
 
     // Big.hpp
@@ -225,6 +234,10 @@ int main()
     ofstream("M.hpp") << mDotHpp;
     ofstream("N.hpp") << nDotHpp;
     ofstream("O.hpp") << oDotHpp;
+    ofstream("X.hpp") << xDotHpp;
+    ofstream("Y.hpp") << yDotHpp;
+    ofstream("Z.hpp") << zDotHpp;
+    ofstream("Big.hpp") << bigDotHpp;
     ofstream("main.cpp") << mainDotCpp;
 
     return {};
@@ -257,6 +270,11 @@ tl::expected<int, string> runTest()
     string oHpp = (current_path() / "O.hpp").generic_string();
     string nPcm = (current_path() / "N .pcm").generic_string();
     string oPcm = (current_path() / "O .pcm").generic_string();
+    string xHpp = (current_path() / "X.hpp").generic_string();
+    string yHpp = (current_path() / "Y.hpp").generic_string();
+    string zHpp = (current_path() / "Z.hpp").generic_string();
+    string bigHpp = (current_path() / "Big.hpp").generic_string();
+    string bigPcm = (current_path() / "Big .pcm").generic_string();
 
     // compiling A-C.cpp
     {
@@ -711,6 +729,86 @@ tl::expected<int, string> runTest()
         {
             return tl::unexpected("received message of wrong type");
         }
+        const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
+        printMessage(ctbLastMessage, false);
+        manager.closeConnection();
+    }
+
+    // compiling Big.hpp
+    {
+        const auto &r = makeIPCManagerBS(bigPcm);
+        if (!r)
+        {
+            return tl::unexpected("creating manager failed" + r.error() + "\n");
+        }
+
+        const IPCManagerBS &manager = *r;
+
+        string compileCommand =
+            CLANG_CMD R"( -noScanIPC -std=c++20 -fmodule-header=user -xc++-header Big.hpp -o ")" + bigPcm + "\"";
+        if (const auto &r2 = Run(compileCommand); !r2)
+        {
+            return tl::unexpected(r2.error());
+        }
+
+        CTB type;
+        char buffer[320];
+        auto sendHeaderFile = [&manager, &type, &buffer](const string &headerFileName,
+                                                         const string &filePath) -> tl::expected<int, string> {
+            if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+            {
+                string str = r2.error();
+                return tl::unexpected("manager receive message failed" + r2.error() + "\n");
+            }
+
+            if (type != CTB::NON_MODULE)
+            {
+                return tl::unexpected("received message of wrong type");
+            }
+            const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
+
+            if (ctbNonModMHpp.str != headerFileName || ctbNonModMHpp.isHeaderUnit == true)
+            {
+                return tl::unexpected("wrong message received");
+            }
+
+            BTCNonModule headerFile;
+            headerFile.isHeaderUnit = false;
+            headerFile.filePath = filePath;
+            if (const auto &r2 = manager.sendMessage(std::move(headerFile)); !r2)
+            {
+                string str = r2.error();
+                return tl::unexpected("manager send message failed" + r2.error() + "\n");
+            }
+            return {};
+        };
+
+        if (const auto &r2 = sendHeaderFile("X.hpp", xHpp); !r2)
+        {
+            return r2;
+        }
+
+        if (const auto &r2 = sendHeaderFile("Y.hpp", xHpp); !r2)
+        {
+            return r2;
+        }
+
+        if (const auto &r2 = sendHeaderFile("Z.hpp", xHpp); !r2)
+        {
+            return r2;
+        }
+
+        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
+        }
+
+        if (type != CTB::LAST_MESSAGE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
