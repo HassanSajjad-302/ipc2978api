@@ -252,7 +252,11 @@ tl::expected<int, string> runTest()
     string aPcm = (current_path() / "A .pcm").generic_string();
     string bObj = (current_path() / "B .o").generic_string();
     string bPcm = (current_path() / "B .pcm").generic_string();
+    string mHpp = (current_path() / "M.hpp").generic_string();
+    string nHpp = (current_path() / "N.hpp").generic_string();
+    string oHpp = (current_path() / "O.hpp").generic_string();
     string nPcm = (current_path() / "N .pcm").generic_string();
+    string oPcm = (current_path() / "O .pcm").generic_string();
 
     // compiling A-C.cpp
     {
@@ -292,6 +296,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("wrong logical name received while compiling A-C.cpp");
         }
         printMessage(ctbLastMessage, false);
+        manager.closeConnection();
     }
 
     // compiling A-B.cpp
@@ -332,6 +337,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("wrong logical name received while compiling A-B.cpp");
         }
         printMessage(ctbLastMessage, false);
+        manager.closeConnection();
     }
 
     // compiling A.cpp
@@ -399,6 +405,7 @@ tl::expected<int, string> runTest()
 
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
+        manager.closeConnection();
     }
 
     // compiling B.cpp
@@ -471,6 +478,7 @@ tl::expected<int, string> runTest()
 
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
+        manager.closeConnection();
     }
 
     // compiling N.hpp
@@ -493,6 +501,33 @@ tl::expected<int, string> runTest()
 
         CTB type;
         char buffer[320];
+
+        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
+        }
+
+        if (type != CTB::NON_MODULE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+        const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
+
+        if (ctbNonModMHpp.str != "M.hpp" || ctbNonModMHpp.isHeaderUnit == true)
+        {
+            return tl::unexpected("wrong message received");
+        }
+
+        BTCNonModule nonModMPcm;
+        nonModMPcm.isHeaderUnit = false;
+        nonModMPcm.filePath = mHpp;
+        if (const auto &r2 = manager.sendMessage(std::move(nonModMPcm)); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
+        }
+
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -506,6 +541,180 @@ tl::expected<int, string> runTest()
 
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
+        manager.closeConnection();
+    }
+
+    // compiling O.hpp
+    {
+        const auto &r = makeIPCManagerBS(oPcm);
+        if (!r)
+        {
+            return tl::unexpected("creating manager failed" + r.error() + "\n");
+        }
+
+        const IPCManagerBS &manager = *r;
+
+        string compileCommand =
+            CLANG_CMD R"( -noScanIPC -std=c++20 -fmodule-header=user -xc++-header O.hpp -o ")" + oPcm + "\"";
+        if (const auto &r2 = Run(compileCommand); !r2)
+        {
+            return tl::unexpected(r2.error());
+        }
+
+        CTB type;
+        char buffer[320];
+        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
+        }
+
+        if (type != CTB::NON_MODULE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+        const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
+        if (ctbNonModMHpp.str != "M.hpp" || ctbNonModMHpp.isHeaderUnit == true)
+        {
+            return tl::unexpected("wrong message received");
+        }
+
+        BTCNonModule nonModMPcm;
+        nonModMPcm.isHeaderUnit = false;
+        nonModMPcm.filePath = mHpp;
+        if (const auto &r2 = manager.sendMessage(std::move(nonModMPcm)); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
+        }
+
+        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
+        }
+
+        if (type != CTB::NON_MODULE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+        const auto &ctbNonModNHpp = reinterpret_cast<CTBNonModule &>(buffer);
+        if (ctbNonModNHpp.str != "N.hpp" || ctbNonModNHpp.isHeaderUnit == false)
+        {
+            return tl::unexpected("wrong message received");
+        }
+
+        BTCNonModule nonModNPcm;
+        nonModNPcm.isHeaderUnit = true;
+        nonModNPcm.filePath = nPcm;
+
+        if (const auto &r2 = manager.sendMessage(std::move(nonModNPcm)); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
+        }
+
+        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
+        }
+
+        if (type != CTB::LAST_MESSAGE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+        const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
+        printMessage(ctbLastMessage, false);
+        manager.closeConnection();
+    }
+
+
+    // compiling O.hpp with include-translation. BTCNonModule for N.hpp will be sent with
+    // isHeaderUnit = true and its filePath = nPcm.
+    {
+        const auto &r = makeIPCManagerBS(oPcm);
+        if (!r)
+        {
+            return tl::unexpected("creating manager failed" + r.error() + "\n");
+        }
+
+        const IPCManagerBS &manager = *r;
+
+        string compileCommand = CLANG_CMD
+                                R"( -noScanIPC -std=c++20 -DTRANSLATING -fmodule-header=user -xc++-header O.hpp -o ")" +
+                                oPcm + "\"";
+        if (const auto &r2 = Run(compileCommand); !r2)
+        {
+            return tl::unexpected(r2.error());
+        }
+
+        CTB type;
+        char buffer[320];
+        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
+        }
+
+        if (type != CTB::NON_MODULE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+        const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
+        if (ctbNonModMHpp.str != "M.hpp" || ctbNonModMHpp.isHeaderUnit == true)
+        {
+            return tl::unexpected("wrong message received");
+        }
+
+        BTCNonModule nonModMPcm;
+        nonModMPcm.isHeaderUnit = true;
+        nonModMPcm.filePath = nPcm;
+        if (const auto &r2 = manager.sendMessage(std::move(nonModMPcm)); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
+        }
+
+        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
+        }
+
+        if (type != CTB::NON_MODULE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+        const auto &ctbNonModNHpp = reinterpret_cast<CTBNonModule &>(buffer);
+        if (ctbNonModNHpp.str != "N.hpp" || ctbNonModNHpp.isHeaderUnit == true)
+        {
+            return tl::unexpected("wrong message received");
+        }
+
+        BTCNonModule nonModNPcm;
+        nonModNPcm.isHeaderUnit = true;
+        nonModNPcm.filePath = nPcm;
+
+        if (const auto &r2 = manager.sendMessage(std::move(nonModNPcm)); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
+        }
+
+        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
+        }
+
+        if (type != CTB::LAST_MESSAGE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+        const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
+        printMessage(ctbLastMessage, false);
+        manager.closeConnection();
     }
 
     fflush(stdout);
