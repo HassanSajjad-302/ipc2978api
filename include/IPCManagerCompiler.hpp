@@ -126,11 +126,21 @@ template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage
     }
     string str = __FILE__;
     str += ':';
-    str += __LINE__;
+    str += std::to_string(__LINE__);
     return tl::unexpected(getErrorString("N2978 IPC API internal error" + str));
 }
 [[nodiscard]] tl::expected<IPCManagerCompiler, string> makeIPCManagerCompiler(string BMIIfHeaderUnitObjOtherwisePath);
 inline IPCManagerCompiler *managerCompiler;
 inline CTBLastMessage lastMessage;
+
+// Equality operator for use in unordered_map
+bool operator==(const CTBNonModule &lhs, const CTBNonModule &rhs);
+// Hash function for CTBNonModule
+struct CTBNonModuleHash
+{
+    uint64_t operator()(const CTBNonModule &ctb) const;
+};
+
+inline std::unordered_map<CTBNonModule, BTCNonModule, CTBNonModuleHash> respnses;
 } // namespace N2978
 #endif // IPC_MANAGER_COMPILER_HPP

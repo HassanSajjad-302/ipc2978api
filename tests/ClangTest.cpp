@@ -206,12 +206,20 @@ inline int z = x + y + 5;
 #include "Z.hpp"
 )";
 
-    // B.cpp
-    const string bDotCpp = R"(
-export module B;
+    // Foo.cpp
+    const string fooDotCpp = R"(
+module;
+#include "X.hpp"
+#include "Z.hpp"
+export module Foo;
 import A;
 
-char const* BWorld() { return World(); }
+export void func()
+{
+    Hello();
+    World();
+    int s = x + y + z;
+}
 )";
 
     // main.cpp
@@ -230,7 +238,6 @@ int main()
     ofstream("A.cpp") << aDotCpp;
     ofstream("A-B.cpp") << aBDotCPP;
     ofstream("A-C.cpp") << aCDotCPP;
-    ofstream("B.cpp") << bDotCpp;
     ofstream("M.hpp") << mDotHpp;
     ofstream("N.hpp") << nDotHpp;
     ofstream("O.hpp") << oDotHpp;
@@ -238,6 +245,7 @@ int main()
     ofstream("Y.hpp") << yDotHpp;
     ofstream("Z.hpp") << zDotHpp;
     ofstream("Big.hpp") << bigDotHpp;
+    ofstream("Foo.cpp") << fooDotCpp;
     ofstream("main.cpp") << mainDotCpp;
 
     return {};
@@ -275,6 +283,8 @@ tl::expected<int, string> runTest()
     string zHpp = (current_path() / "Z.hpp").generic_string();
     string bigHpp = (current_path() / "Big.hpp").generic_string();
     string bigPcm = (current_path() / "Big .pcm").generic_string();
+    string fooPcm = (current_path() / "Foo .pcm").generic_string();
+    string fooObj = (current_path() / "Foo .o").generic_string();
 
     // compiling A-C.cpp
     {
@@ -788,14 +798,134 @@ tl::expected<int, string> runTest()
             return r2;
         }
 
-        if (const auto &r2 = sendHeaderFile("Y.hpp", xHpp); !r2)
+        if (const auto &r2 = sendHeaderFile("Y.hpp", yHpp); !r2)
         {
             return r2;
         }
 
-        if (const auto &r2 = sendHeaderFile("Z.hpp", xHpp); !r2)
+        if (const auto &r2 = sendHeaderFile("Z.hpp", zHpp); !r2)
         {
             return r2;
+        }
+
+        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
+        }
+
+        if (type != CTB::LAST_MESSAGE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+
+        const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
+        printMessage(ctbLastMessage, false);
+        manager.closeConnection();
+    }
+
+    // compiling Foo.cpp
+    {
+        const auto &r = makeIPCManagerBS(fooObj);
+        if (!r)
+        {
+            return tl::unexpected("creating manager failed" + r.error() + "\n");
+        }
+
+        const IPCManagerBS &manager = *r;
+
+        string compileCommand =
+            CLANG_CMD R"( -noScanIPC -std=c++20 -fmodules-reduced-bmi -c -xc++-module Foo.cpp -fmodule-output=")" +
+            fooPcm + "\" -o \"" + fooObj + "\"";
+        if (const auto &r2 = Run(compileCommand); !r2)
+        {
+            return tl::unexpected(r2.error());
+        }
+
+        CTB type;
+        char buffer[320];
+
+        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
+        }
+
+        if (type != CTB::NON_MODULE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+        const auto &xHeader = reinterpret_cast<CTBNonModule &>(buffer);
+
+        if (xHeader.str != "X.hpp" || xHeader.isHeaderUnit == true)
+        {
+            return tl::unexpected("wrong message received");
+        }
+
+        BTCNonModule bigHu;
+        bigHu.isHeaderUnit = true;
+        bigHu.filePath = bigPcm;
+
+        if (const auto &r2 = manager.sendMessage(bigHu); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
+        }
+
+        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
+        }
+
+        if (type != CTB::NON_MODULE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+        const auto &zHeader = reinterpret_cast<CTBNonModule &>(buffer);
+
+        if (zHeader.str != "Z.hpp" || zHeader.isHeaderUnit == true)
+        {
+            return tl::unexpected("wrong message received");
+        }
+
+        if (const auto &r2 = manager.sendMessage(bigHu); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
+        }
+
+        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
+        }
+
+        if (type != CTB::MODULE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+        const auto &aModule = reinterpret_cast<CTBModule &>(buffer);
+
+        if (aModule.moduleName != "A")
+        {
+            return tl::unexpected("wrong message received");
+        }
+
+        BTCModule amod;
+        amod.requested.filePath = aPcm;
+        ModuleDep d;
+        d.file.filePath = aBPcm;
+        d.logicalName = "A:B";
+        amod.deps.emplace_back(d);
+        d.file.filePath = aCPcm;
+        d.logicalName = "A:C";
+        amod.deps.emplace_back(d);
+
+        if (const auto &r2 = manager.sendMessage(amod); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)

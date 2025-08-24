@@ -344,4 +344,17 @@ void IPCManagerCompiler::closeConnection() const
 #endif
 }
 
+bool operator==(const CTBNonModule &lhs, const CTBNonModule &rhs)
+{
+    return lhs.isHeaderUnit == rhs.isHeaderUnit && lhs.str == rhs.str;
+}
+
+uint64_t CTBNonModuleHash::operator()(const CTBNonModule &ctb) const
+{
+    const_cast<char &>(ctb.str[ctb.str.size()]) = ctb.isHeaderUnit;
+    const uint64_t hash = rapidhash(ctb.str.data(), ctb.str.size() + 1);
+    const_cast<char &>(ctb.str[ctb.str.size()]) = '\0';
+    return hash;
+}
+
 } // namespace N2978
