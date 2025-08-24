@@ -50,7 +50,7 @@ int main()
         {
             CTBNonModule nonModule;
             nonModule.isHeaderUnit = getRandomBool();
-            nonModule.str = "3";
+            nonModule.logicalName = "3";
 
             if (const auto &r2 = manager.receiveBTCNonModule(nonModule); !r2)
             {

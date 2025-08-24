@@ -196,12 +196,6 @@ tl::expected<void, string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], 
             return tl::unexpected(exitStatusExpected.error());
         }
 
-        const auto &headerFilesExpected = readVectorOfStringFromPipe(buffer, bytesRead, bytesProcessed);
-        if (!headerFilesExpected)
-        {
-            return tl::unexpected(headerFilesExpected.error());
-        }
-
         const auto &outputExpected = readStringFromPipe(buffer, bytesRead, bytesProcessed);
         if (!outputExpected)
         {
@@ -228,11 +222,10 @@ tl::expected<void, string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], 
 
         messageType = CTB::LAST_MESSAGE;
 
-        auto &[exitStatus, headerFiles, output, errorOutput, logicalName, fileSize] =
+        auto &[exitStatus, output, errorOutput, logicalName, fileSize] =
             getInitializedObjectFromBuffer<CTBLastMessage>(ctbBuffer);
 
         exitStatus = *exitStatusExpected;
-        headerFiles = *headerFilesExpected;
         output = *outputExpected;
         errorOutput = *errorOutputExpected;
         logicalName = *logicalNameExpected;

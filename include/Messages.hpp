@@ -35,12 +35,10 @@ struct CTBModule
 
 // This is sent when the compiler needs something else than a module.
 // isHeaderUnit is set when the compiler knows that it is a header-unit.
-// If findInclude flag is provided, then the compiler sends logicalName,
-// Otherwise the compiler sends the full path.
 struct CTBNonModule
 {
     bool isHeaderUnit = false;
-    string str;
+    string logicalName;
 };
 
 // This is the last message sent by the compiler.
@@ -49,8 +47,6 @@ struct CTBLastMessage
     // Whether the compilation succeeded or failed.
     bool errorOccurred = false;
     // Following fields are meaningless if the compilation failed.
-    // header-includes discovered during compilation.
-    vector<string> headerFiles;
     // compiler output
     string output;
     // compiler error output.
@@ -61,8 +57,7 @@ struct CTBLastMessage
     // This is communicated because the receiving process has no
     // way to learn the shared memory file size on both Windows
     // and Linux without a filesystem call.
-    // Meaningless if the file compiled is not a module interface unit
-    // or a header-unit.
+    // Meaningless if the compilation does not produce BMI.
     uint32_t fileSize = UINT32_MAX;
 };
 
@@ -100,6 +95,7 @@ struct HuDep
 {
     BMIFile file;
     string logicalName;
+    // whether header-unit / header-file belongs to user or system directory.
     bool user = true;
 };
 

@@ -48,7 +48,7 @@ void printMessage(const CTBNonModule &nonModule, const bool sent)
     printSendingOrReceiving(sent);
     print("CTBNonModule\n\n");
     print("IsHeaderUnit: {}\n\n", nonModule.isHeaderUnit);
-    print("str: {}\n\n", nonModule.str);
+    print("logicalName: {}\n\n", nonModule.logicalName);
 }
 
 void printMessage(const CTBLastMessage &lastMessage, const bool sent)
@@ -58,11 +58,6 @@ void printMessage(const CTBLastMessage &lastMessage, const bool sent)
     print("ExitStatus: {}\n\n", !lastMessage.errorOccurred);
     if (!lastMessage.errorOccurred)
     {
-        print("HeaderFiles Size: {}\n\n", lastMessage.headerFiles.size());
-        for (uint32_t i = 0; i < lastMessage.headerFiles.size(); i++)
-        {
-            print("HeaderFiles[{}]: {}\n\n", i, lastMessage.headerFiles[i]);
-        }
         print("Output: {}\n\n", lastMessage.output);
         print("ErrorOutput: {}\n\n", lastMessage.errorOutput);
         print("LogicalName: {}\n\n", lastMessage.logicalName);

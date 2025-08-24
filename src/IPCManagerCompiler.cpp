@@ -130,7 +130,7 @@ tl::expected<BTCNonModule, string> IPCManagerCompiler::receiveBTCNonModule(const
 {
     vector<char> buffer = getBufferWithType(CTB::NON_MODULE);
     buffer.emplace_back(nonModule.isHeaderUnit);
-    writeString(buffer, nonModule.str);
+    writeString(buffer, nonModule.logicalName);
     if (const auto &r = writeInternal(buffer); !r)
     {
         return tl::unexpected(r.error());
@@ -142,7 +142,6 @@ tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastM
 {
     vector<char> buffer = getBufferWithType(CTB::LAST_MESSAGE);
     buffer.emplace_back(lastMessage.errorOccurred);
-    writeVectorOfStrings(buffer, lastMessage.headerFiles);
     writeString(buffer, lastMessage.output);
     writeString(buffer, lastMessage.errorOutput);
     writeString(buffer, lastMessage.logicalName);
@@ -346,14 +345,14 @@ void IPCManagerCompiler::closeConnection() const
 
 bool operator==(const CTBNonModule &lhs, const CTBNonModule &rhs)
 {
-    return lhs.isHeaderUnit == rhs.isHeaderUnit && lhs.str == rhs.str;
+    return lhs.isHeaderUnit == rhs.isHeaderUnit && lhs.logicalName == rhs.logicalName;
 }
 
 uint64_t CTBNonModuleHash::operator()(const CTBNonModule &ctb) const
 {
-    const_cast<char &>(ctb.str[ctb.str.size()]) = ctb.isHeaderUnit;
-    const uint64_t hash = rapidhash(ctb.str.data(), ctb.str.size() + 1);
-    const_cast<char &>(ctb.str[ctb.str.size()]) = '\0';
+    const_cast<char &>(ctb.logicalName[ctb.logicalName.size()]) = ctb.isHeaderUnit;
+    const uint64_t hash = rapidhash(ctb.logicalName.data(), ctb.logicalName.size() + 1);
+    const_cast<char &>(ctb.logicalName[ctb.logicalName.size()]) = '\0';
     return hash;
 }
 

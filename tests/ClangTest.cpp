@@ -492,7 +492,7 @@ tl::expected<int, string> runTest()
         }
         const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
 
-        if (ctbNonModMHpp.str != "M.hpp" || ctbNonModMHpp.isHeaderUnit == true)
+        if (ctbNonModMHpp.logicalName != "M.hpp" || ctbNonModMHpp.isHeaderUnit == true)
         {
             return tl::unexpected("wrong message received");
         }
@@ -556,7 +556,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("received message of wrong type");
         }
         const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
-        if (ctbNonModMHpp.str != "M.hpp" || ctbNonModMHpp.isHeaderUnit == true)
+        if (ctbNonModMHpp.logicalName != "M.hpp" || ctbNonModMHpp.isHeaderUnit == true)
         {
             return tl::unexpected("wrong message received");
         }
@@ -581,7 +581,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("received message of wrong type");
         }
         const auto &ctbNonModNHpp = reinterpret_cast<CTBNonModule &>(buffer);
-        if (ctbNonModNHpp.str != "N.hpp" || ctbNonModNHpp.isHeaderUnit == false)
+        if (ctbNonModNHpp.logicalName != "N.hpp" || ctbNonModNHpp.isHeaderUnit == false)
         {
             return tl::unexpected("wrong message received");
         }
@@ -646,7 +646,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("received message of wrong type");
         }
         const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
-        if (ctbNonModMHpp.str != "M.hpp" || ctbNonModMHpp.isHeaderUnit == true)
+        if (ctbNonModMHpp.logicalName != "M.hpp" || ctbNonModMHpp.isHeaderUnit == true)
         {
             return tl::unexpected("wrong message received");
         }
@@ -671,7 +671,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("received message of wrong type");
         }
         const auto &ctbNonModNHpp = reinterpret_cast<CTBNonModule &>(buffer);
-        if (ctbNonModNHpp.str != "N.hpp" || ctbNonModNHpp.isHeaderUnit == true)
+        if (ctbNonModNHpp.logicalName != "N.hpp" || ctbNonModNHpp.isHeaderUnit == true)
         {
             return tl::unexpected("wrong message received");
         }
@@ -738,7 +738,7 @@ tl::expected<int, string> runTest()
             }
             const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
 
-            if (ctbNonModMHpp.str != headerFileName || ctbNonModMHpp.isHeaderUnit == true)
+            if (ctbNonModMHpp.logicalName != headerFileName || ctbNonModMHpp.isHeaderUnit == true)
             {
                 return tl::unexpected("wrong message received");
             }
@@ -821,7 +821,7 @@ tl::expected<int, string> runTest()
         }
         const auto &xHeader = reinterpret_cast<CTBNonModule &>(buffer);
 
-        if (xHeader.str != "X.hpp" || xHeader.isHeaderUnit == true)
+        if (xHeader.logicalName != "X.hpp" || xHeader.isHeaderUnit == true)
         {
             return tl::unexpected("wrong message received");
         }
@@ -848,7 +848,7 @@ tl::expected<int, string> runTest()
         }
         const auto &zHeader = reinterpret_cast<CTBNonModule &>(buffer);
 
-        if (zHeader.str != "Z.hpp" || zHeader.isHeaderUnit == true)
+        if (zHeader.logicalName != "Z.hpp" || zHeader.isHeaderUnit == true)
         {
             return tl::unexpected("wrong message received");
         }
