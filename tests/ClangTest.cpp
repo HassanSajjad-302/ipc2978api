@@ -87,8 +87,24 @@ tl::expected<void, string> Run(const string &command)
 }
 #endif
 
+tl::expected<void, std::string> CloseProcess()
+{
+#ifdef _WIN32
+    if (WaitForSingleObject(pi.hProcess, INFINITE) == WAIT_FAILED)
+    {
+        return tl::unexpected("WaitForSingleObject" + getErrorString());
+    }
+#else
+    if (waitpid(procId, &procStatus, 0) == -1)
+    {
+        return tl::unexpected("waitpid" + getErrorString());
+    }
+#endif
+    return {};
+}
+
 // Creates all the input files (source files + pcm files) that are needed for the test.
-[[nodiscard]] tl::expected<void, string> setupTest()
+void setupTest()
 {
     //  A.cpp
     const string aDotCpp = R"(
@@ -202,6 +218,8 @@ inline int z = x + y + 5;
     // Big.hpp
     const string bigDotHpp = R"(
 #include "X.hpp"
+// todo
+// following two should not be requested as Big.hpp includes the following as well.
 #include "Y.hpp"
 #include "Z.hpp"
 )";
@@ -214,7 +232,7 @@ module;
 export module Foo;
 import A;
 
-export void func()
+export void Foo()
 {
     Hello();
     World();
@@ -224,14 +242,15 @@ export void func()
 
     // main.cpp
     const string mainDotCpp = R"(
+import Foo;
+// only foo will be requested as A is already sent with it.
 import A;
-import <iostream>;
 
 int main()
 {
-    std::cout << Hello() << ' ' << World() << '\n';
-    std::cout << BWorld() << '\n';
-    // WorldImpl(); // ERROR: WorldImpl() is not visible.
+    Hello();
+    World();
+    Foo();
 }
 )";
 
@@ -247,17 +266,11 @@ int main()
     ofstream("Big.hpp") << bigDotHpp;
     ofstream("Foo.cpp") << fooDotCpp;
     ofstream("main.cpp") << mainDotCpp;
-
-    return {};
 }
 
 tl::expected<int, string> runTest()
 {
-
-    if (const auto &r = setupTest(); !r)
-    {
-        return tl::unexpected(r.error());
-    }
+    setupTest();
 
     string current = current_path().generic_string() + '/';
     string mainFilePath = current + "main .o";
@@ -285,6 +298,7 @@ tl::expected<int, string> runTest()
     string bigPcm = (current_path() / "Big .pcm").generic_string();
     string fooPcm = (current_path() / "Foo .pcm").generic_string();
     string fooObj = (current_path() / "Foo .o").generic_string();
+    string mainObj = (current_path() / "main .o").generic_string();
 
     // compiling A-C.cpp
     {
@@ -325,6 +339,10 @@ tl::expected<int, string> runTest()
         }
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
+        if (const auto &r2 = CloseProcess(); !r2)
+        {
+            return tl::unexpected("closing process failed");
+        }
     }
 
     // compiling A-B.cpp
@@ -366,6 +384,10 @@ tl::expected<int, string> runTest()
         }
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
+        if (const auto &r2 = CloseProcess(); !r2)
+        {
+            return tl::unexpected("closing process failed");
+        }
     }
 
     // compiling A.cpp
@@ -412,6 +434,7 @@ tl::expected<int, string> runTest()
         ModuleDep modDep;
         modDep.file.filePath = aCPcm;
         modDep.logicalName = "A:C";
+        modDep.isHeaderUnit = false;
         btcMod.deps.emplace_back(std::move(modDep));
 
         if (const auto &r2 = manager.sendMessage(std::move(btcMod)); !r2)
@@ -434,79 +457,10 @@ tl::expected<int, string> runTest()
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
-    }
-
-    // compiling B.cpp
-    {
-        const auto &r = makeIPCManagerBS(bObj);
-        if (!r)
+        if (const auto &r2 = CloseProcess(); !r2)
         {
-            return tl::unexpected("creating manager failed" + r.error() + "\n");
+            return tl::unexpected("closing process failed");
         }
-
-        const IPCManagerBS &manager = *r;
-
-        string compileCommand =
-            CLANG_CMD R"( -noScanIPC -std=c++20 -fmodules-reduced-bmi -c -xc++-module B.cpp -fmodule-output=")" + bPcm +
-            "\" -o \"" + bObj + "\"";
-        if (const auto &r2 = Run(compileCommand); !r2)
-        {
-            return tl::unexpected(r2.error());
-        }
-
-        CTB type;
-        char buffer[320];
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
-        if (type != CTB::MODULE)
-        {
-            return tl::unexpected("received message of wrong type");
-        }
-
-        const auto &ctbModule = reinterpret_cast<CTBModule &>(buffer);
-
-        if (ctbModule.moduleName != "A")
-        {
-            return tl::unexpected("wrong logical name received while compiling B.cpp");
-        }
-        printMessage(ctbModule, false);
-
-        BTCModule btcMod;
-        btcMod.requested.filePath = aPcm;
-        ModuleDep modDep;
-        modDep.file.filePath = aCPcm;
-        modDep.logicalName = "A:C";
-        btcMod.deps.emplace_back(std::move(modDep));
-
-        ModuleDep modDep2;
-        modDep2.file.filePath = aBPcm;
-        modDep2.logicalName = "A:B";
-        btcMod.deps.emplace_back(std::move(modDep2));
-
-        if (const auto &r2 = manager.sendMessage(std::move(btcMod)); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager send message failed" + r2.error() + "\n");
-        }
-
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
-        if (type != CTB::LAST_MESSAGE)
-        {
-            return tl::unexpected("received message of wrong type");
-        }
-
-        const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
-        printMessage(ctbLastMessage, false);
-        manager.closeConnection();
     }
 
     // compiling N.hpp
@@ -570,6 +524,10 @@ tl::expected<int, string> runTest()
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
+        if (const auto &r2 = CloseProcess(); !r2)
+        {
+            return tl::unexpected("closing process failed");
+        }
     }
 
     // compiling O.hpp
@@ -655,6 +613,10 @@ tl::expected<int, string> runTest()
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
+        if (const auto &r2 = CloseProcess(); !r2)
+        {
+            return tl::unexpected("closing process failed");
+        }
     }
 
     // compiling O.hpp with include-translation. BTCNonModule for N.hpp will be sent with
@@ -742,6 +704,10 @@ tl::expected<int, string> runTest()
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
+        if (const auto &r2 = CloseProcess(); !r2)
+        {
+            return tl::unexpected("closing process failed");
+        }
     }
 
     // compiling Big.hpp
@@ -822,6 +788,10 @@ tl::expected<int, string> runTest()
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
+        if (const auto &r2 = CloseProcess(); !r2)
+        {
+            return tl::unexpected("closing process failed");
+        }
     }
 
     // compiling Foo.cpp
@@ -915,6 +885,7 @@ tl::expected<int, string> runTest()
         BTCModule amod;
         amod.requested.filePath = aPcm;
         ModuleDep d;
+        d.isHeaderUnit = false;
         d.file.filePath = aBPcm;
         d.logicalName = "A:B";
         amod.deps.emplace_back(d);
@@ -942,8 +913,120 @@ tl::expected<int, string> runTest()
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
+        if (const auto &r2 = CloseProcess(); !r2)
+        {
+            return tl::unexpected("closing process failed");
+        }
     }
 
+    // compiling main.cpp
+    auto compileMain = [&](bool shouldFail) -> tl::expected<int, string>
+    {
+        const auto &r = makeIPCManagerBS(mainObj);
+        if (!r)
+        {
+            return tl::unexpected("creating manager failed" + r.error() + "\n");
+        }
+
+        const IPCManagerBS &manager = *r;
+
+        string compileCommand = CLANG_CMD R"( -noScanIPC -std=c++20 -c main.cpp -o ")" + mainObj + "\"";
+        if (const auto &r2 = Run(compileCommand); !r2)
+        {
+            return tl::unexpected(r2.error());
+        }
+
+        CTB type;
+        char buffer[320];
+        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
+        }
+
+        if (type != CTB::MODULE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+
+        const auto &ctbModule = reinterpret_cast<CTBModule &>(buffer);
+
+        if (ctbModule.moduleName != "Foo")
+        {
+            return tl::unexpected("wrong logical name received while compiling A-B.cpp");
+        }
+        printMessage(ctbModule, false);
+
+        BTCModule btcMod;
+        btcMod.requested.filePath = fooPcm;
+        ModuleDep modDep;
+        modDep.file.filePath = bigPcm;
+        modDep.logicalName = "Big.hpp";
+        modDep.isHeaderUnit = true;
+        btcMod.deps.emplace_back(std::move(modDep));
+        modDep.isHeaderUnit = false;
+        modDep.file.filePath = aPcm;
+        modDep.logicalName = "A";
+        btcMod.deps.emplace_back(std::move(modDep));
+        modDep.file.filePath = aBPcm;
+        modDep.logicalName = "A:B";
+        btcMod.deps.emplace_back(std::move(modDep));
+        modDep.file.filePath = aCPcm;
+        modDep.logicalName = "A:C";
+        btcMod.deps.emplace_back(std::move(modDep));
+
+        if (const auto &r2 = manager.sendMessage(std::move(btcMod)); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
+        }
+
+        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
+        }
+
+        if (type != CTB::LAST_MESSAGE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+
+        const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
+        if (ctbLastMessage.errorOccurred != shouldFail)
+        {
+            return tl::unexpected("wrong last message received");
+        }
+
+        printMessage(ctbLastMessage, false);
+        manager.closeConnection();
+        return {};
+        if (const auto &r2 = CloseProcess(); !r2)
+        {
+            return tl::unexpected("closing process failed");
+        }
+    };
+
+    if (const auto &r = compileMain(false); !r)
+    {
+        string str = r.error();
+        return tl::unexpected("compiling main failed" + r.error() + "\n");
+    }
+    // main.cpp
+    const string mainDotCpp = R"(
+import Foo;
+// only foo will be requested as A is already sent with it.
+import A;
+
+int main()
+{
+    Hello();
+    World();
+    Foo();
+
+)";
+
+    ofstream("main.cpp") << mainDotCpp;
     fflush(stdout);
 
     BMIFile mod;
@@ -1057,18 +1140,6 @@ tl::expected<int, string> runTest()
     {
         return tl::unexpected("creating manager failed" + r.error() + "\n");
     }
-
-#ifdef _WIN32
-    if (WaitForSingleObject(pi.hProcess, INFINITE) == WAIT_FAILED)
-    {
-        return tl::unexpected("WaitForSingleObject" + getErrorString());
-    }
-#else
-    if (waitpid(procId, &procStatus, 0) == -1)
-    {
-        return tl::unexpected("waitpid" + getErrorString());
-    }
-#endif
 
     return {};
 }

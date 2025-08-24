@@ -86,6 +86,7 @@ struct ModuleDep
 {
     BMIFile file;
     string logicalName;
+    bool isHeaderUnit;
 };
 
 // Reply for CTBModule

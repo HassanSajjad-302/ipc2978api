@@ -83,6 +83,7 @@ void printMessage(const BTCModule &btcModule, const bool sent)
         print("Deps[{}] FilePath: {}\n\n", i, btcModule.deps[i].file.filePath);
         print("Deps[{}] FileSize: {}\n\n", i, btcModule.deps[i].file.fileSize);
         print("Deps[{}] LogicalName: {}\n\n", i, btcModule.deps[i].logicalName);
+        print("Deps[{}] IsHeaderUnit: {}\n\n", i, btcModule.deps[i].isHeaderUnit);
     }
 }
 

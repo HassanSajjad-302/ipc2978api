@@ -181,6 +181,7 @@ void Manager::writeModuleDep(vector<char> &buffer, const ModuleDep &dep)
 {
     writeProcessMappingOfBMIFile(buffer, dep.file);
     writeString(buffer, dep.logicalName);
+    buffer.emplace_back(dep.isHeaderUnit);
 }
 
 void Manager::writeHuDep(vector<char> &buffer, const HuDep &dep)
@@ -328,11 +329,18 @@ tl::expected<ModuleDep, string> Manager::readModuleDepFromPipe(char (&buffer)[40
         return tl::unexpected(r3.error());
     }
 
+    const auto &r4 = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
+    if (!r4)
+    {
+        return tl::unexpected(r4.error());
+    }
+
     ModuleDep modDep;
 
     modDep.file.filePath = *r;
     modDep.file.fileSize = *r2;
     modDep.logicalName = *r3;
+    modDep.isHeaderUnit = *r4;
 
     return modDep;
 }
