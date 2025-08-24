@@ -310,9 +310,8 @@ tl::expected<int, string> runTest()
 
         const IPCManagerBS &manager = *r;
 
-        string compileCommand =
-            CLANG_CMD R"( -noScanIPC -std=c++20 -fmodules-reduced-bmi -c -xc++-module A-C.cpp -fmodule-output=")" +
-            aCPcm + "\" -o \"" + aCObj + "\"";
+        string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aCObj +
+                                "\" -noScanIPC -c -xc++-module A-C.cpp -fmodule-output=\"" + aCPcm + "\"";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -355,9 +354,8 @@ tl::expected<int, string> runTest()
 
         const IPCManagerBS &manager = *r;
 
-        string compileCommand =
-            CLANG_CMD R"( -noScanIPC -std=c++20 -fmodules-reduced-bmi -c -xc++-module A-B.cpp -fmodule-output=")" +
-            aBPcm + "\" -o \"" + aBObj + "\"";
+        string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aBObj +
+                                "\" -noScanIPC -c -xc++-module A-B.cpp -fmodule-output=\"" + aBPcm + "\"";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -400,9 +398,8 @@ tl::expected<int, string> runTest()
 
         const IPCManagerBS &manager = *r;
 
-        string compileCommand =
-            CLANG_CMD R"( -noScanIPC -std=c++20 -fmodules-reduced-bmi -c -xc++-module A.cpp -fmodule-output=")" + aPcm +
-            "\" -o \"" + aObj + "\"";
+        string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aObj +
+                                "\" -noScanIPC -c -xc++-module A.cpp -fmodule-output=\"" + aPcm + "\"";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -473,9 +470,8 @@ tl::expected<int, string> runTest()
 
         const IPCManagerBS &manager = *r;
 
-        string compileCommand =
-            CLANG_CMD R"( -noScanIPC -std=c++20 -DCOMMAND_MACRO -fmodule-header=user -xc++-header N.hpp -o ")" + nPcm +
-            "\"";
+        string compileCommand = CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + nPcm +
+                                "\" -noScanIPC -xc++-header N.hpp -DCOMMAND_MACRO";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -541,7 +537,7 @@ tl::expected<int, string> runTest()
         const IPCManagerBS &manager = *r;
 
         string compileCommand =
-            CLANG_CMD R"( -noScanIPC -std=c++20 -fmodule-header=user -xc++-header O.hpp -o ")" + oPcm + "\"";
+            CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm + "\" -noScanIPC -xc++-header O.hpp";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -630,9 +626,8 @@ tl::expected<int, string> runTest()
 
         const IPCManagerBS &manager = *r;
 
-        string compileCommand = CLANG_CMD
-                                R"( -noScanIPC -std=c++20 -DTRANSLATING -fmodule-header=user -xc++-header O.hpp -o ")" +
-                                oPcm + "\"";
+        string compileCommand = CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm +
+                                "\" -noScanIPC -xc++-header O.hpp -DTRANSLATING";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -721,7 +716,7 @@ tl::expected<int, string> runTest()
         const IPCManagerBS &manager = *r;
 
         string compileCommand =
-            CLANG_CMD R"( -noScanIPC -std=c++20 -fmodule-header=user -xc++-header Big.hpp -o ")" + bigPcm + "\"";
+            CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + bigPcm + "\" -noScanIPC -xc++-header Big.hpp";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -804,9 +799,8 @@ tl::expected<int, string> runTest()
 
         const IPCManagerBS &manager = *r;
 
-        string compileCommand =
-            CLANG_CMD R"( -noScanIPC -std=c++20 -fmodules-reduced-bmi -c -xc++-module Foo.cpp -fmodule-output=")" +
-            fooPcm + "\" -o \"" + fooObj + "\"";
+        string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + fooObj +
+                                "\" -noScanIPC -c -xc++-module Foo.cpp -fmodule-output=\"" + fooPcm + "\"";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -929,7 +923,7 @@ tl::expected<int, string> runTest()
 
         const IPCManagerBS &manager = *r;
 
-        string compileCommand = CLANG_CMD R"( -noScanIPC -std=c++20 -c main.cpp -o ")" + mainObj + "\"";
+        string compileCommand = CLANG_CMD R"( -std=c++20 -o ")" + mainObj + "\" -noScanIPC -c main.cpp";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -1026,7 +1020,6 @@ int main()
 )";
 
     ofstream("main.cpp") << mainDotCpp;
-
 
     if (const auto &r = compileMain(false); !r)
     {
