@@ -251,7 +251,7 @@ int main()
     Hello();
     World();
     Foo();
-}
+// no } to test for error
 )";
 
     ofstream("A.cpp") << aDotCpp;
@@ -920,8 +920,7 @@ tl::expected<int, string> runTest()
     }
 
     // compiling main.cpp
-    auto compileMain = [&](bool shouldFail) -> tl::expected<int, string>
-    {
+    auto compileMain = [&](bool shouldFail) -> tl::expected<int, string> {
         const auto &r = makeIPCManagerBS(mainObj);
         if (!r)
         {
@@ -1007,7 +1006,7 @@ tl::expected<int, string> runTest()
         }
     };
 
-    if (const auto &r = compileMain(false); !r)
+    if (const auto &r = compileMain(true); !r)
     {
         string str = r.error();
         return tl::unexpected("compiling main failed" + r.error() + "\n");
@@ -1023,124 +1022,19 @@ int main()
     Hello();
     World();
     Foo();
-
+}
 )";
 
     ofstream("main.cpp") << mainDotCpp;
+
+
+    if (const auto &r = compileMain(false); !r)
+    {
+        string str = r.error();
+        return tl::unexpected("compiling main failed" + r.error() + "\n");
+    }
+
     fflush(stdout);
-
-    BMIFile mod;
-    mod.filePath = modFilePath;
-    mod.fileSize = 0;
-
-    BMIFile mod2;
-    mod2.filePath = mod2FilePath;
-    mod2.fileSize = 0;
-    ModuleDep mod2Dep;
-    mod2Dep.file = std::move(mod2);
-    mod2Dep.logicalName = "mod2";
-
-    BTCModule b;
-    b.requested = std::move(mod);
-    b.deps.emplace_back(std::move(mod2Dep));
-
-    printMessage(b, true);
-
-    // compiling main.cpp
-    if (const auto &r = makeIPCManagerBS(std::move(mainFilePath)); r)
-    {
-        uint8_t messageCount = 0;
-        const IPCManagerBS &manager = *r;
-
-        string objFile = (current_path() / "main .o").generic_string() + "\"";
-        string compileCommand = CLANG_CMD R"( -std=c++20 -c main.cpp -noScanIPC -o ")" + objFile;
-        if (const auto &r2 = Run(compileCommand); !r2)
-        {
-            return tl::unexpected(r2.error());
-        }
-
-        while (true)
-        {
-            CTB type;
-            char buffer[320];
-            if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-            {
-                string str = r2.error();
-                return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-            }
-
-            switch (type)
-            {
-
-            case CTB::MODULE: {
-                const auto &ctbModule = reinterpret_cast<CTBModule &>(buffer);
-                printMessage(ctbModule, false);
-
-                if (!messageCount)
-                {
-                    ++messageCount;
-
-                    BMIFile mod;
-                    mod.filePath = modFilePath;
-                    mod.fileSize = 0;
-
-                    BMIFile mod2;
-                    mod2.filePath = mod2FilePath;
-                    mod2.fileSize = 0;
-                    ModuleDep mod2Dep;
-                    mod2Dep.file = std::move(mod2);
-                    mod2Dep.logicalName = "mod2";
-
-                    BTCModule b;
-                    b.requested = std::move(mod);
-                    b.deps.emplace_back(std::move(mod2Dep));
-
-                    if (const auto &r2 = manager.sendMessage(b); !r2)
-                    {
-                        return tl::unexpected(r2.error());
-                    }
-                    printMessage(b, true);
-                }
-                else if (messageCount == 1)
-                {
-                    ++messageCount;
-                    BMIFile mod1;
-                    mod1.filePath = mod1FilePath;
-                    mod1.fileSize = 0;
-
-                    BTCModule b;
-                    b.requested = std::move(mod1);
-
-                    if (const auto &r2 = manager.sendMessage(b); !r2)
-                    {
-                        return tl::unexpected(r2.error());
-                    }
-                    printMessage(b, true);
-                }
-            }
-
-            break;
-
-            case CTB::NON_MODULE: {
-            }
-
-            case CTB::LAST_MESSAGE: {
-            }
-
-                return tl::unexpected("Unexpected message received");
-            }
-
-            if (messageCount == 2)
-            {
-                break;
-            }
-        }
-    }
-    else
-    {
-        return tl::unexpected("creating manager failed" + r.error() + "\n");
-    }
-
     return {};
 }
 } // namespace
