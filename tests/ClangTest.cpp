@@ -48,7 +48,7 @@ namespace
 PROCESS_INFORMATION pi;
 tl::expected<void, string> Run(const string &command)
 {
-    STARTUPINFOA si;
+    STARTUPINFOA si{};
     si.cb = sizeof(si);
     if (!CreateProcessA(nullptr,                             // lpApplicationName
                         const_cast<char *>(command.c_str()), // lpCommandLine
@@ -993,11 +993,11 @@ tl::expected<int, string> runTest()
 
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
-        return {};
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
         }
+        return {};
     };
 
     if (const auto &r = compileMain(true); !r)
