@@ -122,13 +122,13 @@ void listenForCompiler()
 
 int runTest()
 {
-    const auto &r = makeIPCManagerBS((std::filesystem::current_path() / "test").string());
+    const auto r = makeIPCManagerBS((std::filesystem::current_path() / "test").string());
     if (!r)
     {
         exitFailure(r.error());
     }
 
-    const IPCManagerBS &manager = r.value();
+    IPCManagerBS manager = r.value();
     listenForCompiler();
     fflush(stdout);
     char buffer[320];
@@ -236,17 +236,50 @@ int runTest()
         }
     }
 
+    IPCManagerBS oldManager = manager;
+    // This tests the scenario where build-system has not yet called the receiveMessage after calling
+    // the makeIPCManagerBS() while compiler process already exited and sent the CTBLastMessage.
+    // To ensure that we make build-system manager before CompilerTest making compiler manager,
+    // we make it here.
+
+    if (auto r2 = makeIPCManagerBS((std::filesystem::current_path() / "test1").string()); !r2)
+    {
+        exitFailure(r2.error());
+    }
+    else
+    {
+        manager = r2.value();
+    }
+
     if (lastMessage.errorOccurred == EXIT_SUCCESS)
     {
         constexpr BTCLastMessage btcLastMessage;
 
-        if (const auto &r2 = manager.sendMessage(btcLastMessage); !r2)
+        if (const auto &r2 = oldManager.sendMessage(btcLastMessage); !r2)
         {
             exitFailure(r2.error());
         }
         print("Reply to Second CTBLastMessage ");
         printMessage(btcLastMessage, true);
     }
+    oldManager.closeConnection();
+
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+
+    // CompilerTest would have exited by now
+    if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+    {
+        exitFailure(r2.error());
+    }
+
+    if (type != CTB::LAST_MESSAGE)
+    {
+        print("Test failed. Expected CTB::LAST_MESSAGE.\n");
+    }
+
+    print("Received CTBLastMessage on new manager.");
+    printMessage(reinterpret_cast<CTBLastMessage &>(buffer), false);
+
     manager.closeConnection();
     return EXIT_SUCCESS;
 }

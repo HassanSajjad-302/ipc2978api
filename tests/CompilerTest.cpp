@@ -22,12 +22,13 @@ void exitFailure(const string &r)
 
 int main()
 {
-    const auto &r = makeIPCManagerCompiler((filesystem::current_path() / "test").string());
+    const auto r = makeIPCManagerCompiler((filesystem::current_path() / "test").string());
     if (!r)
     {
         exitFailure(r.error());
     }
-    const IPCManagerCompiler &manager = r.value();
+
+    IPCManagerCompiler manager = r.value();
     std::uniform_int_distribution distribution(0, 20);
     for (uint64_t i = 0; i < distribution(generator); ++i)
     {
@@ -65,7 +66,7 @@ int main()
     }
 
     CTBLastMessage ctbLastMessage;
-    ctbLastMessage.errorOccurred = EXIT_SUCCESS;
+    ctbLastMessage.errorOccurred = false;
     if (const auto &r2 = manager.sendCTBLastMessage(ctbLastMessage); !r2)
     {
         exitFailure(r2.error());
@@ -76,7 +77,7 @@ int main()
 
     // This tests file sharing. Contents of both outputs should be the same.
     CTBLastMessage lastMessageWithSharedFile;
-    lastMessageWithSharedFile.errorOccurred = EXIT_SUCCESS;
+    lastMessageWithSharedFile.errorOccurred = false;
     string fileContent = getRandomString();
     lastMessageWithSharedFile.fileSize = fileContent.size();
     print("Second ");
@@ -91,4 +92,25 @@ int main()
     print("File Content: {}\n\n", fileContent.data());
 
     print("BTCLastMessage has been received\n");
+
+    manager.closeConnection();
+
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    const auto r2 = makeIPCManagerCompiler((filesystem::current_path() / "test1").string());
+    if (!r2)
+    {
+        exitFailure(r2.error());
+    }
+    manager = r2.value();
+
+    ctbLastMessage.errorOccurred = true;
+    if (const auto &r3 = manager.sendCTBLastMessage(ctbLastMessage); !r3)
+    {
+        exitFailure(r3.error());
+    }
+
+    print("BTCLastMessage received on new manager.\n");
+    printMessage(ctbLastMessage, true);
+
+    manager.closeConnection();
 }
