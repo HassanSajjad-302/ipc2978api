@@ -14,6 +14,9 @@ inline std::mt19937 generator(rd());
 
 string getRandomString();
 bool getRandomBool();
+uint32_t getRandomNumber(uint32_t max);
+BTCModule getBTCModule();
+BTCNonModule getBTCNonModule();
 void printSendingOrReceiving(bool sent);
 void printMessage(const CTBModule &ctbModule, bool sent);
 void printMessage(const CTBNonModule &nonModule, bool sent);

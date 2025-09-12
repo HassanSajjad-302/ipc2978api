@@ -82,7 +82,7 @@ template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage
 
         BTCModule moduleFile;
         moduleFile.requested = *r;
-        moduleFile.deps = *r2;
+        moduleFile.modDeps = *r2;
         if (bytesRead == bytesProcessed)
         {
             return moduleFile;

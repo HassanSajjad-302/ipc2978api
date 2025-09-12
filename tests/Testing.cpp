@@ -24,6 +24,82 @@ bool getRandomBool()
     return distribution(generator);
 }
 
+uint32_t getRandomNumber(const uint32_t max)
+{
+    std::uniform_int_distribution<> distribution(0, max);
+    return distribution(generator);
+}
+
+BTCModule getBTCModule()
+{
+    BTCModule b;
+
+    BMIFile file;
+    file.filePath = getRandomString();
+    file.fileSize = 0;
+    b.requested = std::move(file);
+
+    const uint32_t modDepCount = getRandomNumber(10);
+    for (uint32_t i = 0; i < modDepCount; ++i)
+    {
+
+        ModuleDep modDep;
+        modDep.user = getRandomBool();
+        modDep.isHeaderUnit = getRandomBool();
+        const uint32_t logicalNameSize = getRandomNumber(10);
+        for (uint32_t i = 0; i < logicalNameSize; ++i)
+        {
+            modDep.logicalNames.emplace_back(getRandomString());
+        }
+        b.modDeps.emplace_back(std::move(modDep));
+    }
+
+    return b;
+}
+
+BTCNonModule getBTCNonModule()
+{
+    BTCNonModule nonModule;
+    nonModule.isHeaderUnit = getRandomBool();
+    nonModule.user = getRandomBool();
+    nonModule.filePath = getRandomString();
+    nonModule.fileSize = 0;
+
+    uint32_t logicalNameSize = getRandomNumber(10);
+    for (uint32_t i = 0; i < logicalNameSize; ++i)
+    {
+        nonModule.logicalNames.emplace_back(getRandomString());
+    }
+
+    const uint32_t headerFilesSize = getRandomNumber(10);
+    for (uint32_t i = 0; i < headerFilesSize; ++i)
+    {
+        HeaderFile h;
+        h.logicalName = getRandomString();
+        h.user = getRandomBool();
+        h.filePath = getRandomString();
+        nonModule.headerFiles.emplace_back(std::move(h));
+    }
+
+    const uint32_t huDepSize = getRandomNumber(10);
+    for (uint32_t i = 0; i < huDepSize; ++i)
+    {
+        HuDep huDep;
+        huDep.file.filePath = getRandomString();
+        huDep.file.fileSize = 0;
+
+        logicalNameSize = getRandomNumber(10);
+        for (uint32_t j = 0; j < logicalNameSize; ++j)
+        {
+            huDep.logicalNames.emplace_back(getRandomString());
+        }
+        huDep.user = getRandomBool();
+        nonModule.huDeps.emplace_back(std::move(huDep));
+    }
+
+    return nonModule;
+}
+
 void printSendingOrReceiving(const bool sent)
 {
     if (sent)
@@ -72,13 +148,18 @@ void printMessage(const BTCModule &btcModule, const bool sent)
 
     print("Requested FilePath: {}\n\n", btcModule.requested.filePath);
     print("Requested FileSize: {}\n\n", btcModule.requested.fileSize);
-    print("Deps Size: {}\n\n", btcModule.deps.size());
-    for (uint32_t i = 0; i < btcModule.deps.size(); i++)
+    print("Deps Size: {}\n\n", btcModule.modDeps.size());
+    for (uint32_t i = 0; i < btcModule.modDeps.size(); i++)
     {
-        print("Deps[{}] FilePath: {}\n\n", i, btcModule.deps[i].file.filePath);
-        print("Deps[{}] FileSize: {}\n\n", i, btcModule.deps[i].file.fileSize);
-        print("Deps[{}] LogicalName: {}\n\n", i, btcModule.deps[i].logicalNames);
-        print("Deps[{}] IsHeaderUnit: {}\n\n", i, btcModule.deps[i].isHeaderUnit);
+        print("Mod-Dep[{}] IsHeaderUnit: {}\n\n", i, btcModule.modDeps[i].isHeaderUnit);
+        print("Mod-Dep[{}] FilePath: {}\n\n", i, btcModule.modDeps[i].file.filePath);
+        print("Mod-Dep[{}] FileSize: {}\n\n", i, btcModule.modDeps[i].file.fileSize);
+        print("Mod-Dep[{}] LogicalName Size: {}\n\n", i, btcModule.modDeps[i].logicalNames.size());
+        for (uint32_t j = 0; j < btcModule.modDeps[i].logicalNames.size(); ++j)
+        {
+            print("Mod-Dep[{}] LogicalName[{}]: {}\n\n", i, j, btcModule.modDeps[i].logicalNames[j]);
+        }
+        print("Mod-Dep[{}] User: {}\n\n", i, btcModule.modDeps[i].user);
     }
 }
 
@@ -87,14 +168,31 @@ void printMessage(const BTCNonModule &nonModule, const bool sent)
     printSendingOrReceiving(sent);
     print("BTCNonModule\n\n");
     print("IsHeaderUnit {}\n\n", nonModule.isHeaderUnit);
+    print("User {}\n\n", nonModule.user);
     print("FilePath {}\n\n", nonModule.filePath);
     print("FileSize {}\n\n", nonModule.fileSize);
+
+    for (uint32_t i = 0; i < nonModule.logicalNames.size(); i++)
+    {
+        print("Logical-Name[{}]: {}\n\n", i, nonModule.logicalNames[i]);
+    }
+
+    for (uint32_t i = 0; i < nonModule.headerFiles.size(); i++)
+    {
+        print("Header-File[{}] LogicalName: {}\n\n", i, nonModule.headerFiles[i].logicalName);
+        print("Header-File[{}] FilePath: {}\n\n", i, nonModule.headerFiles[i].filePath);
+        print("Header-File[{}] User: {}\n\n", i, nonModule.headerFiles[i].user);
+    }
+
     for (uint32_t i = 0; i < nonModule.huDeps.size(); i++)
     {
-        print("Deps[{}] FilePath: {}\n\n", i, nonModule.huDeps[i].file.filePath);
-        print("Deps[{}] FileSize: {}\n\n", i, nonModule.huDeps[i].file.fileSize);
-        print("Deps[{}] LogicalName: {}\n\n", i, nonModule.huDeps[i].logicalName);
-        print("Deps[{}] User: {}\n\n", i, nonModule.huDeps[i].user);
+        print("Hu-Dep[{}] FilePath: {}\n\n", i, nonModule.huDeps[i].file.filePath);
+        print("Hu-Dep[{}] FileSize: {}\n\n", i, nonModule.huDeps[i].file.fileSize);
+        for (uint32_t j = 0; j < nonModule.huDeps[i].logicalNames.size(); ++j)
+        {
+            print("Mod-Dep[{}] LogicalName[{}]: {}\n\n", i, j, nonModule.huDeps[i].logicalNames[j]);
+        }
+        print("Hu-Dep[{}] User: {}\n\n", i, nonModule.huDeps[i].user);
     }
 }
 

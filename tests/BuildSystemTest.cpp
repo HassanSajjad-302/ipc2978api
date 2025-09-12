@@ -149,11 +149,7 @@ int runTest()
         case CTB::MODULE: {
             const auto &ctbModule = reinterpret_cast<CTBModule &>(buffer);
             printMessage(ctbModule, false);
-            BMIFile file;
-            file.filePath = getRandomString();
-            file.fileSize = 0;
-            BTCModule b;
-            b.requested = std::move(file);
+            BTCModule b = getBTCModule();
             if (const auto &r2 = manager.sendMessage(b); !r2)
             {
                 exitFailure(r2.error());
@@ -166,9 +162,7 @@ int runTest()
         case CTB::NON_MODULE: {
             const auto &ctbNonModule = reinterpret_cast<CTBNonModule &>(buffer);
             printMessage(ctbNonModule, false);
-            BTCNonModule nonModule;
-            nonModule.isHeaderUnit = getRandomBool();
-            nonModule.filePath = getRandomString();
+            BTCNonModule nonModule = getBTCNonModule();
             if (const auto &r2 = manager.sendMessage(nonModule); !r2)
             {
                 exitFailure(r2.error());

@@ -432,7 +432,7 @@ tl::expected<int, string> runTest()
         modDep.file.filePath = aCPcm;
         modDep.logicalNames = "A:C";
         modDep.isHeaderUnit = false;
-        btcMod.deps.emplace_back(std::move(modDep));
+        btcMod.modDeps.emplace_back(std::move(modDep));
 
         if (const auto &r2 = manager.sendMessage(std::move(btcMod)); !r2)
         {
@@ -882,10 +882,10 @@ tl::expected<int, string> runTest()
         d.isHeaderUnit = false;
         d.file.filePath = aBPcm;
         d.logicalNames = "A:B";
-        amod.deps.emplace_back(d);
+        amod.modDeps.emplace_back(d);
         d.file.filePath = aCPcm;
         d.logicalNames = "A:C";
-        amod.deps.emplace_back(d);
+        amod.modDeps.emplace_back(d);
 
         if (const auto &r2 = manager.sendMessage(amod); !r2)
         {
@@ -956,17 +956,17 @@ tl::expected<int, string> runTest()
         modDep.file.filePath = bigPcm;
         modDep.logicalNames = "Big.hpp";
         modDep.isHeaderUnit = true;
-        btcMod.deps.emplace_back(std::move(modDep));
+        btcMod.modDeps.emplace_back(std::move(modDep));
         modDep.isHeaderUnit = false;
         modDep.file.filePath = aPcm;
         modDep.logicalNames = "A";
-        btcMod.deps.emplace_back(std::move(modDep));
+        btcMod.modDeps.emplace_back(std::move(modDep));
         modDep.file.filePath = aBPcm;
         modDep.logicalNames = "A:B";
-        btcMod.deps.emplace_back(std::move(modDep));
+        btcMod.modDeps.emplace_back(std::move(modDep));
         modDep.file.filePath = aCPcm;
         modDep.logicalNames = "A:C";
-        btcMod.deps.emplace_back(std::move(modDep));
+        btcMod.modDeps.emplace_back(std::move(modDep));
 
         if (const auto &r2 = manager.sendMessage(std::move(btcMod)); !r2)
         {

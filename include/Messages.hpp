@@ -93,13 +93,13 @@ struct ModuleDep
 struct BTCModule
 {
     BMIFile requested;
-    vector<ModuleDep> deps;
+    vector<ModuleDep> modDeps;
 };
 
 struct HuDep
 {
     BMIFile file;
-    vector<string> logicalName;
+    vector<string> logicalNames;
     // whether header-unit / header-file belongs to user or system directory.
     bool user = true;
 };

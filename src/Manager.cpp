@@ -188,7 +188,7 @@ void Manager::writeModuleDep(vector<char> &buffer, const ModuleDep &dep)
 void Manager::writeHuDep(vector<char> &buffer, const HuDep &dep)
 {
     writeProcessMappingOfBMIFile(buffer, dep.file);
-    writeVectorOfStrings(buffer, dep.logicalName);
+    writeVectorOfStrings(buffer, dep.logicalNames);
     buffer.emplace_back(dep.user);
 }
 
@@ -410,7 +410,7 @@ tl::expected<HuDep, string> Manager::readHuDepFromPipe(char (&buffer)[4096], uin
 
     HuDep huDep;
     huDep.file = *r;
-    huDep.logicalName = *r2;
+    huDep.logicalNames = *r2;
     huDep.user = *r3;
     return huDep;
 }
