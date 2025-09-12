@@ -21,7 +21,8 @@ struct Response
     // if type == HEADER_FILE, then fileSize has no meaning
     BMIFile file;
     ResponseType type;
-    Response(BMIFile file_, ResponseType type_);
+    bool user;
+    Response(BMIFile file_, ResponseType type_, bool user_);
 };
 
 // IPC Manager Compiler
@@ -32,6 +33,7 @@ class IPCManagerCompiler : Manager
     [[nodiscard]] tl::expected<void, string> receiveBTCLastMessage() const;
 
     std::unordered_map<string, Response> responses;
+    decltype(responses)::iterator it;
 
   public:
     CTBLastMessage lastMessage{};
@@ -40,8 +42,8 @@ class IPCManagerCompiler : Manager
 #else
     explicit IPCManagerCompiler(int fdSocket_);
 #endif
-    [[nodiscard]] tl::expected<BTCModule, string> receiveBTCModule(const CTBModule &moduleName) const;
-    [[nodiscard]] tl::expected<BTCNonModule, string> receiveBTCNonModule(const CTBNonModule &nonModule) const;
+    [[nodiscard]] tl::expected<BTCModule, string> receiveBTCModule(const CTBModule &moduleName);
+    [[nodiscard]] tl::expected<BTCNonModule, string> receiveBTCNonModule(const CTBNonModule &nonModule);
     [[nodiscard]] tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage) const;
     [[nodiscard]] tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage,
                                                                 const string &bmiFile, const string &filePath) const;
@@ -74,15 +76,23 @@ template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage
             return tl::unexpected(r.error());
         }
 
-        const auto &r2 = readVectorOfModuleDepFromPipe(buffer, bytesRead, bytesProcessed);
+        const auto &r2 = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
         if (!r2)
         {
             return tl::unexpected(r2.error());
         }
 
+        const auto &r3 = readVectorOfModuleDepFromPipe(buffer, bytesRead, bytesProcessed);
+        if (!r3)
+        {
+            return tl::unexpected(r3.error());
+        }
+
         BTCModule moduleFile;
         moduleFile.requested = *r;
-        moduleFile.modDeps = *r2;
+        moduleFile.user = *r2;
+        moduleFile.modDeps = *r3;
+
         if (bytesRead == bytesProcessed)
         {
             return moduleFile;

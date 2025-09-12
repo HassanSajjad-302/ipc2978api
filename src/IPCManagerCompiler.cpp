@@ -87,7 +87,8 @@ IPCManagerCompiler::IPCManagerCompiler(const int fdSocket_)
 }
 #endif
 
-Response::Response(BMIFile file_, const ResponseType type_) : file(std::move(file_)), type(type_)
+Response::Response(BMIFile file_, const ResponseType type_, const bool user_)
+    : file(std::move(file_)), type(type_), user(user_)
 {
 }
 
@@ -117,7 +118,7 @@ tl::expected<void, string> IPCManagerCompiler::receiveBTCLastMessage() const
     return {};
 }
 
-tl::expected<BTCModule, string> IPCManagerCompiler::receiveBTCModule(const CTBModule &moduleName) const
+tl::expected<BTCModule, string> IPCManagerCompiler::receiveBTCModule(const CTBModule &moduleName)
 {
 
     vector<char> buffer = getBufferWithType(CTB::MODULE);
@@ -127,10 +128,31 @@ tl::expected<BTCModule, string> IPCManagerCompiler::receiveBTCModule(const CTBMo
         return tl::unexpected(r.error());
     }
 
-    return receiveMessage<BTCModule>();
+    const auto &received = receiveMessage<BTCModule>();
+
+    if (received)
+    {
+        auto &[f, user, deps] = received.value();
+        responses.emplace(moduleName.moduleName, Response(f, ResponseType::MODULE, user));
+        for (const auto &[isHeaderUnit, file, logicalNames, user] : deps)
+        {
+            if (isHeaderUnit)
+            {
+                for (const string &s : logicalNames)
+                {
+                    responses.emplace(s, Response(file, ResponseType::HEADER_UNIT, user));
+                }
+            }
+            else
+            {
+                responses.emplace(logicalNames[0], Response(file, ResponseType::MODULE, user));
+            }
+        }
+    }
+    return received;
 }
 
-tl::expected<BTCNonModule, string> IPCManagerCompiler::receiveBTCNonModule(const CTBNonModule &nonModule) const
+tl::expected<BTCNonModule, string> IPCManagerCompiler::receiveBTCNonModule(const CTBNonModule &nonModule)
 {
     vector<char> buffer = getBufferWithType(CTB::NON_MODULE);
     buffer.emplace_back(nonModule.isHeaderUnit);
@@ -139,7 +161,46 @@ tl::expected<BTCNonModule, string> IPCManagerCompiler::receiveBTCNonModule(const
     {
         return tl::unexpected(r.error());
     }
-    return receiveMessage<BTCNonModule>();
+
+    const auto &received = receiveMessage<BTCNonModule>();
+
+    if (received)
+    {
+        const auto &[isHeaderUnit, user, filePath, fileSize, logicalNames, headerFiles, huDeps] = received.value();
+
+        BMIFile f;
+        f.filePath = filePath;
+        f.fileSize = fileSize;
+
+        if (!isHeaderUnit)
+        {
+            responses.emplace(nonModule.logicalName, Response(f, ResponseType::HEADER_FILE, user));
+            return received;
+        }
+
+        responses.emplace(nonModule.logicalName, Response(f, ResponseType::HEADER_UNIT, user));
+
+        for (const string &h : logicalNames)
+        {
+            responses.emplace(h, Response(f, ResponseType::HEADER_UNIT, user));
+        }
+
+        for (const auto &[logicalName, filePath, user] : headerFiles)
+        {
+            BMIFile headerBMI;
+            headerBMI.filePath = filePath;
+            responses.emplace(logicalName, Response(headerBMI, ResponseType::HEADER_FILE, user));
+        }
+
+        for (const auto &[file, logicalNames, user] : huDeps)
+        {
+            for (const string &l : logicalNames)
+            {
+                responses.emplace(l, Response(file, ResponseType::HEADER_UNIT, user));
+            }
+        }
+    }
+    return received;
 }
 
 tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage) const

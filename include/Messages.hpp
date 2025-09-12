@@ -93,6 +93,7 @@ struct ModuleDep
 struct BTCModule
 {
     BMIFile requested;
+    bool user = true;
     vector<ModuleDep> modDeps;
 };
 

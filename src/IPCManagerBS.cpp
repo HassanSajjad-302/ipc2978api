@@ -258,6 +258,7 @@ tl::expected<void, string> IPCManagerBS::sendMessage(const BTCModule &moduleFile
 {
     vector<char> buffer;
     writeProcessMappingOfBMIFile(buffer, moduleFile.requested);
+    buffer.emplace_back(moduleFile.user);
     writeVectorOfModuleDep(buffer, moduleFile.modDeps);
     if (const auto &r = writeInternal(buffer); !r)
     {

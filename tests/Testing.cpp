@@ -37,15 +37,18 @@ BTCModule getBTCModule()
     BMIFile file;
     file.filePath = getRandomString();
     file.fileSize = 0;
+
     b.requested = std::move(file);
+
+    b.user = getRandomBool();
 
     const uint32_t modDepCount = getRandomNumber(10);
     for (uint32_t i = 0; i < modDepCount; ++i)
     {
-
         ModuleDep modDep;
         modDep.user = getRandomBool();
         modDep.isHeaderUnit = getRandomBool();
+        modDep.logicalNames.emplace_back(getRandomString());
         const uint32_t logicalNameSize = getRandomNumber(10);
         for (uint32_t i = 0; i < logicalNameSize; ++i)
         {
@@ -89,6 +92,7 @@ BTCNonModule getBTCNonModule()
         huDep.file.fileSize = 0;
 
         logicalNameSize = getRandomNumber(10);
+        huDep.logicalNames.emplace_back(getRandomString());
         for (uint32_t j = 0; j < logicalNameSize; ++j)
         {
             huDep.logicalNames.emplace_back(getRandomString());
@@ -147,6 +151,7 @@ void printMessage(const BTCModule &btcModule, const bool sent)
     print("BTCModule\n\n");
 
     print("Requested FilePath: {}\n\n", btcModule.requested.filePath);
+    print("Requested User: {}\n\n", btcModule.user);
     print("Requested FileSize: {}\n\n", btcModule.requested.fileSize);
     print("Deps Size: {}\n\n", btcModule.modDeps.size());
     for (uint32_t i = 0; i < btcModule.modDeps.size(); i++)
