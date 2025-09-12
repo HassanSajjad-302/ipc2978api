@@ -48,7 +48,7 @@ void printMessage(const CTBNonModule &nonModule, const bool sent)
     printSendingOrReceiving(sent);
     print("CTBNonModule\n\n");
     print("IsHeaderUnit: {}\n\n", nonModule.isHeaderUnit);
-    print("logicalName: {}\n\n", nonModule.logicalName);
+    print("logicalNames: {}\n\n", nonModule.logicalName);
 }
 
 void printMessage(const CTBLastMessage &lastMessage, const bool sent)
@@ -77,7 +77,7 @@ void printMessage(const BTCModule &btcModule, const bool sent)
     {
         print("Deps[{}] FilePath: {}\n\n", i, btcModule.deps[i].file.filePath);
         print("Deps[{}] FileSize: {}\n\n", i, btcModule.deps[i].file.fileSize);
-        print("Deps[{}] LogicalName: {}\n\n", i, btcModule.deps[i].logicalName);
+        print("Deps[{}] LogicalName: {}\n\n", i, btcModule.deps[i].logicalNames);
         print("Deps[{}] IsHeaderUnit: {}\n\n", i, btcModule.deps[i].isHeaderUnit);
     }
 }
@@ -89,12 +89,12 @@ void printMessage(const BTCNonModule &nonModule, const bool sent)
     print("IsHeaderUnit {}\n\n", nonModule.isHeaderUnit);
     print("FilePath {}\n\n", nonModule.filePath);
     print("FileSize {}\n\n", nonModule.fileSize);
-    for (uint32_t i = 0; i < nonModule.deps.size(); i++)
+    for (uint32_t i = 0; i < nonModule.huDeps.size(); i++)
     {
-        print("Deps[{}] FilePath: {}\n\n", i, nonModule.deps[i].file.filePath);
-        print("Deps[{}] FileSize: {}\n\n", i, nonModule.deps[i].file.fileSize);
-        print("Deps[{}] LogicalName: {}\n\n", i, nonModule.deps[i].logicalName);
-        print("Deps[{}] User: {}\n\n", i, nonModule.deps[i].user);
+        print("Deps[{}] FilePath: {}\n\n", i, nonModule.huDeps[i].file.filePath);
+        print("Deps[{}] FileSize: {}\n\n", i, nonModule.huDeps[i].file.fileSize);
+        print("Deps[{}] LogicalName: {}\n\n", i, nonModule.huDeps[i].logicalName);
+        print("Deps[{}] User: {}\n\n", i, nonModule.huDeps[i].user);
     }
 }
 

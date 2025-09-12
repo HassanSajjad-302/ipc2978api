@@ -5,6 +5,7 @@
 #include "rapidhash.h"
 
 #include <string>
+#include <utility>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -85,6 +86,10 @@ IPCManagerCompiler::IPCManagerCompiler(const int fdSocket_)
     fdSocket = fdSocket_;
 }
 #endif
+
+Response::Response(BMIFile file_, const ResponseType type_) : file(std::move(file_)), type(type_)
+{
+}
 
 tl::expected<void, string> IPCManagerCompiler::receiveBTCLastMessage() const
 {
@@ -346,13 +351,4 @@ bool operator==(const CTBNonModule &lhs, const CTBNonModule &rhs)
 {
     return lhs.isHeaderUnit == rhs.isHeaderUnit && lhs.logicalName == rhs.logicalName;
 }
-
-uint64_t CTBNonModuleHash::operator()(const CTBNonModule &ctb) const
-{
-    const_cast<char &>(ctb.logicalName[ctb.logicalName.size()]) = ctb.isHeaderUnit;
-    const uint64_t hash = rapidhash(ctb.logicalName.data(), ctb.logicalName.size() + 1);
-    const_cast<char &>(ctb.logicalName[ctb.logicalName.size()]) = '\0';
-    return hash;
-}
-
 } // namespace N2978

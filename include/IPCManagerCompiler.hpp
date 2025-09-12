@@ -9,12 +9,29 @@ using std::string_view;
 namespace N2978
 {
 
+enum class ResponseType
+{
+    MODULE,
+    HEADER_UNIT,
+    HEADER_FILE
+};
+
+struct Response
+{
+    // if type == HEADER_FILE, then fileSize has no meaning
+    BMIFile file;
+    ResponseType type;
+    Response(BMIFile file_, ResponseType type_);
+};
+
 // IPC Manager Compiler
 class IPCManagerCompiler : Manager
 {
     template <typename T> tl::expected<T, string> receiveMessage() const;
     // This is not exposed. sendCTBLastMessage calls this.
     [[nodiscard]] tl::expected<void, string> receiveBTCLastMessage() const;
+
+    std::unordered_map<string, Response> responses;
 
   public:
     CTBLastMessage lastMessage{};
@@ -79,13 +96,13 @@ template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage
             return tl::unexpected(r.error());
         }
 
-        const auto &r2 = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        const auto &r2 = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
         if (!r2)
         {
             return tl::unexpected(r2.error());
         }
 
-        const auto &r3 = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
+        const auto &r3 = readStringFromPipe(buffer, bytesRead, bytesProcessed);
         if (!r3)
         {
             return tl::unexpected(r3.error());
@@ -97,18 +114,32 @@ template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage
             return tl::unexpected(r4.error());
         }
 
-        const auto &r5 = readVectorOfHuDepFromPipe(buffer, bytesRead, bytesProcessed);
+        const auto &r5 = readVectorOfStringFromPipe(buffer, bytesRead, bytesProcessed);
         if (!r5)
         {
             return tl::unexpected(r5.error());
         }
 
+        const auto &r6 = readVectorOfHeaderFileFromPipe(buffer, bytesRead, bytesProcessed);
+        if (!r6)
+        {
+            return tl::unexpected(r6.error());
+        }
+
+        const auto &r7 = readVectorOfHuDepFromPipe(buffer, bytesRead, bytesProcessed);
+        if (!r7)
+        {
+            return tl::unexpected(r7.error());
+        }
+
         BTCNonModule nonModule;
         nonModule.isHeaderUnit = *r;
-        nonModule.filePath = *r2;
-        nonModule.user = *r3;
+        nonModule.user = *r2;
+        nonModule.filePath = *r3;
         nonModule.fileSize = *r4;
-        nonModule.deps = *r5;
+        nonModule.logicalNames = *r5;
+        nonModule.headerFiles = *r6;
+        nonModule.huDeps = *r7;
 
         if (bytesRead == bytesProcessed)
         {
@@ -131,16 +162,5 @@ template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage
 }
 [[nodiscard]] tl::expected<IPCManagerCompiler, string> makeIPCManagerCompiler(string BMIIfHeaderUnitObjOtherwisePath);
 inline IPCManagerCompiler *managerCompiler;
-inline CTBLastMessage lastMessage;
-
-// Equality operator for use in unordered_map
-bool operator==(const CTBNonModule &lhs, const CTBNonModule &rhs);
-// Hash function for CTBNonModule
-struct CTBNonModuleHash
-{
-    uint64_t operator()(const CTBNonModule &ctb) const;
-};
-
-inline std::unordered_map<CTBNonModule, BTCNonModule, CTBNonModuleHash> respnses;
 } // namespace N2978
 #endif // IPC_MANAGER_COMPILER_HPP

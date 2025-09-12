@@ -74,10 +74,12 @@ class Manager
     static void writeProcessMappingOfBMIFile(vector<char> &buffer, const BMIFile &file);
     static void writeModuleDep(vector<char> &buffer, const ModuleDep &dep);
     static void writeHuDep(vector<char> &buffer, const HuDep &dep);
+    static void writeHeaderFile(vector<char> &buffer, const HeaderFile &dep);
     static void writeVectorOfStrings(vector<char> &buffer, const vector<string> &strs);
     static void writeVectorOfProcessMappingOfBMIFiles(vector<char> &buffer, const vector<BMIFile> &files);
     static void writeVectorOfModuleDep(vector<char> &buffer, const vector<ModuleDep> &deps);
-    static void writeVectorOfHuDep(vector<char> &buffer, const vector<HuDep> &deps);
+    static void writeVectorOfHuDeps(vector<char> &buffer, const vector<HuDep> &deps);
+    static void writeVectorOfHeaderFiles(vector<char> &buffer, const vector<HeaderFile> &headerFiles);
 
     tl::expected<bool, string> readBoolFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                                                 uint32_t &bytesProcessed) const;
@@ -98,6 +100,11 @@ class Manager
                                                   uint32_t &bytesProcessed) const;
     tl::expected<vector<HuDep>, string> readVectorOfHuDepFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
                                                                   uint32_t &bytesProcessed) const;
+    tl::expected<HeaderFile, string> readHeaderFileFromPipe(char (&buffer)[BUFFERSIZE], uint32_t &bytesRead,
+                                                            uint32_t &bytesProcessed) const;
+    tl::expected<vector<HeaderFile>, string> readVectorOfHeaderFileFromPipe(char (&buffer)[BUFFERSIZE],
+                                                                            uint32_t &bytesRead,
+                                                                            uint32_t &bytesProcessed) const;
     tl::expected<void, string> readNumberOfBytes(char *output, uint32_t size, char (&buffer)[BUFFERSIZE],
                                                  uint32_t &bytesRead, uint32_t &bytesProcessed) const;
 };

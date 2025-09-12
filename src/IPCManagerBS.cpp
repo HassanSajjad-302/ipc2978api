@@ -270,10 +270,12 @@ tl::expected<void, string> IPCManagerBS::sendMessage(const BTCNonModule &nonModu
 {
     vector<char> buffer;
     buffer.emplace_back(nonModule.isHeaderUnit);
-    writeString(buffer, nonModule.filePath);
     buffer.emplace_back(nonModule.user);
+    writeString(buffer, nonModule.filePath);
     writeUInt32(buffer, nonModule.fileSize);
-    writeVectorOfHuDep(buffer, nonModule.deps);
+    writeVectorOfStrings(buffer, nonModule.logicalNames);
+    writeVectorOfHeaderFiles(buffer, nonModule.headerFiles);
+    writeVectorOfHuDeps(buffer, nonModule.huDeps);
     if (const auto &r = writeInternal(buffer); !r)
     {
         return tl::unexpected(r.error());

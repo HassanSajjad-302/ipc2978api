@@ -10,7 +10,6 @@ using std::string, std::vector;
 
 namespace N2978
 {
-
 // CTB --> Compiler to Build-System
 // BTC --> Build-System to Compiler
 
@@ -79,9 +78,15 @@ struct BMIFile
 
 struct ModuleDep
 {
-    BMIFile file;
-    string logicalName;
     bool isHeaderUnit;
+    BMIFile file;
+    // if isHeaderUnit == true, then the following might
+    // contain more than one values, as header-unit can be
+    // composed of multiple header-files. And if later,
+    // any of the following logicalNames is included or
+    // imported, the following can be used instead.
+    vector<string> logicalNames;
+    bool user = true;
 };
 
 // Reply for CTBModule
@@ -94,8 +99,15 @@ struct BTCModule
 struct HuDep
 {
     BMIFile file;
-    string logicalName;
+    vector<string> logicalName;
     // whether header-unit / header-file belongs to user or system directory.
+    bool user = true;
+};
+
+struct HeaderFile
+{
+    string logicalName;
+    string filePath;
     bool user = true;
 };
 
@@ -103,13 +115,17 @@ struct HuDep
 struct BTCNonModule
 {
     bool isHeaderUnit = false;
-    string filePath;
-    // if isHeaderUnit == false, the following three are meaning-less.
-    // whether header-unit / header-file belongs to user or system directory.
     bool user = true;
+    string filePath;
+    // if isHeaderUnit == false, the following are meaning-less.
     // if isHeaderUnit == true, fileSize of the requested file.
     uint32_t fileSize;
-    vector<HuDep> deps;
+    vector<string> logicalNames;
+    // build-system might send the following on first request, if it knows that a
+    // header-unit is being compiled that compose multiple header-files to reduce
+    // the number of subsequent requests.
+    vector<HeaderFile> headerFiles;
+    vector<HuDep> huDeps;
 };
 
 // Reply for CTBLastMessage if the compilation succeeded.
