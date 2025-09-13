@@ -103,6 +103,24 @@ tl::expected<void, std::string> CloseProcess()
     return {};
 }
 
+// main.cpp
+const string mainDotCpp = R"(
+// only one request of Foo will be made as A and Big.hpp
+// will be provided with it.
+import Foo;
+import A;
+#include "Y.hpp"
+#include "Z.hpp"
+
+int main()
+{
+    Hello();
+    World();
+    Foo();
+// has no closing brace to test for error.
+
+)";
+
 // Creates all the input files (source files + pcm files) that are needed for the test.
 void setupTest()
 {
@@ -240,23 +258,6 @@ export void Foo()
     World();
     int s = x + y + z;
 }
-)";
-
-    // main.cpp
-    const string mainDotCpp = R"(
-// only one request of Foo will be made as A and Big.hpp
-// will be provided with it.
-import Foo;
-import A;
-#include "Y.hpp"
-#include "Z.hpp"
-
-int main()
-{
-    Hello();
-    World();
-    Foo();
-// no } to test for error
 )";
 
     ofstream("A.cpp") << aDotCpp;
@@ -969,6 +970,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager receive message failed" + r2.error() + "\n");
         }
 
+        CTBModule &mod = reinterpret_cast<CTBModule &>(buffer);
         if (type != CTB::LAST_MESSAGE)
         {
             return tl::unexpected("received message of wrong type");
@@ -995,26 +997,13 @@ tl::expected<int, string> runTest()
         return tl::unexpected("compiling main failed" + r.error() + "\n");
     }
     // main.cpp
-    const string mainDotCpp = R"(
-import Foo;
-// only foo will be requested as A is already sent with it.
-import A;
+    ofstream("main.cpp") << mainDotCpp + '}';
 
-int main()
-{
-    Hello();
-    World();
-    Foo();
-}
-)";
-
-    ofstream("main.cpp") << mainDotCpp;
-
-    /*if (const auto &r = compileMain(false); !r)
+    if (const auto &r = compileMain(false); !r)
     {
         string str = r.error();
         return tl::unexpected("compiling main failed" + r.error() + "\n");
-    }*/
+    }
 
     fflush(stdout);
     return {};
