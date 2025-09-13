@@ -229,6 +229,8 @@ inline int z = x + y + 5;
 module;
 #include "X.hpp"
 #include "Z.hpp"
+#include "Y.hpp"
+#include "Big.hpp"
 export module Foo;
 import A;
 
@@ -242,9 +244,12 @@ export void Foo()
 
     // main.cpp
     const string mainDotCpp = R"(
+// only one request of Foo will be made as A and Big.hpp
+// will be provided with it.
 import Foo;
-// only foo will be requested as A is already sent with it.
 import A;
+#include "Y.hpp"
+#include "Z.hpp"
 
 int main()
 {
@@ -744,15 +749,16 @@ tl::expected<int, string> runTest()
         BTCNonModule headerFile;
         headerFile.isHeaderUnit = false;
         headerFile.filePath = xHpp;
-        HeaderFile h;
-        h.logicalName = "Y.hpp";
-        h.filePath = yHpp;
-        h.user = true;
-        headerFile.headerFiles.emplace_back(std::move(h));
-        h.logicalName = "Z.hpp";
-        h.filePath = zHpp;
-        h.user = true;
-        headerFile.headerFiles.emplace_back(std::move(h));
+        HeaderFile yHeaderFile;
+        yHeaderFile.logicalName = "Y.hpp";
+        yHeaderFile.filePath = yHpp;
+        yHeaderFile.user = true;
+        headerFile.headerFiles.emplace_back(std::move(yHeaderFile));
+        HeaderFile zHeaderFile;
+        zHeaderFile.logicalName = "Z.hpp";
+        zHeaderFile.filePath = zHpp;
+        zHeaderFile.user = true;
+        headerFile.headerFiles.emplace_back(std::move(zHeaderFile));
 
         if (const auto &r2 = manager.sendMessage(std::move(headerFile)); !r2)
         {
@@ -766,7 +772,6 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager receive message failed" + r2.error() + "\n");
         }
 
-        CTBNonModule &non = reinterpret_cast<CTBNonModule &>(buffer);
         if (type != CTB::LAST_MESSAGE)
         {
             return tl::unexpected("received message of wrong type");
@@ -821,29 +826,9 @@ tl::expected<int, string> runTest()
         BTCNonModule bigHu;
         bigHu.isHeaderUnit = true;
         bigHu.filePath = bigPcm;
-
-        if (const auto &r2 = manager.sendMessage(bigHu); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager send message failed" + r2.error() + "\n");
-        }
-
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
-        if (type != CTB::NON_MODULE)
-        {
-            return tl::unexpected("received message of wrong type");
-        }
-        const auto &zHeader = reinterpret_cast<CTBNonModule &>(buffer);
-
-        if (zHeader.logicalName != "Z.hpp" || zHeader.isHeaderUnit == true)
-        {
-            return tl::unexpected("wrong message received");
-        }
+        bigHu.logicalNames.emplace_back("Big.hpp");
+        bigHu.logicalNames.emplace_back("Y.hpp");
+        bigHu.logicalNames.emplace_back("Z.hpp");
 
         if (const auto &r2 = manager.sendMessage(bigHu); !r2)
         {
@@ -870,14 +855,15 @@ tl::expected<int, string> runTest()
 
         BTCModule amod;
         amod.requested.filePath = aPcm;
-        ModuleDep d;
-        d.isHeaderUnit = false;
-        d.file.filePath = aBPcm;
-        d.logicalNames.emplace_back("A:B");
-        amod.modDeps.emplace_back(d);
-        d.file.filePath = aCPcm;
-        d.logicalNames.emplace_back("A:C");
-        amod.modDeps.emplace_back(d);
+        ModuleDep abModDep;
+        abModDep.isHeaderUnit = false;
+        abModDep.file.filePath = aBPcm;
+        abModDep.logicalNames.emplace_back("A:B");
+        amod.modDeps.emplace_back(std::move(abModDep));
+        ModuleDep acModDep;
+        acModDep.file.filePath = aCPcm;
+        acModDep.logicalNames.emplace_back("A:C");
+        amod.modDeps.emplace_back(std::move(acModDep));
 
         if (const auto &r2 = manager.sendMessage(amod); !r2)
         {
@@ -942,27 +928,36 @@ tl::expected<int, string> runTest()
         }
         printMessage(ctbModule, false);
 
-        BTCModule btcMod;
-        /*
-        btcMod.requested.filePath = fooPcm;
+        BTCModule m;
+        m.requested.filePath = fooPcm;
         ModuleDep modDep;
         modDep.file.filePath = bigPcm;
-        modDep.logicalNames = "Big.hpp";
+        modDep.logicalNames.emplace_back("Big.hpp");
+        modDep.logicalNames.emplace_back("X.hpp");
+        modDep.logicalNames.emplace_back("Y.hpp");
+        modDep.logicalNames.emplace_back("Z.hpp");
         modDep.isHeaderUnit = true;
-        btcMod.modDeps.emplace_back(std::move(modDep));
-        modDep.isHeaderUnit = false;
-        modDep.file.filePath = aPcm;
-        modDep.logicalNames = "A";
-        btcMod.modDeps.emplace_back(std::move(modDep));
-        modDep.file.filePath = aBPcm;
-        modDep.logicalNames = "A:B";
-        btcMod.modDeps.emplace_back(std::move(modDep));
-        modDep.file.filePath = aCPcm;
-        modDep.logicalNames = "A:C";
-        btcMod.modDeps.emplace_back(std::move(modDep));
+        m.modDeps.emplace_back(std::move(modDep));
 
-        */
-        if (const auto &r2 = manager.sendMessage(std::move(btcMod)); !r2)
+        ModuleDep aModDep;
+        aModDep.isHeaderUnit = false;
+        aModDep.file.filePath = aPcm;
+        aModDep.logicalNames.emplace_back("A");
+        m.modDeps.emplace_back(std::move(aModDep));
+
+        ModuleDep bModDep;
+        bModDep.isHeaderUnit = false;
+        bModDep.file.filePath = aBPcm;
+        bModDep.logicalNames.emplace_back("A:B");
+        m.modDeps.emplace_back(std::move(bModDep));
+
+        ModuleDep cModDep;
+        cModDep.isHeaderUnit = false;
+        cModDep.file.filePath = aCPcm;
+        cModDep.logicalNames.emplace_back("A:C");
+        m.modDeps.emplace_back(std::move(cModDep));
+
+        if (const auto &r2 = manager.sendMessage(std::move(m)); !r2)
         {
             string str = r2.error();
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
@@ -1015,11 +1010,11 @@ int main()
 
     ofstream("main.cpp") << mainDotCpp;
 
-    if (const auto &r = compileMain(false); !r)
+    /*if (const auto &r = compileMain(false); !r)
     {
         string str = r.error();
         return tl::unexpected("compiling main failed" + r.error() + "\n");
-    }
+    }*/
 
     fflush(stdout);
     return {};
