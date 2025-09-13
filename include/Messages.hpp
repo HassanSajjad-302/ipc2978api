@@ -6,8 +6,6 @@
 #include <string>
 #include <vector>
 
-using std::string, std::vector;
-
 namespace N2978
 {
 // CTB --> Compiler to Build-System
@@ -29,7 +27,7 @@ enum class CTB : uint8_t
 // This is sent when the compiler needs a module.
 struct CTBModule
 {
-    string moduleName;
+    std::string moduleName;
 };
 
 // This is sent when the compiler needs something else than a module.
@@ -37,7 +35,7 @@ struct CTBModule
 struct CTBNonModule
 {
     bool isHeaderUnit = false;
-    string logicalName;
+    std::string logicalName;
 };
 
 // This is the last message sent by the compiler.
@@ -47,12 +45,12 @@ struct CTBLastMessage
     bool errorOccurred = false;
     // Following fields are meaningless if the compilation failed.
     // compiler output
-    string output;
+    std::string output;
     // compiler error output.
     // Any IPC related error output should be reported on stderr.
-    string errorOutput;
+    std::string errorOutput;
     // exported module name if any.
-    string logicalName;
+    std::string logicalName;
     // This is communicated because the receiving process has no
     // way to learn the shared memory file size on both Windows
     // and Linux without a filesystem call.
@@ -72,7 +70,7 @@ enum class BTC : uint8_t
 
 struct BMIFile
 {
-    string filePath;
+    std::string filePath;
     uint32_t fileSize = UINT32_MAX;
 };
 
@@ -85,7 +83,7 @@ struct ModuleDep
     // composed of multiple header-files. And if later,
     // any of the following logicalNames is included or
     // imported, the following can be used instead.
-    vector<string> logicalNames;
+    std::vector<std::string> logicalNames;
     bool user = true;
 };
 
@@ -94,21 +92,21 @@ struct BTCModule
 {
     BMIFile requested;
     bool user = true;
-    vector<ModuleDep> modDeps;
+    std::vector<ModuleDep> modDeps;
 };
 
 struct HuDep
 {
     BMIFile file;
-    vector<string> logicalNames;
+    std::vector<std::string> logicalNames;
     // whether header-unit / header-file belongs to user or system directory.
     bool user = true;
 };
 
 struct HeaderFile
 {
-    string logicalName;
-    string filePath;
+    std::string logicalName;
+    std::string filePath;
     bool user = true;
 };
 
@@ -117,16 +115,16 @@ struct BTCNonModule
 {
     bool isHeaderUnit = false;
     bool user = true;
-    string filePath;
+    std::string filePath;
     // if isHeaderUnit == false, the following are meaning-less.
     // if isHeaderUnit == true, fileSize of the requested file.
     uint32_t fileSize;
-    vector<string> logicalNames;
+    std::vector<std::string> logicalNames;
     // build-system might send the following on first request, if it knows that a
     // header-unit is being compiled that compose multiple header-files to reduce
     // the number of subsequent requests.
-    vector<HeaderFile> headerFiles;
-    vector<HuDep> huDeps;
+    std::vector<HeaderFile> headerFiles;
+    std::vector<HuDep> huDeps;
 };
 
 // Reply for CTBLastMessage if the compilation succeeded.

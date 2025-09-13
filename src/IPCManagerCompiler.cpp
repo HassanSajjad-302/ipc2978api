@@ -92,6 +92,29 @@ Response::Response(BMIFile file_, const ResponseType type_, const bool user_)
 {
 }
 
+uint64_t string_hash::operator()(const std::string &s) const
+{
+    return std::hash<std::string>{}(s);
+}
+
+uint64_t string_hash::operator()(const std::string_view sv) const
+{
+    return std::hash<std::string_view>{}(sv);
+}
+
+bool string_equal::operator()(const std::string &a, const std::string &b) const
+{
+    return a == b;
+}
+bool string_equal::operator()(const std::string &a, const std::string_view b) const
+{
+    return a == b;
+}
+bool string_equal::operator()(const std::string_view a, const std::string &b) const
+{
+    return a == b;
+}
+
 tl::expected<void, string> IPCManagerCompiler::receiveBTCLastMessage() const
 {
     char buffer[BUFFERSIZE];

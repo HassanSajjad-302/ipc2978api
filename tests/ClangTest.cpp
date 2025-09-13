@@ -430,7 +430,7 @@ tl::expected<int, string> runTest()
         btcMod.requested.filePath = aBPcm;
         ModuleDep modDep;
         modDep.file.filePath = aCPcm;
-        modDep.logicalNames = "A:C";
+        modDep.logicalNames.emplace_back("A:C");
         modDep.isHeaderUnit = false;
         btcMod.modDeps.emplace_back(std::move(modDep));
 
@@ -881,10 +881,10 @@ tl::expected<int, string> runTest()
         ModuleDep d;
         d.isHeaderUnit = false;
         d.file.filePath = aBPcm;
-        d.logicalNames = "A:B";
+        d.logicalNames.emplace_back("A:B");
         amod.modDeps.emplace_back(d);
         d.file.filePath = aCPcm;
-        d.logicalNames = "A:C";
+        d.logicalNames.emplace_back("A:C");
         amod.modDeps.emplace_back(d);
 
         if (const auto &r2 = manager.sendMessage(amod); !r2)
