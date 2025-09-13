@@ -19,12 +19,10 @@
 #include <unistd.h>
 #endif
 
-using std::string;
-
 namespace N2978
 {
 
-tl::expected<IPCManagerCompiler, string> makeIPCManagerCompiler(string BMIIfHeaderUnitObjOtherwisePath)
+tl::expected<IPCManagerCompiler, std::string> makeIPCManagerCompiler(std::string BMIIfHeaderUnitObjOtherwisePath)
 {
 #ifdef _WIN32
     BMIIfHeaderUnitObjOtherwisePath = R"(\\.\pipe\)" + BMIIfHeaderUnitObjOtherwisePath;
@@ -115,7 +113,7 @@ bool string_equal::operator()(const std::string_view a, const std::string &b) co
     return a == b;
 }
 
-tl::expected<void, string> IPCManagerCompiler::receiveBTCLastMessage() const
+tl::expected<void, std::string> IPCManagerCompiler::receiveBTCLastMessage() const
 {
     char buffer[BUFFERSIZE];
     uint32_t bytesRead;
@@ -141,10 +139,10 @@ tl::expected<void, string> IPCManagerCompiler::receiveBTCLastMessage() const
     return {};
 }
 
-tl::expected<BTCModule, string> IPCManagerCompiler::receiveBTCModule(const CTBModule &moduleName)
+tl::expected<BTCModule, std::string> IPCManagerCompiler::receiveBTCModule(const CTBModule &moduleName)
 {
 
-    vector<char> buffer = getBufferWithType(CTB::MODULE);
+    std::vector<char> buffer = getBufferWithType(CTB::MODULE);
     writeString(buffer, moduleName.moduleName);
     if (const auto &r = writeInternal(buffer); !r)
     {
@@ -161,7 +159,7 @@ tl::expected<BTCModule, string> IPCManagerCompiler::receiveBTCModule(const CTBMo
         {
             if (isHeaderUnit)
             {
-                for (const string &s : logicalNames)
+                for (const std::string &s : logicalNames)
                 {
                     responses.emplace(s, Response(file, ResponseType::HEADER_UNIT, user));
                 }
@@ -175,9 +173,9 @@ tl::expected<BTCModule, string> IPCManagerCompiler::receiveBTCModule(const CTBMo
     return received;
 }
 
-tl::expected<BTCNonModule, string> IPCManagerCompiler::receiveBTCNonModule(const CTBNonModule &nonModule)
+tl::expected<BTCNonModule, std::string> IPCManagerCompiler::receiveBTCNonModule(const CTBNonModule &nonModule)
 {
-    vector<char> buffer = getBufferWithType(CTB::NON_MODULE);
+    std::vector<char> buffer = getBufferWithType(CTB::NON_MODULE);
     buffer.emplace_back(nonModule.isHeaderUnit);
     writeString(buffer, nonModule.logicalName);
     if (const auto &r = writeInternal(buffer); !r)
@@ -203,7 +201,7 @@ tl::expected<BTCNonModule, string> IPCManagerCompiler::receiveBTCNonModule(const
 
         responses.emplace(nonModule.logicalName, Response(f, ResponseType::HEADER_UNIT, user));
 
-        for (const string &h : logicalNames)
+        for (const std::string &h : logicalNames)
         {
             responses.emplace(h, Response(f, ResponseType::HEADER_UNIT, user));
         }
@@ -217,7 +215,7 @@ tl::expected<BTCNonModule, string> IPCManagerCompiler::receiveBTCNonModule(const
 
         for (const auto &[file, logicalNames, user] : huDeps)
         {
-            for (const string &l : logicalNames)
+            for (const std::string &l : logicalNames)
             {
                 responses.emplace(l, Response(file, ResponseType::HEADER_UNIT, user));
             }
@@ -226,9 +224,9 @@ tl::expected<BTCNonModule, string> IPCManagerCompiler::receiveBTCNonModule(const
     return received;
 }
 
-tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage) const
+tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage) const
 {
-    vector<char> buffer = getBufferWithType(CTB::LAST_MESSAGE);
+    std::vector<char> buffer = getBufferWithType(CTB::LAST_MESSAGE);
     buffer.emplace_back(lastMessage.errorOccurred);
     writeString(buffer, lastMessage.output);
     writeString(buffer, lastMessage.errorOutput);
@@ -241,8 +239,8 @@ tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastM
     return {};
 }
 
-tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage,
-                                                                  const string &bmiFile, const string &filePath) const
+tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage,
+                                                                  const std::string &bmiFile, const std::string &filePath) const
 {
 #ifdef _WIN32
     const HANDLE hFile = CreateFileA(filePath.c_str(), GENERIC_READ | GENERIC_WRITE,
@@ -350,7 +348,7 @@ tl::expected<void, string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastM
     return {};
 }
 
-tl::expected<ProcessMappingOfBMIFile, string> IPCManagerCompiler::readSharedMemoryBMIFile(const BMIFile &file)
+tl::expected<ProcessMappingOfBMIFile, std::string> IPCManagerCompiler::readSharedMemoryBMIFile(const BMIFile &file)
 {
     ProcessMappingOfBMIFile f{};
 #ifdef _WIN32
@@ -407,7 +405,7 @@ tl::expected<ProcessMappingOfBMIFile, string> IPCManagerCompiler::readSharedMemo
     return f;
 }
 
-tl::expected<void, string> IPCManagerCompiler::closeBMIFileMapping(
+tl::expected<void, std::string> IPCManagerCompiler::closeBMIFileMapping(
     const ProcessMappingOfBMIFile &processMappingOfBMIFile)
 {
 #ifdef _WIN32

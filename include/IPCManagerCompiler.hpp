@@ -42,29 +42,29 @@ struct string_equal
 // IPC Manager Compiler
 class IPCManagerCompiler : Manager
 {
-    template <typename T> tl::expected<T, string> receiveMessage() const;
+    template <typename T> tl::expected<T, std::string> receiveMessage() const;
     // This is not exposed. sendCTBLastMessage calls this.
-    [[nodiscard]] tl::expected<void, string> receiveBTCLastMessage() const;
+    [[nodiscard]] tl::expected<void, std::string> receiveBTCLastMessage() const;
 
   public:
     CTBLastMessage lastMessage{};
-    std::unordered_map<string, Response, string_hash, string_equal> responses;
+    std::unordered_map<std::string, Response, string_hash, string_equal> responses;
 #ifdef _WIN32
     explicit IPCManagerCompiler(void *hPipe_);
 #else
     explicit IPCManagerCompiler(int fdSocket_);
 #endif
-    [[nodiscard]] tl::expected<BTCModule, string> receiveBTCModule(const CTBModule &moduleName);
-    [[nodiscard]] tl::expected<BTCNonModule, string> receiveBTCNonModule(const CTBNonModule &nonModule);
-    [[nodiscard]] tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage) const;
-    [[nodiscard]] tl::expected<void, string> sendCTBLastMessage(const CTBLastMessage &lastMessage,
-                                                                const string &bmiFile, const string &filePath) const;
-    static tl::expected<ProcessMappingOfBMIFile, string> readSharedMemoryBMIFile(const BMIFile &file);
-    static tl::expected<void, string> closeBMIFileMapping(const ProcessMappingOfBMIFile &processMappingOfBMIFile);
+    [[nodiscard]] tl::expected<BTCModule, std::string> receiveBTCModule(const CTBModule &moduleName);
+    [[nodiscard]] tl::expected<BTCNonModule, std::string> receiveBTCNonModule(const CTBNonModule &nonModule);
+    [[nodiscard]] tl::expected<void, std::string> sendCTBLastMessage(const CTBLastMessage &lastMessage) const;
+    [[nodiscard]] tl::expected<void, std::string> sendCTBLastMessage(const CTBLastMessage &lastMessage,
+                                                                const std::string &bmiFile, const std::string &filePath) const;
+    static tl::expected<ProcessMappingOfBMIFile, std::string> readSharedMemoryBMIFile(const BMIFile &file);
+    static tl::expected<void, std::string> closeBMIFileMapping(const ProcessMappingOfBMIFile &processMappingOfBMIFile);
     void closeConnection() const;
 };
 
-template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage() const
+template <typename T> tl::expected<T, std::string> IPCManagerCompiler::receiveMessage() const
 {
     // Read from the pipe.
     char buffer[BUFFERSIZE];
@@ -177,12 +177,12 @@ template <typename T> tl::expected<T, string> IPCManagerCompiler::receiveMessage
     {
         return tl::unexpected(getErrorString(bytesRead, bytesProcessed));
     }
-    string str = __FILE__;
+    std::string str = __FILE__;
     str += ':';
     str += std::to_string(__LINE__);
     return tl::unexpected(getErrorString("N2978 IPC API internal error" + str));
 }
-[[nodiscard]] tl::expected<IPCManagerCompiler, string> makeIPCManagerCompiler(string BMIIfHeaderUnitObjOtherwisePath);
+[[nodiscard]] tl::expected<IPCManagerCompiler, std::string> makeIPCManagerCompiler(std::string BMIIfHeaderUnitObjOtherwisePath);
 inline IPCManagerCompiler *managerCompiler;
 } // namespace N2978
 #endif // IPC_MANAGER_COMPILER_HPP
