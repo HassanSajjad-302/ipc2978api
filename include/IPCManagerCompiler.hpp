@@ -24,21 +24,6 @@ struct Response
     Response(BMIFile file_, ResponseType type_, bool user_);
 };
 
-struct string_hash
-{
-    using is_transparent = void;
-    uint64_t operator()(const std::string &s) const;
-    uint64_t operator()(std::string_view sv) const;
-};
-
-struct string_equal
-{
-    using is_transparent = void;
-    bool operator()(const std::string &a, const std::string &b) const;
-    bool operator()(const std::string &a, std::string_view b) const;
-    bool operator()(std::string_view a, const std::string &b) const;
-};
-
 // IPC Manager Compiler
 class IPCManagerCompiler : Manager
 {
@@ -48,7 +33,7 @@ class IPCManagerCompiler : Manager
 
   public:
     CTBLastMessage lastMessage{};
-    std::unordered_map<std::string, Response, string_hash, string_equal> responses;
+    std::unordered_map<std::string, Response> responses;
 #ifdef _WIN32
     explicit IPCManagerCompiler(void *hPipe_);
 #else
