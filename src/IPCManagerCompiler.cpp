@@ -240,7 +240,8 @@ tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const CTB
 }
 
 tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage,
-                                                                  const std::string &bmiFile, const std::string &filePath) const
+                                                                       const std::string &bmiFile,
+                                                                       const std::string &filePath) const
 {
 #ifdef _WIN32
     const HANDLE hFile = CreateFileA(filePath.c_str(), GENERIC_READ | GENERIC_WRITE,

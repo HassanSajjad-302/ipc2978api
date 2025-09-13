@@ -330,7 +330,8 @@ tl::expected<ProcessMappingOfBMIFile, std::string> IPCManagerBS::createSharedMem
 #endif
 }
 
-tl::expected<void, std::string> IPCManagerBS::closeBMIFileMapping(const ProcessMappingOfBMIFile &processMappingOfBMIFile)
+tl::expected<void, std::string> IPCManagerBS::closeBMIFileMapping(
+    const ProcessMappingOfBMIFile &processMappingOfBMIFile)
 {
 #ifdef _WIN32
     CloseHandle(processMappingOfBMIFile.mapping);

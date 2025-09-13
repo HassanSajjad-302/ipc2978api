@@ -58,7 +58,8 @@ class IPCManagerCompiler : Manager
     [[nodiscard]] tl::expected<BTCNonModule, std::string> receiveBTCNonModule(const CTBNonModule &nonModule);
     [[nodiscard]] tl::expected<void, std::string> sendCTBLastMessage(const CTBLastMessage &lastMessage) const;
     [[nodiscard]] tl::expected<void, std::string> sendCTBLastMessage(const CTBLastMessage &lastMessage,
-                                                                const std::string &bmiFile, const std::string &filePath) const;
+                                                                     const std::string &bmiFile,
+                                                                     const std::string &filePath) const;
     static tl::expected<ProcessMappingOfBMIFile, std::string> readSharedMemoryBMIFile(const BMIFile &file);
     static tl::expected<void, std::string> closeBMIFileMapping(const ProcessMappingOfBMIFile &processMappingOfBMIFile);
     void closeConnection() const;
