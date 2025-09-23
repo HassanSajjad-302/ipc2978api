@@ -20,6 +20,22 @@ void exitFailure(const string &r)
     exit(EXIT_FAILURE);
 }
 
+struct CompilerTest
+{
+    IPCManagerCompiler *compilerManager;
+    explicit CompilerTest(IPCManagerCompiler *c) : compilerManager(c)
+    {
+    }
+    [[nodiscard]] tl::expected<BTCModule, std::string> receiveBTCModule(const CTBModule &moduleName)
+    {
+        return compilerManager->receiveBTCModule(moduleName);
+    }
+    [[nodiscard]] tl::expected<BTCNonModule, std::string> receiveBTCNonModule(const CTBNonModule &nonModule)
+    {
+        return compilerManager->receiveBTCNonModule(nonModule);
+    }
+};
+
 int main()
 {
     const auto r = makeIPCManagerCompiler((filesystem::current_path() / "test").string());
@@ -29,6 +45,7 @@ int main()
     }
 
     IPCManagerCompiler manager = r.value();
+    CompilerTest t(&manager);
     std::uniform_int_distribution distribution(0, 20);
     for (uint64_t i = 0; i < distribution(generator); ++i)
     {
@@ -37,7 +54,7 @@ int main()
             CTBModule ctbModule;
             ctbModule.moduleName = getRandomString();
 
-            if (const auto &r2 = manager.receiveBTCModule(ctbModule); !r2)
+            if (const auto &r2 = t.receiveBTCModule(ctbModule); !r2)
             {
                 exitFailure(r2.error());
             }
@@ -53,7 +70,7 @@ int main()
             nonModule.isHeaderUnit = getRandomBool();
             nonModule.logicalName = "3";
 
-            if (const auto &r2 = manager.receiveBTCNonModule(nonModule); !r2)
+            if (const auto &r2 = t.receiveBTCNonModule(nonModule); !r2)
             {
                 exitFailure(r2.error());
             }

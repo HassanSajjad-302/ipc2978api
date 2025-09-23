@@ -970,7 +970,6 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager receive message failed" + r2.error() + "\n");
         }
 
-        CTBModule &mod = reinterpret_cast<CTBModule &>(buffer);
         if (type != CTB::LAST_MESSAGE)
         {
             return tl::unexpected("received message of wrong type");

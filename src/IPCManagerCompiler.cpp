@@ -85,7 +85,7 @@ IPCManagerCompiler::IPCManagerCompiler(const int fdSocket_)
 }
 #endif
 
-Response::Response(BMIFile file_, const ResponseType type_, const bool user_)
+Response::Response(BMIFile file_, const FileType type_, const bool user_)
     : file(std::move(file_)), type(type_), user(user_)
 {
 }
@@ -126,24 +126,24 @@ tl::expected<BTCModule, std::string> IPCManagerCompiler::receiveBTCModule(const 
         return tl::unexpected(r.error());
     }
 
-    const auto &received = receiveMessage<BTCModule>();
+    auto received = receiveMessage<BTCModule>();
 
     if (received)
     {
         auto &[f, user, deps] = received.value();
-        responses.emplace(moduleName.moduleName, Response(f, ResponseType::MODULE, user));
-        for (const auto &[isHeaderUnit, file, logicalNames, user] : deps)
+        responses.emplace(moduleName.moduleName, Response(std::move(f), FileType::MODULE, user));
+        for (auto &[isHeaderUnit, file, logicalNames, user] : deps)
         {
             if (isHeaderUnit)
             {
                 for (const std::string &s : logicalNames)
                 {
-                    responses.emplace(s, Response(std::move(file), ResponseType::HEADER_UNIT, user));
+                    responses.emplace(s, Response(file, FileType::HEADER_UNIT, user));
                 }
             }
             else
             {
-                responses.emplace(logicalNames[0], Response(std::move(file), ResponseType::MODULE, user));
+                responses.emplace(logicalNames[0], Response(std::move(file), FileType::MODULE, user));
             }
         }
     }
@@ -160,43 +160,78 @@ tl::expected<BTCNonModule, std::string> IPCManagerCompiler::receiveBTCNonModule(
         return tl::unexpected(r.error());
     }
 
-    const auto &received = receiveMessage<BTCNonModule>();
+    auto received = receiveMessage<BTCNonModule>();
 
     if (received)
     {
-        const auto &[isHeaderUnit, user, filePath, fileSize, logicalNames, headerFiles, huDeps] = received.value();
+        auto &[isHeaderUnit, user, filePath, fileSize, logicalNames, headerFiles, huDeps] = received.value();
 
         BMIFile f;
-        f.filePath = filePath;
+        f.filePath = std::move(filePath);
         f.fileSize = fileSize;
 
         if (isHeaderUnit)
         {
-            for (const std::string &h : logicalNames)
+            for (std::string &h : logicalNames)
             {
-                responses.emplace(h, Response(f, ResponseType::HEADER_UNIT, user));
+                responses.emplace(std::move(h), Response(f, FileType::HEADER_UNIT, user));
             }
-            for (const auto &[file, logicalNames, user] : huDeps)
+            for (auto &[file, logicalHUDep, user] : huDeps)
             {
-                for (const std::string &l : logicalNames)
+                for (std::string &l : logicalHUDep)
                 {
-                    responses.emplace(l, Response(std::move(file), ResponseType::HEADER_UNIT, user));
+                    responses.emplace(std::move(l), Response(file, FileType::HEADER_UNIT, user));
                 }
             }
-            responses.emplace(nonModule.logicalName, Response(std::move(f), ResponseType::HEADER_UNIT, user));
+            responses.emplace(nonModule.logicalName, Response(std::move(f), FileType::HEADER_UNIT, user));
         }
         else
         {
-            for (const auto &[logicalName, filePath, user] : headerFiles)
+            for (auto &[logicalName, headerFilePath, user] : headerFiles)
             {
                 BMIFile headerBMI;
-                headerBMI.filePath = filePath;
-                responses.emplace(logicalName, Response(std::move(headerBMI), ResponseType::HEADER_FILE, user));
+                headerBMI.filePath = std::move(headerFilePath);
+                responses.emplace(std::move(logicalName), Response(std::move(headerBMI), FileType::HEADER_FILE, user));
             }
-            responses.emplace(nonModule.logicalName, Response(std::move(f), ResponseType::HEADER_FILE, user));
+            responses.emplace(nonModule.logicalName, Response(std::move(f), FileType::HEADER_FILE, user));
         }
     }
     return received;
+}
+
+tl::expected<Response, std::string> IPCManagerCompiler::findResponse(const std::string &logicalName,
+                                                                     const FileType type)
+{
+    if (const auto &it = responses.find(logicalName);
+        it == responses.end() ||
+        (it->second.type != type && (it->second.type != FileType::HEADER_UNIT || type != FileType::HEADER_FILE)))
+    {
+        if (type == FileType::MODULE)
+        {
+            CTBModule ctbModule;
+            ctbModule.moduleName = logicalName;
+            if (const auto &r2 = receiveBTCModule(ctbModule); !r2)
+            {
+                return tl::unexpected(r2.error());
+            }
+        }
+        else
+        {
+            CTBNonModule ctbNonModule;
+            ctbNonModule.logicalName = logicalName;
+            ctbNonModule.isHeaderUnit = type == FileType::HEADER_UNIT;
+            if (const auto &r2 = receiveBTCNonModule(ctbNonModule); !r2)
+            {
+                return tl::unexpected(r2.error());
+            }
+        }
+
+        return responses.at(logicalName);
+    }
+    else
+    {
+        return it->second;
+    }
 }
 
 tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage) const
