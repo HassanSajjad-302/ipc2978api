@@ -21,8 +21,8 @@ struct Response
     // if type == HEADER_FILE, then fileSize has no meaning
     BMIFile file;
     FileType type;
-    bool user;
-    Response(BMIFile file_, FileType type_, bool user_);
+    bool isSystem;
+    Response(BMIFile file_, FileType type_, bool isSystem_);
 };
 
 // IPC Manager Compiler

@@ -85,8 +85,8 @@ IPCManagerCompiler::IPCManagerCompiler(const int fdSocket_)
 }
 #endif
 
-Response::Response(BMIFile file_, const FileType type_, const bool user_)
-    : file(std::move(file_)), type(type_), user(user_)
+Response::Response(BMIFile file_, const FileType type_, const bool isSystem_)
+    : file(std::move(file_)), type(type_), isSystem(isSystem_)
 {
 }
 
@@ -130,20 +130,20 @@ tl::expected<BTCModule, std::string> IPCManagerCompiler::receiveBTCModule(const 
 
     if (received)
     {
-        auto &[f, user, deps] = received.value();
-        responses.emplace(moduleName.moduleName, Response(std::move(f), FileType::MODULE, user));
-        for (auto &[isHeaderUnit, file, logicalNames, user] : deps)
+        auto &[f, isSystem, deps] = received.value();
+        responses.emplace(moduleName.moduleName, Response(std::move(f), FileType::MODULE, isSystem));
+        for (auto &[isHeaderUnit, file, logicalNames, isSystem] : deps)
         {
             if (isHeaderUnit)
             {
                 for (const std::string &s : logicalNames)
                 {
-                    responses.emplace(s, Response(file, FileType::HEADER_UNIT, user));
+                    responses.emplace(s, Response(file, FileType::HEADER_UNIT, isSystem));
                 }
             }
             else
             {
-                responses.emplace(logicalNames[0], Response(std::move(file), FileType::MODULE, user));
+                responses.emplace(logicalNames[0], Response(std::move(file), FileType::MODULE, isSystem));
             }
         }
     }
@@ -164,7 +164,7 @@ tl::expected<BTCNonModule, std::string> IPCManagerCompiler::receiveBTCNonModule(
 
     if (received)
     {
-        auto &[isHeaderUnit, user, filePath, fileSize, logicalNames, headerFiles, huDeps] = received.value();
+        auto &[isHeaderUnit, isSystem, filePath, fileSize, logicalNames, headerFiles, huDeps] = received.value();
 
         BMIFile f;
         f.filePath = std::move(filePath);
@@ -174,26 +174,27 @@ tl::expected<BTCNonModule, std::string> IPCManagerCompiler::receiveBTCNonModule(
         {
             for (std::string &h : logicalNames)
             {
-                responses.emplace(std::move(h), Response(f, FileType::HEADER_UNIT, user));
+                responses.emplace(std::move(h), Response(f, FileType::HEADER_UNIT, isSystem));
             }
-            for (auto &[file, logicalHUDep, user] : huDeps)
+            for (auto &[file, logicalHUDep, isSystem] : huDeps)
             {
                 for (std::string &l : logicalHUDep)
                 {
-                    responses.emplace(std::move(l), Response(file, FileType::HEADER_UNIT, user));
+                    responses.emplace(std::move(l), Response(file, FileType::HEADER_UNIT, isSystem));
                 }
             }
-            responses.emplace(nonModule.logicalName, Response(std::move(f), FileType::HEADER_UNIT, user));
+            responses.emplace(nonModule.logicalName, Response(std::move(f), FileType::HEADER_UNIT, isSystem));
         }
         else
         {
-            for (auto &[logicalName, headerFilePath, user] : headerFiles)
+            for (auto &[logicalName, headerFilePath, isSystem] : headerFiles)
             {
                 BMIFile headerBMI;
                 headerBMI.filePath = std::move(headerFilePath);
-                responses.emplace(std::move(logicalName), Response(std::move(headerBMI), FileType::HEADER_FILE, user));
+                responses.emplace(std::move(logicalName),
+                                  Response(std::move(headerBMI), FileType::HEADER_FILE, isSystem));
             }
-            responses.emplace(nonModule.logicalName, Response(std::move(f), FileType::HEADER_FILE, user));
+            responses.emplace(nonModule.logicalName, Response(std::move(f), FileType::HEADER_FILE, isSystem));
         }
     }
     return received;
