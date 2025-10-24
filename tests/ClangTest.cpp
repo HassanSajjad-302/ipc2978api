@@ -105,12 +105,12 @@ tl::expected<void, std::string> CloseProcess()
 
 // main.cpp
 const string mainDotCpp = R"(
-// only one request of Foo will be made as A and Big.hpp
+// only one request of Foo will be made as A and big.hpp
 // will be provided with it.
 import Foo;
 import A;
-#include "Y.hpp"
-#include "Z.hpp"
+#include "y.hpp"
+#include "z.hpp"
 
 int main()
 {
@@ -154,10 +154,10 @@ module A:C; // partition module implementation unit
 char const* WorldImpl() { return "World"; }
 )";
 
-    // M.hpp, N.hpp and O.hpp are to be used as header-units, header-files
-    // while X.hpp, Y.hpp and Z.hpp are to be used as big-hu by include Big.hpp
+    // m.hpp, n.hpp and o.hpp are to be used as header-units, header-files
+    // while x.hpp, y.hpp and z.hpp are to be used as big-hu by include big.hpp
 
-    // M.hpp
+    // m.hpp
     const string mDotHpp = R"(
 // this file can not be included without first defining M_HEADER_FILE
 // this is to demonstrate difference between header-file and header-unit.
@@ -170,7 +170,7 @@ fail compilation
 #endif
 )";
 
-    // N.hpp
+    // n.hpp
     const string nDotHpp = R"(
 // should work just fine as macro should not seep in here while inclusion.
 
@@ -178,7 +178,7 @@ fail compilation
 fail compilation
 #else
 #define M_HEADER_FILE
-#include "M.hpp"
+#include "m.hpp"
 inline int n = 5 + m;
 #endif
 
@@ -191,23 +191,23 @@ fail compilation
 #endif
 )";
 
-    // O.hpp
+    // o.hpp
     const string oDotHpp = R"(
 // TRANSLATING should be defined if /translateInclude is being used.
-// "O.hpp" should still be treated as header-file.
+// "o.hpp" should still be treated as header-file.
 
 #define M_HEADER_FILE
-#include "M.hpp"
+#include "m.hpp"
 #ifdef TRANSLATING
-#include "N.hpp"
+#include "n.hpp"
 #else
-import "N.hpp";
+import "n.hpp";
 #endif
 
 inline int o = n + m + 5;
 )";
 
-    // X.hpp
+    // x.hpp
     const string xDotHpp = R"(
 #ifndef X_HPP
 #define X_HPP
@@ -215,40 +215,40 @@ inline int x = 5;
 #endif
 )";
 
-    // Y.hpp
+    // y.hpp
     const string yDotHpp = R"(
 #ifndef Y_HPP
 #define Y_HPP
-#include "X.hpp"
+#include "x.hpp"
 inline int y = x + 5;
 #endif
 )";
 
-    // Z.hpp
+    // z.hpp
     const string zDotHpp = R"(
 #ifndef Z_HPP
 #define Z_HPP
-#include "Y.hpp"
+#include "y.hpp"
 inline int z = x + y + 5;
 #endif
 )";
 
-    // Big.hpp
+    // big.hpp
     const string bigDotHpp = R"(
-#include "X.hpp"
+#include "x.hpp"
 // todo
-// following two should not be requested as Big.hpp includes the following as well.
-#include "Y.hpp"
-#include "Z.hpp"
+// following two should not be requested as big.hpp includes the following as well.
+#include "y.hpp"
+#include "z.hpp"
 )";
 
     // Foo.cpp
     const string fooDotCpp = R"(
 module;
-#include "X.hpp"
-#include "Z.hpp"
-#include "Y.hpp"
-#include "Big.hpp"
+#include "x.hpp"
+#include "z.hpp"
+#include "y.hpp"
+#include "big.hpp"
 export module Foo;
 import A;
 
@@ -263,13 +263,13 @@ export void Foo()
     ofstream("A.cpp") << aDotCpp;
     ofstream("A-B.cpp") << aBDotCPP;
     ofstream("A-C.cpp") << aCDotCPP;
-    ofstream("M.hpp") << mDotHpp;
-    ofstream("N.hpp") << nDotHpp;
-    ofstream("O.hpp") << oDotHpp;
-    ofstream("X.hpp") << xDotHpp;
-    ofstream("Y.hpp") << yDotHpp;
-    ofstream("Z.hpp") << zDotHpp;
-    ofstream("Big.hpp") << bigDotHpp;
+    ofstream("m.hpp") << mDotHpp;
+    ofstream("n.hpp") << nDotHpp;
+    ofstream("o.hpp") << oDotHpp;
+    ofstream("x.hpp") << xDotHpp;
+    ofstream("y.hpp") << yDotHpp;
+    ofstream("z.hpp") << zDotHpp;
+    ofstream("big.hpp") << bigDotHpp;
     ofstream("Foo.cpp") << fooDotCpp;
     ofstream("main.cpp") << mainDotCpp;
 }
@@ -292,15 +292,15 @@ tl::expected<int, string> runTest()
     string aPcm = (current_path() / "A .pcm").generic_string();
     string bObj = (current_path() / "B .o").generic_string();
     string bPcm = (current_path() / "B .pcm").generic_string();
-    string mHpp = (current_path() / "M.hpp").generic_string();
-    string nHpp = (current_path() / "N.hpp").generic_string();
-    string oHpp = (current_path() / "O.hpp").generic_string();
+    string mHpp = (current_path() / "m.hpp").generic_string();
+    string nHpp = (current_path() / "n.hpp").generic_string();
+    string oHpp = (current_path() / "o.hpp").generic_string();
     string nPcm = (current_path() / "N .pcm").generic_string();
     string oPcm = (current_path() / "O .pcm").generic_string();
-    string xHpp = (current_path() / "X.hpp").generic_string();
-    string yHpp = (current_path() / "Y.hpp").generic_string();
-    string zHpp = (current_path() / "Z.hpp").generic_string();
-    string bigHpp = (current_path() / "Big.hpp").generic_string();
+    string xHpp = (current_path() / "x.hpp").generic_string();
+    string yHpp = (current_path() / "y.hpp").generic_string();
+    string zHpp = (current_path() / "z.hpp").generic_string();
+    string bigHpp = (current_path() / "big.hpp").generic_string();
     string bigPcm = (current_path() / "Big .pcm").generic_string();
     string fooPcm = (current_path() / "Foo .pcm").generic_string();
     string fooObj = (current_path() / "Foo .o").generic_string();
@@ -466,7 +466,7 @@ tl::expected<int, string> runTest()
         }
     }
 
-    // compiling N.hpp
+    // compiling n.hpp
     {
         const auto &r = makeIPCManagerBS(nPcm);
         if (!r)
@@ -477,7 +477,7 @@ tl::expected<int, string> runTest()
         const IPCManagerBS &manager = *r;
 
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + nPcm +
-                                "\" -noScanIPC -xc++-header N.hpp -DCOMMAND_MACRO";
+                                "\" -noScanIPC -xc++-header n.hpp -DCOMMAND_MACRO";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -498,7 +498,7 @@ tl::expected<int, string> runTest()
         }
         const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
 
-        if (ctbNonModMHpp.logicalName != "M.hpp" || ctbNonModMHpp.isHeaderUnit == true)
+        if (ctbNonModMHpp.logicalName != "m.hpp" || ctbNonModMHpp.isHeaderUnit == true)
         {
             return tl::unexpected("wrong message received");
         }
@@ -532,7 +532,7 @@ tl::expected<int, string> runTest()
         }
     }
 
-    // compiling O.hpp
+    // compiling o.hpp
     {
         const auto &r = makeIPCManagerBS(oPcm);
         if (!r)
@@ -543,7 +543,7 @@ tl::expected<int, string> runTest()
         const IPCManagerBS &manager = *r;
 
         string compileCommand =
-            CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm + "\" -noScanIPC -xc++-header O.hpp";
+            CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm + "\" -noScanIPC -xc++-header o.hpp";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -562,7 +562,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("received message of wrong type");
         }
         const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
-        if (ctbNonModMHpp.logicalName != "M.hpp" || ctbNonModMHpp.isHeaderUnit == true)
+        if (ctbNonModMHpp.logicalName != "m.hpp" || ctbNonModMHpp.isHeaderUnit == true)
         {
             return tl::unexpected("wrong message received");
         }
@@ -587,7 +587,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("received message of wrong type");
         }
         const auto &ctbNonModNHpp = reinterpret_cast<CTBNonModule &>(buffer);
-        if (ctbNonModNHpp.logicalName != "N.hpp" || ctbNonModNHpp.isHeaderUnit == false)
+        if (ctbNonModNHpp.logicalName != "n.hpp" || ctbNonModNHpp.isHeaderUnit == false)
         {
             return tl::unexpected("wrong message received");
         }
@@ -621,7 +621,7 @@ tl::expected<int, string> runTest()
         }
     }
 
-    // compiling O.hpp with include-translation. BTCNonModule for N.hpp will be received with
+    // compiling o.hpp with include-translation. BTCNonModule for n.hpp will be received with
     // isHeaderUnit = true.
     {
         const auto &r = makeIPCManagerBS(oPcm);
@@ -633,7 +633,7 @@ tl::expected<int, string> runTest()
         const IPCManagerBS &manager = *r;
 
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm +
-                                "\" -noScanIPC -xc++-header O.hpp -DTRANSLATING";
+                                "\" -noScanIPC -xc++-header o.hpp -DTRANSLATING";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -652,7 +652,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("received message of wrong type");
         }
         const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
-        if (ctbNonModMHpp.logicalName != "M.hpp" || ctbNonModMHpp.isHeaderUnit == true)
+        if (ctbNonModMHpp.logicalName != "m.hpp" || ctbNonModMHpp.isHeaderUnit == true)
         {
             return tl::unexpected("wrong message received");
         }
@@ -677,7 +677,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("received message of wrong type");
         }
         const auto &ctbNonModNHpp = reinterpret_cast<CTBNonModule &>(buffer);
-        if (ctbNonModNHpp.logicalName != "N.hpp" || ctbNonModNHpp.isHeaderUnit == true)
+        if (ctbNonModNHpp.logicalName != "n.hpp" || ctbNonModNHpp.isHeaderUnit == true)
         {
             return tl::unexpected("wrong message received");
         }
@@ -711,7 +711,7 @@ tl::expected<int, string> runTest()
         }
     }
 
-    // compiling Big.hpp
+    // compiling big.hpp
     {
         const auto &r = makeIPCManagerBS(bigPcm);
         if (!r)
@@ -722,7 +722,7 @@ tl::expected<int, string> runTest()
         const IPCManagerBS &manager = *r;
 
         string compileCommand =
-            CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + bigPcm + "\" -noScanIPC -xc++-header Big.hpp";
+            CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + bigPcm + "\" -noScanIPC -xc++-header big.hpp";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -742,7 +742,7 @@ tl::expected<int, string> runTest()
         }
         const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
 
-        if (ctbNonModMHpp.logicalName != "X.hpp" || ctbNonModMHpp.isHeaderUnit == true)
+        if (ctbNonModMHpp.logicalName != "x.hpp" || ctbNonModMHpp.isHeaderUnit == true)
         {
             return tl::unexpected("wrong message received");
         }
@@ -751,12 +751,12 @@ tl::expected<int, string> runTest()
         headerFile.isHeaderUnit = false;
         headerFile.filePath = xHpp;
         HeaderFile yHeaderFile;
-        yHeaderFile.logicalName = "Y.hpp";
+        yHeaderFile.logicalName = "y.hpp";
         yHeaderFile.filePath = yHpp;
         yHeaderFile.isSystem = true;
         headerFile.headerFiles.emplace_back(std::move(yHeaderFile));
         HeaderFile zHeaderFile;
-        zHeaderFile.logicalName = "Z.hpp";
+        zHeaderFile.logicalName = "z.hpp";
         zHeaderFile.filePath = zHpp;
         zHeaderFile.isSystem = true;
         headerFile.headerFiles.emplace_back(std::move(zHeaderFile));
@@ -819,7 +819,7 @@ tl::expected<int, string> runTest()
         }
         const auto &xHeader = reinterpret_cast<CTBNonModule &>(buffer);
 
-        if (xHeader.logicalName != "X.hpp" || xHeader.isHeaderUnit == true)
+        if (xHeader.logicalName != "x.hpp" || xHeader.isHeaderUnit == true)
         {
             return tl::unexpected("wrong message received");
         }
@@ -827,9 +827,9 @@ tl::expected<int, string> runTest()
         BTCNonModule bigHu;
         bigHu.isHeaderUnit = true;
         bigHu.filePath = bigPcm;
-        bigHu.logicalNames.emplace_back("Big.hpp");
-        bigHu.logicalNames.emplace_back("Y.hpp");
-        bigHu.logicalNames.emplace_back("Z.hpp");
+        bigHu.logicalNames.emplace_back("big.hpp");
+        bigHu.logicalNames.emplace_back("y.hpp");
+        bigHu.logicalNames.emplace_back("z.hpp");
 
         if (const auto &r2 = manager.sendMessage(bigHu); !r2)
         {
@@ -933,10 +933,10 @@ tl::expected<int, string> runTest()
         m.requested.filePath = fooPcm;
         ModuleDep modDep;
         modDep.file.filePath = bigPcm;
-        modDep.logicalNames.emplace_back("Big.hpp");
-        modDep.logicalNames.emplace_back("X.hpp");
-        modDep.logicalNames.emplace_back("Y.hpp");
-        modDep.logicalNames.emplace_back("Z.hpp");
+        modDep.logicalNames.emplace_back("big.hpp");
+        modDep.logicalNames.emplace_back("x.hpp");
+        modDep.logicalNames.emplace_back("y.hpp");
+        modDep.logicalNames.emplace_back("z.hpp");
         modDep.isHeaderUnit = true;
         m.modDeps.emplace_back(std::move(modDep));
 

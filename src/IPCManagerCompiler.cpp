@@ -176,23 +176,23 @@ tl::expected<BTCNonModule, std::string> IPCManagerCompiler::receiveBTCNonModule(
             {
                 responses.emplace(std::move(h), Response(f, FileType::HEADER_UNIT, isSystem));
             }
-            for (auto &[file, logicalHUDep, isSystem] : huDeps)
+            for (auto &[file, logicalHUDep, isSystem2] : huDeps)
             {
                 for (std::string &l : logicalHUDep)
                 {
-                    responses.emplace(std::move(l), Response(file, FileType::HEADER_UNIT, isSystem));
+                    responses.emplace(std::move(l), Response(file, FileType::HEADER_UNIT, isSystem2));
                 }
             }
             responses.emplace(nonModule.logicalName, Response(std::move(f), FileType::HEADER_UNIT, isSystem));
         }
         else
         {
-            for (auto &[logicalName, headerFilePath, isSystem] : headerFiles)
+            for (auto &[logicalName, headerFilePath, isSystem2] : headerFiles)
             {
                 BMIFile headerBMI;
                 headerBMI.filePath = std::move(headerFilePath);
                 responses.emplace(std::move(logicalName),
-                                  Response(std::move(headerBMI), FileType::HEADER_FILE, isSystem));
+                                  Response(std::move(headerBMI), FileType::HEADER_FILE, isSystem2));
             }
             responses.emplace(nonModule.logicalName, Response(std::move(f), FileType::HEADER_FILE, isSystem));
         }
