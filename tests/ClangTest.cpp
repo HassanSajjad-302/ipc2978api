@@ -753,12 +753,12 @@ tl::expected<int, string> runTest()
         HeaderFile yHeaderFile;
         yHeaderFile.logicalName = "Y.hpp";
         yHeaderFile.filePath = yHpp;
-        yHeaderFile.user = true;
+        yHeaderFile.isSystem = true;
         headerFile.headerFiles.emplace_back(std::move(yHeaderFile));
         HeaderFile zHeaderFile;
         zHeaderFile.logicalName = "Z.hpp";
         zHeaderFile.filePath = zHpp;
-        zHeaderFile.user = true;
+        zHeaderFile.isSystem = true;
         headerFile.headerFiles.emplace_back(std::move(zHeaderFile));
 
         if (const auto &r2 = manager.sendMessage(std::move(headerFile)); !r2)

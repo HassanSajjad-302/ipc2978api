@@ -199,9 +199,18 @@ tl::expected<BTCNonModule, std::string> IPCManagerCompiler::receiveBTCNonModule(
     return received;
 }
 
-tl::expected<Response, std::string> IPCManagerCompiler::findResponse(const std::string &logicalName,
-                                                                     const FileType type)
+tl::expected<Response, std::string> IPCManagerCompiler::findResponse(std::string logicalName, const FileType type)
 {
+#ifdef _WIN32
+    if (type != FileType::MODULE)
+    {
+        for (char &c : logicalName)
+        {
+            c = std::tolower(c);
+        }
+    }
+#endif
+
     if (const auto &it = responses.find(logicalName);
         it == responses.end() ||
         (it->second.type != type && (it->second.type != FileType::HEADER_UNIT || type != FileType::HEADER_FILE)))

@@ -40,13 +40,13 @@ BTCModule getBTCModule()
 
     b.requested = std::move(file);
 
-    b.user = getRandomBool();
+    b.isSystem = getRandomBool();
 
     const uint32_t modDepCount = getRandomNumber(10);
     for (uint32_t i = 0; i < modDepCount; ++i)
     {
         ModuleDep modDep;
-        modDep.user = getRandomBool();
+        modDep.isSystem = getRandomBool();
         modDep.isHeaderUnit = getRandomBool();
         modDep.logicalNames.emplace_back(getRandomString());
         const uint32_t logicalNameSize = getRandomNumber(10);
@@ -64,7 +64,7 @@ BTCNonModule getBTCNonModule()
 {
     BTCNonModule nonModule;
     nonModule.isHeaderUnit = getRandomBool();
-    nonModule.user = getRandomBool();
+    nonModule.isSystem = getRandomBool();
     nonModule.filePath = getRandomString();
     nonModule.fileSize = 0;
 
@@ -79,7 +79,7 @@ BTCNonModule getBTCNonModule()
     {
         HeaderFile h;
         h.logicalName = getRandomString();
-        h.user = getRandomBool();
+        h.isSystem = getRandomBool();
         h.filePath = getRandomString();
         nonModule.headerFiles.emplace_back(std::move(h));
     }
@@ -97,7 +97,7 @@ BTCNonModule getBTCNonModule()
         {
             huDep.logicalNames.emplace_back(getRandomString());
         }
-        huDep.user = getRandomBool();
+        huDep.isSystem = getRandomBool();
         nonModule.huDeps.emplace_back(std::move(huDep));
     }
 
@@ -151,7 +151,7 @@ void printMessage(const BTCModule &btcModule, const bool sent)
     print("BTCModule\n\n");
 
     print("Requested FilePath: {}\n\n", btcModule.requested.filePath);
-    print("Requested User: {}\n\n", btcModule.user);
+    print("Requested User: {}\n\n", btcModule.isSystem);
     print("Requested FileSize: {}\n\n", btcModule.requested.fileSize);
     print("Deps Size: {}\n\n", btcModule.modDeps.size());
     for (uint32_t i = 0; i < btcModule.modDeps.size(); i++)
@@ -164,7 +164,7 @@ void printMessage(const BTCModule &btcModule, const bool sent)
         {
             print("Mod-Dep[{}] LogicalName[{}]: {}\n\n", i, j, btcModule.modDeps[i].logicalNames[j]);
         }
-        print("Mod-Dep[{}] User: {}\n\n", i, btcModule.modDeps[i].user);
+        print("Mod-Dep[{}] User: {}\n\n", i, btcModule.modDeps[i].isSystem);
     }
 }
 
@@ -173,7 +173,7 @@ void printMessage(const BTCNonModule &nonModule, const bool sent)
     printSendingOrReceiving(sent);
     print("BTCNonModule\n\n");
     print("IsHeaderUnit {}\n\n", nonModule.isHeaderUnit);
-    print("User {}\n\n", nonModule.user);
+    print("User {}\n\n", nonModule.isSystem);
     print("FilePath {}\n\n", nonModule.filePath);
     print("FileSize {}\n\n", nonModule.fileSize);
 
@@ -186,7 +186,7 @@ void printMessage(const BTCNonModule &nonModule, const bool sent)
     {
         print("Header-File[{}] LogicalName: {}\n\n", i, nonModule.headerFiles[i].logicalName);
         print("Header-File[{}] FilePath: {}\n\n", i, nonModule.headerFiles[i].filePath);
-        print("Header-File[{}] User: {}\n\n", i, nonModule.headerFiles[i].user);
+        print("Header-File[{}] User: {}\n\n", i, nonModule.headerFiles[i].isSystem);
     }
 
     for (uint32_t i = 0; i < nonModule.huDeps.size(); i++)
@@ -197,7 +197,7 @@ void printMessage(const BTCNonModule &nonModule, const bool sent)
         {
             print("Mod-Dep[{}] LogicalName[{}]: {}\n\n", i, j, nonModule.huDeps[i].logicalNames[j]);
         }
-        print("Hu-Dep[{}] User: {}\n\n", i, nonModule.huDeps[i].user);
+        print("Hu-Dep[{}] User: {}\n\n", i, nonModule.huDeps[i].isSystem);
     }
 }
 

@@ -257,7 +257,7 @@ tl::expected<void, std::string> IPCManagerBS::sendMessage(const BTCModule &modul
 {
     std::vector<char> buffer;
     writeProcessMappingOfBMIFile(buffer, moduleFile.requested);
-    buffer.emplace_back(moduleFile.user);
+    buffer.emplace_back(moduleFile.isSystem);
     writeVectorOfModuleDep(buffer, moduleFile.modDeps);
     if (const auto &r = writeInternal(buffer); !r)
     {
@@ -270,7 +270,7 @@ tl::expected<void, std::string> IPCManagerBS::sendMessage(const BTCNonModule &no
 {
     std::vector<char> buffer;
     buffer.emplace_back(nonModule.isHeaderUnit);
-    buffer.emplace_back(nonModule.user);
+    buffer.emplace_back(nonModule.isSystem);
     writeString(buffer, nonModule.filePath);
     writeUInt32(buffer, nonModule.fileSize);
     writeVectorOfStrings(buffer, nonModule.logicalNames);
