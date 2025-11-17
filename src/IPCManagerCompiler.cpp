@@ -128,23 +128,25 @@ tl::expected<BTCModule, std::string> IPCManagerCompiler::receiveBTCModule(const 
 
     auto received = receiveMessage<BTCModule>();
 
-    if (received)
+    if (!received)
     {
-        auto &[f, isSystem, deps] = received.value();
-        responses.emplace(moduleName.moduleName, Response(std::move(f), FileType::MODULE, isSystem));
-        for (auto &[isHeaderUnit, file, logicalNames, isSystem] : deps)
+        return received;
+    }
+
+    auto &[f, isSystem, deps] = received.value();
+    responses.emplace(moduleName.moduleName, Response(std::move(f), FileType::MODULE, isSystem));
+    for (auto &[isHeaderUnit, file, logicalNames, isSystem] : deps)
+    {
+        if (isHeaderUnit)
         {
-            if (isHeaderUnit)
+            for (const std::string &s : logicalNames)
             {
-                for (const std::string &s : logicalNames)
-                {
-                    responses.emplace(s, Response(file, FileType::HEADER_UNIT, isSystem));
-                }
+                responses.emplace(s, Response(file, FileType::HEADER_UNIT, isSystem));
             }
-            else
-            {
-                responses.emplace(logicalNames[0], Response(std::move(file), FileType::MODULE, isSystem));
-            }
+        }
+        else
+        {
+            responses.emplace(logicalNames[0], Response(std::move(file), FileType::MODULE, isSystem));
         }
     }
     return received;
@@ -162,41 +164,38 @@ tl::expected<BTCNonModule, std::string> IPCManagerCompiler::receiveBTCNonModule(
 
     auto received = receiveMessage<BTCNonModule>();
 
-    if (received)
+    if (!received)
     {
-        auto &[isHeaderUnit, isSystem, filePath, fileSize, logicalNames, headerFiles, huDeps] = received.value();
+        return received;
+    }
 
-        BMIFile f;
-        f.filePath = std::move(filePath);
-        f.fileSize = fileSize;
+    auto &[isHeaderUnit, isSystem, filePath, fileSize, logicalNames, headerFiles, huDeps] = received.value();
 
-        if (isHeaderUnit)
+    BMIFile f;
+    f.filePath = std::move(filePath);
+    f.fileSize = fileSize;
+
+    for (std::string &h : logicalNames)
+    {
+        responses.emplace(std::move(h), Response(f, FileType::HEADER_UNIT, isSystem));
+    }
+    for (auto &[file, logicalHUDep, isSystem2] : huDeps)
+    {
+        for (std::string &l : logicalHUDep)
         {
-            for (std::string &h : logicalNames)
-            {
-                responses.emplace(std::move(h), Response(f, FileType::HEADER_UNIT, isSystem));
-            }
-            for (auto &[file, logicalHUDep, isSystem2] : huDeps)
-            {
-                for (std::string &l : logicalHUDep)
-                {
-                    responses.emplace(std::move(l), Response(file, FileType::HEADER_UNIT, isSystem2));
-                }
-            }
-            responses.emplace(nonModule.logicalName, Response(std::move(f), FileType::HEADER_UNIT, isSystem));
-        }
-        else
-        {
-            for (auto &[logicalName, headerFilePath, isSystem2] : headerFiles)
-            {
-                BMIFile headerBMI;
-                headerBMI.filePath = std::move(headerFilePath);
-                responses.emplace(std::move(logicalName),
-                                  Response(std::move(headerBMI), FileType::HEADER_FILE, isSystem2));
-            }
-            responses.emplace(nonModule.logicalName, Response(std::move(f), FileType::HEADER_FILE, isSystem));
+            responses.emplace(std::move(l), Response(file, FileType::HEADER_UNIT, isSystem2));
         }
     }
+    for (auto &[logicalName, headerFilePath, isSystem2] : headerFiles)
+    {
+        BMIFile headerBMI;
+        headerBMI.filePath = std::move(headerFilePath);
+        responses.emplace(std::move(logicalName), Response(std::move(headerBMI), FileType::HEADER_FILE, isSystem2));
+    }
+
+    responses.emplace(nonModule.logicalName,
+                      Response(std::move(f), isHeaderUnit ? FileType::HEADER_UNIT : FileType::HEADER_FILE, isSystem));
+
     return received;
 }
 
