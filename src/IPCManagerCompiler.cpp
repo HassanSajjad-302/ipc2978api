@@ -103,6 +103,8 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCLastMessage() cons
         bytesRead = *r;
     }
 
+    // The BTCLastMessage must be 1 byte of true signaling that build-system has successfully created a shared memory
+    // mapping of the BMI file.
     if (buffer[0] != static_cast<char>(true))
     {
         return tl::unexpected(getErrorString(ErrorCategory::INCORRECT_BTC_LAST_MESSAGE));
@@ -118,9 +120,9 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCLastMessage() cons
 
 tl::expected<BTCModule, std::string> IPCManagerCompiler::receiveBTCModule(const CTBModule &moduleName)
 {
-
     std::vector<char> buffer = getBufferWithType(CTB::MODULE);
     writeString(buffer, moduleName.moduleName);
+    // This call sends the CTBModule to the build-system.
     if (const auto &r = writeInternal(buffer); !r)
     {
         return tl::unexpected(r.error());
@@ -130,15 +132,22 @@ tl::expected<BTCModule, std::string> IPCManagerCompiler::receiveBTCModule(const 
 
     if (!received)
     {
-        return received;
+        return tl::unexpected(received.error());
     }
 
     auto &[f, isSystem, deps] = received.value();
     responses.emplace(moduleName.moduleName, Response(std::move(f), FileType::MODULE, isSystem));
+
+    // Build-system will also send all the dependencies of this module.
     for (auto &[isHeaderUnit, file, logicalNames, isSystem] : deps)
     {
         if (isHeaderUnit)
         {
+            // logicalNames include all the include-names of the composing-headers of the big header-unit dependency.
+            // These are mapped to the dependency big-hu in IPCManagerCompiler::responses cache. e.g. if the module
+            // "Cat" depends on the "string" which is compiled as big-hu "stl", then build-system will send all the
+            // composing include-names like "vector" etc. So if we any of these is requested later, response cache will
+            // have them mapped to the big-hu BMI "stl".
             for (const std::string &s : logicalNames)
             {
                 responses.emplace(s, Response(file, FileType::HEADER_UNIT, isSystem));
@@ -146,6 +155,7 @@ tl::expected<BTCModule, std::string> IPCManagerCompiler::receiveBTCModule(const 
         }
         else
         {
+            // logicalNames[0] is the module logicalName of the dependency module.
             responses.emplace(logicalNames[0], Response(std::move(file), FileType::MODULE, isSystem));
         }
     }
@@ -157,6 +167,7 @@ tl::expected<BTCNonModule, std::string> IPCManagerCompiler::receiveBTCNonModule(
     std::vector<char> buffer = getBufferWithType(CTB::NON_MODULE);
     buffer.emplace_back(nonModule.isHeaderUnit);
     writeString(buffer, nonModule.logicalName);
+    // This call sends the CTBNonModule to the build-system.
     if (const auto &r = writeInternal(buffer); !r)
     {
         return tl::unexpected(r.error());
@@ -166,26 +177,36 @@ tl::expected<BTCNonModule, std::string> IPCManagerCompiler::receiveBTCNonModule(
 
     if (!received)
     {
-        return received;
+        return tl::unexpected(received.error());
     }
 
     auto &[isHeaderUnit, isSystem, filePath, fileSize, logicalNames, headerFiles, huDeps] = received.value();
 
+    // the requested header-file or header-unit
     BMIFile f;
     f.filePath = std::move(filePath);
     f.fileSize = fileSize;
 
     for (std::string &h : logicalNames)
     {
+        // if our request was compiled as big-hu, then the logicalNames include all the composing include-names of the
+        // big-hu. e.g. if we requested "string" which was compiled as big-hu "stl", this array will include "vector",
+        // "algorithm" etc. These will be mapped to the same BMIFile. This reduces no. of messages.
         responses.emplace(std::move(h), Response(f, FileType::HEADER_UNIT, isSystem));
     }
+
+    // All the hu-deps of this header-unit.
     for (auto &[file, logicalHUDep, isSystem2] : huDeps)
     {
+        // All the composing include-names of the dependency if any. These will be mapped to the dependency big hu.
         for (std::string &l : logicalHUDep)
         {
             responses.emplace(std::move(l), Response(file, FileType::HEADER_UNIT, isSystem2));
         }
     }
+
+    // if we are compiling a big hu, only then the following is received. It is only received in first request. It is
+    // the list of all the composing header-files.
     for (auto &[logicalName, headerFilePath, isSystem2] : headerFiles)
     {
         BMIFile headerBMI;
@@ -212,6 +233,11 @@ tl::expected<Response, std::string> IPCManagerCompiler::findResponse(std::string
 #endif
 
     if (const auto &it = responses.find(logicalName);
+        // This requests from the build-system if we don't have an entry for the logicalName or if there is a type
+        // mismatch between the request and the response. Only allowed mismatch is if the request is of header-file and
+        // the response is a header-unit instead. For other mismatches compiler will request the build-system which will
+        // give not found error. HMake at config-time checks for the logicalName collision and also that a file is not
+        // registered as 2 of header-file, header-unit and module.
         it == responses.end() ||
         (it->second.type != type && (it->second.type != FileType::HEADER_UNIT || type != FileType::HEADER_FILE)))
     {
@@ -243,7 +269,7 @@ tl::expected<Response, std::string> IPCManagerCompiler::findResponse(std::string
     }
 }
 
-tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage) const
+tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage() const
 {
     std::vector<char> buffer = getBufferWithType(CTB::LAST_MESSAGE);
     buffer.emplace_back(lastMessage.errorOccurred);
@@ -258,8 +284,7 @@ tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const CTB
     return {};
 }
 
-tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const CTBLastMessage &lastMessage,
-                                                                       const std::string &bmiFile,
+tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const std::string &bmiFile,
                                                                        const std::string &filePath) const
 {
 #ifdef _WIN32
@@ -303,17 +328,16 @@ tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const CTB
     UnmapViewOfFile(pView);
     CloseHandle(hFile);
 
-    if (const auto &r = sendCTBLastMessage(lastMessage); !r)
+    if (const auto &r = sendCTBLastMessage(); !r)
     {
         return tl::unexpected(r.error());
     }
 
-    if (lastMessage.errorOccurred == EXIT_SUCCESS)
+    // Build-system will send the BTCLastMessage after it has created the BMI file-mapping. Compiler process can not
+    // exit before that.
+    if (const auto &r = receiveBTCLastMessage(); !r)
     {
-        if (const auto &r = receiveBTCLastMessage(); !r)
-        {
-            return tl::unexpected(r.error());
-        }
+        return tl::unexpected(r.error());
     }
 
     CloseHandle(hMap);
