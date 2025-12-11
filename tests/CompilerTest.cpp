@@ -82,30 +82,28 @@ int main()
         }
     }
 
-    CTBLastMessage ctbLastMessage;
-    ctbLastMessage.errorOccurred = false;
-    if (const auto &r2 = manager.sendCTBLastMessage(ctbLastMessage); !r2)
+    manager.lastMessage.errorOccurred = false;
+    if (const auto &r2 = manager.sendCTBLastMessage(); !r2)
     {
         exitFailure(r2.error());
     }
 
     print("First ");
-    printMessage(ctbLastMessage, true);
+    printMessage(manager.lastMessage, true);
 
-    // This tests file sharing. Contents of both outputs should be the same.
-    CTBLastMessage lastMessageWithSharedFile;
-    lastMessageWithSharedFile.errorOccurred = false;
+    manager.lastMessage = CTBLastMessage{};
+    manager.lastMessage.errorOccurred = false;
     string fileContent = getRandomString();
-    lastMessageWithSharedFile.fileSize = fileContent.size();
+    manager.lastMessage.fileSize = fileContent.size();
     print("Second ");
-    if (const auto &r2 = manager.sendCTBLastMessage(lastMessageWithSharedFile, fileContent,
-                                                    (std::filesystem::current_path() / "bmi.txt").generic_string());
+    if (const auto &r2 =
+            manager.sendCTBLastMessage(fileContent, (std::filesystem::current_path() / "bmi.txt").generic_string());
         !r2)
     {
         exitFailure(r.error());
     }
 
-    printMessage(lastMessageWithSharedFile, true);
+    printMessage(manager.lastMessage, true);
     print("File Content: {}\n\n", fileContent.data());
 
     print("BTCLastMessage has been received\n");
@@ -120,14 +118,15 @@ int main()
     }
     manager = r2.value();
 
-    ctbLastMessage.errorOccurred = true;
-    if (const auto &r3 = manager.sendCTBLastMessage(ctbLastMessage); !r3)
+    manager.lastMessage = CTBLastMessage{};
+    manager.lastMessage.errorOccurred = true;
+    if (const auto &r3 = manager.sendCTBLastMessage(); !r3)
     {
         exitFailure(r3.error());
     }
 
     print("BTCLastMessage received on new manager.\n");
-    printMessage(ctbLastMessage, true);
+    printMessage(manager.lastMessage, true);
 
     manager.closeConnection();
 }

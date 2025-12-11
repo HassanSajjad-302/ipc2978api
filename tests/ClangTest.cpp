@@ -124,12 +124,12 @@ int main()
 // Creates all the input files (source files + pcm files) that are needed for the test.
 void setupTest()
 {
-    //  A.cpp
+    //  a.cpp
     const string aDotCpp = R"(
 export module A;     // primary module interface unit
 
 export import :B;    // Hello() is visible when importing 'A'.
-import :C;           // WorldImpl() is now visible only for 'A.cpp'.
+import :C;           // WorldImpl() is now visible only for 'a.cpp'.
 // export import :C; // ERROR: Cannot export a module implementation unit.
 
 // World() is visible by any translation unit importing 'A'.
@@ -138,7 +138,7 @@ export char const* World()
     return WorldImpl();
 }
 )";
-    // A-B.cpp
+    // a-b.cpp
     const string aBDotCPP = R"(
 export module A:B; // partition module interface unit
 
@@ -146,7 +146,7 @@ export module A:B; // partition module interface unit
 export char const* Hello() { return "Hello"; }
 )";
 
-    // A-C.cpp
+    // a-c.cpp
     const string aCDotCPP = R"(
 module A:C; // partition module implementation unit
 
@@ -242,7 +242,7 @@ inline int z = x + y + 5;
 #include "z.hpp"
 )";
 
-    // Foo.cpp
+    // foo.cpp
     const string fooDotCpp = R"(
 module;
 #include "x.hpp"
@@ -260,9 +260,9 @@ export void Foo()
 }
 )";
 
-    ofstream("A.cpp") << aDotCpp;
-    ofstream("A-B.cpp") << aBDotCPP;
-    ofstream("A-C.cpp") << aCDotCPP;
+    ofstream("a.cpp") << aDotCpp;
+    ofstream("a-b.cpp") << aBDotCPP;
+    ofstream("a-c.cpp") << aCDotCPP;
     ofstream("m.hpp") << mDotHpp;
     ofstream("n.hpp") << nDotHpp;
     ofstream("o.hpp") << oDotHpp;
@@ -270,7 +270,7 @@ export void Foo()
     ofstream("y.hpp") << yDotHpp;
     ofstream("z.hpp") << zDotHpp;
     ofstream("big.hpp") << bigDotHpp;
-    ofstream("Foo.cpp") << fooDotCpp;
+    ofstream("foo.cpp") << fooDotCpp;
     ofstream("main.cpp") << mainDotCpp;
 }
 
@@ -278,35 +278,43 @@ tl::expected<int, string> runTest()
 {
     setupTest();
 
-    string current = current_path().generic_string() + '/';
-    string mainFilePath = current + "main .o";
-    string modFilePath = current + "mod .pcm";
-    string mod1FilePath = current + "mod1 .pcm";
-    string mod2FilePath = current + "mod2 .pcm";
+    string str = current_path().string();
+#ifdef _WIN32
+    for (char &c : str)
+    {
+        c = tolower(c);
+    }
+#endif
 
-    string aCObj = (current_path() / "A-C .o").generic_string();
-    string aCPcm = (current_path() / "A-C .pcm").generic_string();
-    string aBObj = (current_path() / "A-B .o").generic_string();
-    string aBPcm = (current_path() / "A-B .pcm").generic_string();
-    string aObj = (current_path() / "A .o").generic_string();
-    string aPcm = (current_path() / "A .pcm").generic_string();
-    string bObj = (current_path() / "B .o").generic_string();
-    string bPcm = (current_path() / "B .pcm").generic_string();
-    string mHpp = (current_path() / "m.hpp").generic_string();
-    string nHpp = (current_path() / "n.hpp").generic_string();
-    string oHpp = (current_path() / "o.hpp").generic_string();
-    string nPcm = (current_path() / "N .pcm").generic_string();
-    string oPcm = (current_path() / "O .pcm").generic_string();
-    string xHpp = (current_path() / "x.hpp").generic_string();
-    string yHpp = (current_path() / "y.hpp").generic_string();
-    string zHpp = (current_path() / "z.hpp").generic_string();
-    string bigHpp = (current_path() / "big.hpp").generic_string();
-    string bigPcm = (current_path() / "Big .pcm").generic_string();
-    string fooPcm = (current_path() / "Foo .pcm").generic_string();
-    string fooObj = (current_path() / "Foo .o").generic_string();
-    string mainObj = (current_path() / "main .o").generic_string();
+    path curPath(str);
 
-    // compiling A-C.cpp
+    string mainFilePath = (curPath / "main .o").string();
+    string modFilePath = (curPath / "mod .pcm").string();
+    string mod1FilePath = (curPath / "mod1 .pcm").string();
+    string mod2FilePath = (curPath / "mod2 .pcm").string();
+    string aCObj = (curPath / "a-c .o").string();
+    string aCPcm = (curPath / "a-c .pcm").string();
+    string aBObj = (curPath / "a-b .o").string();
+    string aBPcm = (curPath / "a-b .pcm").string();
+    string aObj = (curPath / "a .o").string();
+    string aPcm = (curPath / "a .pcm").string();
+    string bObj = (curPath / "b .o").string();
+    string bPcm = (curPath / "b .pcm").string();
+    string mHpp = (curPath / "m.hpp").string();
+    string nHpp = (curPath / "n.hpp").string();
+    string oHpp = (curPath / "o.hpp").string();
+    string nPcm = (curPath / "n .pcm").string();
+    string oPcm = (curPath / "o .pcm").string();
+    string xHpp = (curPath / "x.hpp").string();
+    string yHpp = (curPath / "y.hpp").string();
+    string zHpp = (curPath / "z.hpp").string();
+    string bigHpp = (curPath / "big.hpp").string();
+    string bigPcm = (curPath / "big .pcm").string();
+    string fooPcm = (curPath / "foo .pcm").string();
+    string fooObj = (curPath / "foo .o").string();
+    string mainObj = (curPath / "main .o").string();
+
+    // compiling a-c.cpp
     {
         const auto &r = makeIPCManagerBS(aCObj);
         if (!r)
@@ -317,7 +325,7 @@ tl::expected<int, string> runTest()
         const IPCManagerBS &manager = *r;
 
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aCObj +
-                                "\" -noScanIPC -c -xc++-module A-C.cpp -fmodule-output=\"" + aCPcm + "\"";
+                                "\" -noScanIPC -c -xc++-module a-c.cpp -fmodule-output=\"" + aCPcm + "\"";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -340,7 +348,7 @@ tl::expected<int, string> runTest()
 
         if (ctbLastMessage.logicalName != "A:C")
         {
-            return tl::unexpected("wrong logical name received while compiling A-C.cpp");
+            return tl::unexpected("wrong logical name received while compiling a-c.cpp");
         }
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
@@ -350,7 +358,7 @@ tl::expected<int, string> runTest()
         }
     }
 
-    // compiling A-B.cpp
+    // compiling a-b.cpp
     {
         const auto &r = makeIPCManagerBS(aBObj);
         if (!r)
@@ -361,7 +369,7 @@ tl::expected<int, string> runTest()
         const IPCManagerBS &manager = *r;
 
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aBObj +
-                                "\" -noScanIPC -c -xc++-module A-B.cpp -fmodule-output=\"" + aBPcm + "\"";
+                                "\" -noScanIPC -c -xc++-module a-b.cpp -fmodule-output=\"" + aBPcm + "\"";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -384,7 +392,7 @@ tl::expected<int, string> runTest()
 
         if (ctbLastMessage.logicalName != "A:B")
         {
-            return tl::unexpected("wrong logical name received while compiling A-B.cpp");
+            return tl::unexpected("wrong logical name received while compiling a-b.cpp");
         }
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
@@ -394,7 +402,7 @@ tl::expected<int, string> runTest()
         }
     }
 
-    // compiling A.cpp
+    // compiling a.cpp
     {
         const auto &r = makeIPCManagerBS(aObj);
         if (!r)
@@ -405,7 +413,7 @@ tl::expected<int, string> runTest()
         const IPCManagerBS &manager = *r;
 
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aObj +
-                                "\" -noScanIPC -c -xc++-module A.cpp -fmodule-output=\"" + aPcm + "\"";
+                                "\" -noScanIPC -c -xc++-module a.cpp -fmodule-output=\"" + aPcm + "\"";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -428,14 +436,39 @@ tl::expected<int, string> runTest()
 
         if (ctbModule.moduleName != "A:B")
         {
-            return tl::unexpected("wrong logical name received while compiling A-B.cpp");
+            return tl::unexpected("wrong logical name received while compiling a-b.cpp");
         }
         printMessage(ctbModule, false);
 
+        BMIFile btcModBMI;
+        btcModBMI.filePath = aBPcm;
+        ProcessMappingOfBMIFile btcModBmiProcMap;
+        if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(btcModBMI); r2)
+        {
+            btcModBmiProcMap = *r2;
+        }
+        else
+        {
+            return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
+        }
+
         BTCModule btcMod;
-        btcMod.requested.filePath = aBPcm;
+        btcMod.requested = std::move(btcModBMI);
+
+        BMIFile modDepBMI;
+        modDepBMI.filePath = aCPcm;
+        ProcessMappingOfBMIFile modDepBmiProcMap;
+        if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(modDepBMI); r2)
+        {
+            modDepBmiProcMap = *r2;
+        }
+        else
+        {
+            return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
+        }
+
         ModuleDep modDep;
-        modDep.file.filePath = aCPcm;
+        modDep.file = std::move(modDepBMI);
         modDep.logicalNames.emplace_back("A:C");
         modDep.isHeaderUnit = false;
         btcMod.modDeps.emplace_back(std::move(modDep));
@@ -463,6 +496,16 @@ tl::expected<int, string> runTest()
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
+        }
+
+        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(btcModBmiProcMap); !r2)
+        {
+            return tl::unexpected("closing bmi-mapping failed");
+        }
+
+        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(modDepBmiProcMap); !r2)
+        {
+            return tl::unexpected("closing bmi-mapping failed");
         }
     }
 
@@ -594,7 +637,22 @@ tl::expected<int, string> runTest()
 
         BTCNonModule nonModNPcm;
         nonModNPcm.isHeaderUnit = true;
-        nonModNPcm.filePath = nPcm;
+
+        BMIFile nonModNPcmBmi;
+        nonModNPcmBmi.filePath = nPcm;
+
+        ProcessMappingOfBMIFile nonModNPcmBmiProcMap;
+        if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(nonModNPcmBmi); r2)
+        {
+            nonModNPcmBmiProcMap = *r2;
+        }
+        else
+        {
+            return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
+        }
+
+        nonModNPcm.filePath = std::move(nonModNPcmBmi.filePath);
+        nonModNPcm.fileSize = nonModNPcmBmi.fileSize;
 
         if (const auto &r2 = manager.sendMessage(std::move(nonModNPcm)); !r2)
         {
@@ -618,6 +676,11 @@ tl::expected<int, string> runTest()
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
+        }
+
+        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(nonModNPcmBmiProcMap); !r2)
+        {
+            return tl::unexpected("closing bmi-mapping failed");
         }
     }
 
@@ -683,8 +746,23 @@ tl::expected<int, string> runTest()
         }
 
         BTCNonModule nonModNPcm;
+
+        BMIFile nonModNPcmBmi;
+        nonModNPcmBmi.filePath = nPcm;
+
+        ProcessMappingOfBMIFile nonModNPcmBmiProcMap;
+        if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(nonModNPcmBmi); r2)
+        {
+            nonModNPcmBmiProcMap = *r2;
+        }
+        else
+        {
+            return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
+        }
+
         nonModNPcm.isHeaderUnit = true;
         nonModNPcm.filePath = nPcm;
+        nonModNPcm.fileSize = nonModNPcmBmi.fileSize;
 
         if (const auto &r2 = manager.sendMessage(std::move(nonModNPcm)); !r2)
         {
@@ -708,6 +786,11 @@ tl::expected<int, string> runTest()
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
+        }
+
+        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(nonModNPcmBmiProcMap); !r2)
+        {
+            return tl::unexpected("closing bmi-mapping failed");
         }
     }
 
@@ -787,7 +870,7 @@ tl::expected<int, string> runTest()
         }
     }
 
-    // compiling Foo.cpp
+    // compiling foo.cpp
     {
         const auto &r = makeIPCManagerBS(fooObj);
         if (!r)
@@ -798,7 +881,7 @@ tl::expected<int, string> runTest()
         const IPCManagerBS &manager = *r;
 
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + fooObj +
-                                "\" -noScanIPC -c -xc++-module Foo.cpp -fmodule-output=\"" + fooPcm + "\"";
+                                "\" -noScanIPC -c -xc++-module foo.cpp -fmodule-output=\"" + fooPcm + "\"";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
@@ -826,10 +909,24 @@ tl::expected<int, string> runTest()
 
         BTCNonModule bigHu;
         bigHu.isHeaderUnit = true;
-        bigHu.filePath = bigPcm;
         bigHu.logicalNames.emplace_back("big.hpp");
         bigHu.logicalNames.emplace_back("y.hpp");
         bigHu.logicalNames.emplace_back("z.hpp");
+
+        BMIFile bigHuBmi;
+        bigHuBmi.filePath = bigPcm;
+
+        ProcessMappingOfBMIFile bigHuBmiProcMap;
+        if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(bigHuBmi); r2)
+        {
+            bigHuBmiProcMap = *r2;
+        }
+        else
+        {
+            return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
+        }
+        bigHu.filePath = bigHuBmi.filePath;
+        bigHu.fileSize = bigHuBmi.fileSize;
 
         if (const auto &r2 = manager.sendMessage(bigHu); !r2)
         {
@@ -854,15 +951,27 @@ tl::expected<int, string> runTest()
             return tl::unexpected("wrong message received");
         }
 
+        BMIFile requested;
+        requested.filePath = aPcm;
+        ProcessMappingOfBMIFile aPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(requested);
+
+        BMIFile abModDepBmi;
+        abModDepBmi.filePath = aBPcm;
+        ProcessMappingOfBMIFile aCPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(abModDepBmi);
+
+        BMIFile acModDepBmi;
+        acModDepBmi.filePath = aCPcm;
+        ProcessMappingOfBMIFile aBPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(acModDepBmi);
+
         BTCModule amod;
-        amod.requested.filePath = aPcm;
+        amod.requested = requested;
         ModuleDep abModDep;
         abModDep.isHeaderUnit = false;
-        abModDep.file.filePath = aBPcm;
+        abModDep.file = abModDepBmi;
         abModDep.logicalNames.emplace_back("A:B");
         amod.modDeps.emplace_back(std::move(abModDep));
         ModuleDep acModDep;
-        acModDep.file.filePath = aCPcm;
+        acModDep.file = acModDepBmi;
         acModDep.logicalNames.emplace_back("A:C");
         amod.modDeps.emplace_back(std::move(acModDep));
 
@@ -890,6 +999,15 @@ tl::expected<int, string> runTest()
         {
             return tl::unexpected("closing process failed");
         }
+
+        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(bigHuBmiProcMap); !r2)
+        {
+            return tl::unexpected("closing bmi-mapping failed");
+        }
+
+        IPCManagerBS::closeBMIFileMapping(aPcmProcMap);
+        IPCManagerBS::closeBMIFileMapping(aBPcmProcMap);
+        IPCManagerBS::closeBMIFileMapping(aCPcmProcMap);
     }
 
     // compiling main.cpp
@@ -925,40 +1043,61 @@ tl::expected<int, string> runTest()
 
         if (ctbModule.moduleName != "Foo")
         {
-            return tl::unexpected("wrong logical name received while compiling A-B.cpp");
+            return tl::unexpected("wrong logical name received while compiling a-b.cpp");
         }
         printMessage(ctbModule, false);
 
-        BTCModule m;
-        m.requested.filePath = fooPcm;
-        ModuleDep modDep;
-        modDep.file.filePath = bigPcm;
-        modDep.logicalNames.emplace_back("big.hpp");
-        modDep.logicalNames.emplace_back("x.hpp");
-        modDep.logicalNames.emplace_back("y.hpp");
-        modDep.logicalNames.emplace_back("z.hpp");
-        modDep.isHeaderUnit = true;
-        m.modDeps.emplace_back(std::move(modDep));
+        BMIFile requested;
+        requested.filePath = fooPcm;
+        ProcessMappingOfBMIFile requestedProcMap = *IPCManagerBS::createSharedMemoryBMIFile(requested);
+
+        BMIFile bigHuModDepBmi;
+        bigHuModDepBmi.filePath = bigPcm;
+        ProcessMappingOfBMIFile bigHuModDepBmiProcMap = *IPCManagerBS::createSharedMemoryBMIFile(bigHuModDepBmi);
+
+        BMIFile aModDepBmi;
+        aModDepBmi.filePath = aPcm;
+        ProcessMappingOfBMIFile aPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(aModDepBmi);
+
+        BMIFile abModDepBmi;
+        abModDepBmi.filePath = aBPcm;
+        ProcessMappingOfBMIFile aCPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(abModDepBmi);
+
+        BMIFile acModDepBmi;
+        acModDepBmi.filePath = aCPcm;
+        ProcessMappingOfBMIFile aBPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(acModDepBmi);
+
+        BTCModule foo;
+        foo.requested = requested;
+
+        ModuleDep bigModDep;
+        bigModDep.isHeaderUnit = true;
+        bigModDep.file = bigHuModDepBmi;
+        bigModDep.logicalNames.emplace_back("big.hpp");
+        bigModDep.logicalNames.emplace_back("x.hpp");
+        bigModDep.logicalNames.emplace_back("y.hpp");
+        bigModDep.logicalNames.emplace_back("z.hpp");
+        foo.modDeps.emplace_back(std::move(bigModDep));
 
         ModuleDep aModDep;
         aModDep.isHeaderUnit = false;
-        aModDep.file.filePath = aPcm;
+        aModDep.file = aModDepBmi;
         aModDep.logicalNames.emplace_back("A");
-        m.modDeps.emplace_back(std::move(aModDep));
+        foo.modDeps.emplace_back(std::move(aModDep));
 
         ModuleDep bModDep;
         bModDep.isHeaderUnit = false;
-        bModDep.file.filePath = aBPcm;
+        bModDep.file = abModDepBmi;
         bModDep.logicalNames.emplace_back("A:B");
-        m.modDeps.emplace_back(std::move(bModDep));
+        foo.modDeps.emplace_back(std::move(bModDep));
 
         ModuleDep cModDep;
         cModDep.isHeaderUnit = false;
-        cModDep.file.filePath = aCPcm;
+        cModDep.file = acModDepBmi;
         cModDep.logicalNames.emplace_back("A:C");
-        m.modDeps.emplace_back(std::move(cModDep));
+        foo.modDeps.emplace_back(std::move(cModDep));
 
-        if (const auto &r2 = manager.sendMessage(std::move(m)); !r2)
+        if (const auto &r2 = manager.sendMessage(std::move(foo)); !r2)
         {
             string str = r2.error();
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
@@ -987,6 +1126,12 @@ tl::expected<int, string> runTest()
         {
             return tl::unexpected("closing process failed");
         }
+
+        IPCManagerBS::closeBMIFileMapping(requestedProcMap);
+        IPCManagerBS::closeBMIFileMapping(bigHuModDepBmiProcMap);
+        IPCManagerBS::closeBMIFileMapping(aPcmProcMap);
+        IPCManagerBS::closeBMIFileMapping(aBPcmProcMap);
+        IPCManagerBS::closeBMIFileMapping(aCPcmProcMap);
         return {};
     };
 

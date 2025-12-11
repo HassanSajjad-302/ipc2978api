@@ -4,7 +4,6 @@
 #include "fmt/printf.h"
 #include <chrono>
 #include <filesystem>
-#include <iostream>
 #include <thread>
 
 #ifdef _WIN32
@@ -18,63 +17,6 @@
 #endif
 
 using fmt::print, std::string_view;
-
-tl::expected<string_view, string> readSharedMemoryBMIFile(const BMIFile &file)
-{
-#ifdef _WIN32
-    // 1) Open the existing file‐mapping object (must have been created by another process)
-    const HANDLE mapping = OpenFileMappingA(FILE_MAP_READ,       // read‐only access
-                                            FALSE,               // do not inherit a handle
-                                            file.filePath.data() // name of mapping
-    );
-
-    if (mapping == nullptr)
-    {
-        return tl::unexpected(string{});
-    }
-
-    // 2) Map a view of the file into our address space
-    const LPVOID view = MapViewOfFile(mapping,       // handle to mapping object
-                                      FILE_MAP_READ, // read‐only view
-                                      0,             // file offset high
-                                      0,             // file offset low
-                                      file.fileSize  // number of bytes to map (0 maps the whole file)
-    );
-
-    if (view == nullptr)
-    {
-        CloseHandle(mapping);
-        return tl::unexpected(string{});
-    }
-
-    ProcessMappingOfBMIFile f{};
-    f.mapping = mapping;
-    f.view = view;
-    return string_view{static_cast<char *>(view), file.fileSize};
-#else
-    const int fd = open(file.filePath.data(), O_RDONLY);
-    if (fd == -1)
-    {
-        return tl::unexpected(getErrorString());
-    }
-    void *mapping = mmap(nullptr, file.fileSize, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
-
-    if (close(fd) == -1)
-    {
-        return tl::unexpected(getErrorString());
-    }
-
-    if (mapping == MAP_FAILED)
-    {
-        return tl::unexpected(getErrorString());
-    }
-
-    ProcessMappingOfBMIFile f{};
-    f.mapping = mapping;
-    f.mappingSize = file.fileSize;
-    return string_view{static_cast<char *>(mapping), file.fileSize};
-#endif
-}
 
 bool first = true;
 std::thread *thr;
@@ -91,6 +33,16 @@ void exitFailure(const string &str)
 #else
 #define COMPILER_TEST "./CompilerTest"
 #endif
+
+struct BuildSystemTest
+{
+
+    //  Compiler can use this function to read the BMI file. BMI should be read using this function to conserve memory.
+    static tl::expected<ProcessMappingOfBMIFile, std::string> readSharedMemoryBMIFile(const BMIFile &file)
+    {
+        return IPCManagerCompiler::readSharedMemoryBMIFile(file);
+    }
+};
 
 void listenForCompiler()
 {
@@ -216,7 +168,7 @@ int runTest()
         }
     }
 
-    if (const auto &r2 = IPCManagerCompiler::readSharedMemoryBMIFile(file); !r2)
+    if (const auto &r2 = BuildSystemTest::readSharedMemoryBMIFile(file); !r2)
     {
         exitFailure(r2.error());
     }

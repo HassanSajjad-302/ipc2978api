@@ -85,8 +85,9 @@ IPCManagerCompiler::IPCManagerCompiler(const int fdSocket_)
 }
 #endif
 
-Response::Response(BMIFile file_, const FileType type_, const bool isSystem_)
-    : file(std::move(file_)), type(type_), isSystem(isSystem_)
+Response::Response(std::string filePath_, const ProcessMappingOfBMIFile &mapping_, const FileType type_,
+                   const bool isSystem_)
+    : filePath(std::move(filePath_)), mapping(mapping_), type(type_), isSystem(isSystem_)
 {
 }
 
@@ -136,10 +137,19 @@ tl::expected<BTCModule, std::string> IPCManagerCompiler::receiveBTCModule(const 
     }
 
     auto &[f, isSystem, deps] = received.value();
-    responses.emplace(moduleName.moduleName, Response(std::move(f), FileType::MODULE, isSystem));
+    if (const auto &r = readSharedMemoryBMIFile(f); r)
+    {
+        filePathProcessMapping.emplace(f.filePath, r.value());
+        responses.emplace(moduleName.moduleName,
+                          Response(std::move(f.filePath), r.value(), FileType::MODULE, isSystem));
+    }
+    else
+    {
+        return tl::unexpected(r.error());
+    }
 
     // Build-system will also send all the dependencies of this module.
-    for (auto &[isHeaderUnit, file, logicalNames, isSystem] : deps)
+    for (auto &[isHeaderUnit, file, logicalNames, isSystem2] : deps)
     {
         if (isHeaderUnit)
         {
@@ -148,15 +158,33 @@ tl::expected<BTCModule, std::string> IPCManagerCompiler::receiveBTCModule(const 
             // "Cat" depends on the "string" which is compiled as big-hu "stl", then build-system will send all the
             // composing include-names like "vector" etc. So if we any of these is requested later, response cache will
             // have them mapped to the big-hu BMI "stl".
-            for (const std::string &s : logicalNames)
+            if (const auto &r = readSharedMemoryBMIFile(file); r)
             {
-                responses.emplace(s, Response(file, FileType::HEADER_UNIT, isSystem));
+                filePathProcessMapping.emplace(file.filePath, r.value());
+                for (std::string s : logicalNames)
+                {
+                    responses.emplace(std::move(s),
+                                      Response(file.filePath, r.value(), FileType::HEADER_UNIT, isSystem2));
+                }
+            }
+            else
+            {
+                return tl::unexpected(r.error());
             }
         }
         else
         {
-            // logicalNames[0] is the module logicalName of the dependency module.
-            responses.emplace(logicalNames[0], Response(std::move(file), FileType::MODULE, isSystem));
+            if (const auto &r = readSharedMemoryBMIFile(file); r)
+            {
+                filePathProcessMapping.emplace(file.filePath, r.value());
+                // logicalNames[0] is the module logicalName of the dependency module.
+                responses.emplace(logicalNames[0],
+                                  Response(std::move(file.filePath), r.value(), FileType::MODULE, isSystem2));
+            }
+            else
+            {
+                return tl::unexpected(r.error());
+            }
         }
     }
     return received;
@@ -187,21 +215,41 @@ tl::expected<BTCNonModule, std::string> IPCManagerCompiler::receiveBTCNonModule(
     f.filePath = std::move(filePath);
     f.fileSize = fileSize;
 
-    for (std::string &h : logicalNames)
+    if (isHeaderUnit)
     {
-        // if our request was compiled as big-hu, then the logicalNames include all the composing include-names of the
-        // big-hu. e.g. if we requested "string" which was compiled as big-hu "stl", this array will include "vector",
-        // "algorithm" etc. These will be mapped to the same BMIFile. This reduces no. of messages.
-        responses.emplace(std::move(h), Response(f, FileType::HEADER_UNIT, isSystem));
+        if (const auto &r = readSharedMemoryBMIFile(f); r)
+        {
+            filePathProcessMapping.emplace(f.filePath, r.value());
+            for (std::string &h : logicalNames)
+            {
+                // if our request was compiled as big-hu, then the logicalNames include all the composing include-names
+                // of the big-hu. e.g. if we requested "string" which was compiled as big-hu "stl", this array will
+                // include "vector", "algorithm" etc. These will be mapped to the same BMIFile. This reduces no. of
+                // messages.
+                responses.emplace(std::move(h), Response(f.filePath, r.value(), FileType::HEADER_UNIT, isSystem));
+            }
+        }
+        else
+        {
+            return tl::unexpected(r.error());
+        }
     }
 
     // All the hu-deps of this header-unit.
     for (auto &[file, logicalHUDep, isSystem2] : huDeps)
     {
-        // All the composing include-names of the dependency if any. These will be mapped to the dependency big hu.
-        for (std::string &l : logicalHUDep)
+        if (const auto &r = readSharedMemoryBMIFile(file); r)
         {
-            responses.emplace(std::move(l), Response(file, FileType::HEADER_UNIT, isSystem2));
+            filePathProcessMapping.emplace(file.filePath, r.value());
+            // All the composing include-names of the dependency if any. These will be mapped to the dependency big hu.
+            for (std::string &l : logicalHUDep)
+            {
+                responses.emplace(std::move(l), Response(file.filePath, r.value(), FileType::HEADER_UNIT, isSystem2));
+            }
+        }
+        else
+        {
+            return tl::unexpected(r.error());
         }
     }
 
@@ -211,11 +259,13 @@ tl::expected<BTCNonModule, std::string> IPCManagerCompiler::receiveBTCNonModule(
     {
         BMIFile headerBMI;
         headerBMI.filePath = std::move(headerFilePath);
-        responses.emplace(std::move(logicalName), Response(std::move(headerBMI), FileType::HEADER_FILE, isSystem2));
+        responses.emplace(std::move(logicalName),
+                          Response(std::move(headerBMI.filePath), {}, FileType::HEADER_FILE, isSystem2));
     }
 
-    responses.emplace(nonModule.logicalName,
-                      Response(std::move(f), isHeaderUnit ? FileType::HEADER_UNIT : FileType::HEADER_FILE, isSystem));
+    responses.emplace(
+        nonModule.logicalName,
+        Response(std::move(f.filePath), {}, isHeaderUnit ? FileType::HEADER_UNIT : FileType::HEADER_FILE, isSystem));
 
     return received;
 }
@@ -303,15 +353,12 @@ tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const std
         CreateFileMappingA(hFile, nullptr, PAGE_READWRITE, fileSize.HighPart, fileSize.LowPart, filePath.c_str());
     if (!hMap)
     {
-        CloseHandle(hFile);
         return tl::unexpected(getErrorString());
     }
 
     void *pView = MapViewOfFile(hMap, FILE_MAP_WRITE, 0, 0, bmiFile.size());
     if (!pView)
     {
-        CloseHandle(hFile);
-        CloseHandle(hMap);
         return tl::unexpected(getErrorString());
     }
 
@@ -319,9 +366,6 @@ tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const std
 
     if (!FlushViewOfFile(pView, bmiFile.size()))
     {
-        UnmapViewOfFile(pView);
-        CloseHandle(hFile);
-        CloseHandle(hMap);
         return tl::unexpected(getErrorString());
     }
 
@@ -394,12 +438,21 @@ tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const std
 
 tl::expected<ProcessMappingOfBMIFile, std::string> IPCManagerCompiler::readSharedMemoryBMIFile(const BMIFile &file)
 {
+    return {};
     ProcessMappingOfBMIFile f{};
 #ifdef _WIN32
+    std::string str = file.filePath;
+    for (char &c : str)
+    {
+        if (c == '\\')
+        {
+            c = '/';
+        }
+    }
     // 1) Open the existing file‐mapping object (must have been created by another process)
-    const HANDLE mapping = OpenFileMappingA(FILE_MAP_READ,       // read‐only access
-                                            FALSE,               // do not inherit a handle
-                                            file.filePath.data() // name of mapping
+    const HANDLE mapping = OpenFileMappingA(FILE_MAP_READ, // read‐only access
+                                            FALSE,         // do not inherit a handle
+                                            str.c_str()    // name of mapping
     );
 
     if (mapping == nullptr)
@@ -417,7 +470,6 @@ tl::expected<ProcessMappingOfBMIFile, std::string> IPCManagerCompiler::readShare
 
     if (view == nullptr)
     {
-        CloseHandle(mapping);
         return tl::unexpected(getErrorString());
     }
 
