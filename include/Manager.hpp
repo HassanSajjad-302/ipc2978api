@@ -48,9 +48,6 @@ struct ProcessMappingOfBMIFile
 #ifdef _WIN32
     void *mapping;
     void *view;
-#else
-    void *mapping;
-    uint32_t mappingSize;
 #endif
 };
 

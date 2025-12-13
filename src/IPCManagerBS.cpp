@@ -350,16 +350,26 @@ tl::expected<ProcessMappingOfBMIFile, std::string> IPCManagerBS::createSharedMem
     {
         return tl::unexpected(getErrorString());
     }
-    sharedFile.mapping = mmap(nullptr, bmiFile.fileSize, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
+    if (bmiFile.fileSize == UINT32_MAX)
+    {
+        struct stat st;
+        if (fstat(fd, &st) == -1)
+        {
+            return tl::unexpected(getErrorString());
+        }
+
+        bmiFile.fileSize = st.st_size;
+    }
+    void *mapping = mmap(nullptr, bmiFile.fileSize, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
     if (close(fd) == -1)
     {
         return tl::unexpected(getErrorString());
     }
-    if (sharedFile.mapping == MAP_FAILED)
+    if (mapping == MAP_FAILED)
     {
         return tl::unexpected(getErrorString());
     }
-    sharedFile.mappingSize = bmiFile.fileSize;
+    sharedFile.file = std::string_view(static_cast<char *>(mapping), bmiFile.fileSize);
     return sharedFile;
 #endif
 }
@@ -370,7 +380,7 @@ tl::expected<void, std::string> IPCManagerBS::closeBMIFileMapping(
 #ifdef _WIN32
     CloseHandle(processMappingOfBMIFile.mapping);
 #else
-    if (munmap(processMappingOfBMIFile.mapping, processMappingOfBMIFile.mappingSize) == -1)
+    if (munmap((void *)processMappingOfBMIFile.file.data(), processMappingOfBMIFile.file.size()) == -1)
     {
         return tl::unexpected(getErrorString());
     }

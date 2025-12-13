@@ -417,7 +417,7 @@ tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const std
         return tl::unexpected(getErrorString());
     }
 
-    if (const auto &r = sendCTBLastMessage(lastMessage); !r)
+    if (const auto &r = sendCTBLastMessage(); !r)
     {
         return tl::unexpected(r.error());
     }
@@ -493,8 +493,6 @@ tl::expected<ProcessMappingOfBMIFile, std::string> IPCManagerCompiler::readShare
         return tl::unexpected(getErrorString());
     }
 
-    f.mapping = mapping;
-    f.mappingSize = file.fileSize;
     f.file = {static_cast<char *>(mapping), file.fileSize};
 #endif
     return f;
@@ -507,7 +505,7 @@ tl::expected<void, std::string> IPCManagerCompiler::closeBMIFileMapping(
     UnmapViewOfFile(processMappingOfBMIFile.view);
     CloseHandle(processMappingOfBMIFile.mapping);
 #else
-    if (munmap(processMappingOfBMIFile.mapping, processMappingOfBMIFile.mappingSize) == -1)
+    if (munmap((void *)processMappingOfBMIFile.file.data(), processMappingOfBMIFile.file.size()) == -1)
     {
         return tl::unexpected(getErrorString());
     }
