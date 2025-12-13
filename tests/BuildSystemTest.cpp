@@ -4,6 +4,7 @@
 #include "fmt/printf.h"
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <thread>
 
 #ifdef _WIN32
@@ -20,13 +21,6 @@ using fmt::print, std::string_view;
 
 bool first = true;
 std::thread *thr;
-
-void exitFailure(const string &str)
-{
-    print(stderr, "{}\n", str);
-    print("Test Failed\n");
-    exit(EXIT_FAILURE);
-}
 
 #ifdef _WIN32
 #define COMPILER_TEST ".\\CompilerTest.exe"
@@ -98,19 +92,13 @@ int runTest()
         switch (type)
         {
 
-        case CTB::MODULE: {
-            const auto &ctbModule = reinterpret_cast<CTBModule &>(buffer);
-            printMessage(ctbModule, false);
-            BTCModule b = getBTCModule();
-            if (const auto &r2 = manager.sendMessage(b); !r2)
-            {
-                exitFailure(r2.error());
-            }
-            printMessage(b, true);
-        }
-
-        break;
-
+            // Compiler will only send CTBNonModule. CTBModule is not tested as the build-system needs to create a
+            // shared memory-file using IPCManangerBS::createSharedMemoryBMIFile() mapping before sending a BMIFile.
+            // Similarly, IPCManagerCompiler on receiving a BMIFile will call
+            // IPCManagerCompiler::readSharedMemoryBMIFile and populate internal data structures. To accurately test, we
+            // will have to create lots of on-disk files. The following tests the setup and communication mechanism
+            // while the shared-memory file is tested separately. However, Message serializationa and deserialization is
+            // not fully tested.
         case CTB::NON_MODULE: {
             const auto &ctbNonModule = reinterpret_cast<CTBNonModule &>(buffer);
             printMessage(ctbNonModule, false);
@@ -153,29 +141,35 @@ int runTest()
     // close that mapping. And then create the client memory mapping, print out the file contents. And then close that
     // mapping. And then finally send the BTCLastMessage. This makes code coverage 100%.
 
-    BMIFile file;
-    file.filePath = (std::filesystem::current_path() / "bmi.txt").generic_string();
-    file.fileSize = lastMessage.fileSize;
-    if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(file); !r2)
+    BMIFile bmi;
+    bmi.filePath = (std::filesystem::current_path() / "bmi.txt").generic_string();
+    bmi.fileSize = lastMessage.fileSize;
+    // Creates server mapping to already created mapping
+    if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(bmi); !r2)
     {
         exitFailure(r2.error());
     }
     else
     {
+        // closes the server mapping
         if (const auto &r3 = IPCManagerBS::closeBMIFileMapping(r2.value()); !r3)
         {
             exitFailure(r3.error());
         }
     }
 
-    if (const auto &r2 = BuildSystemTest::readSharedMemoryBMIFile(file); !r2)
+    // creates compiler mapping to already created mapping and read contents.
+    if (const auto &r2 = BuildSystemTest::readSharedMemoryBMIFile(bmi); !r2)
     {
         exitFailure(r2.error());
     }
     else
     {
-        auto &processMappingOfBMIFile = r2.value();
-        print("File Content: {}\n\n", processMappingOfBMIFile.file.data());
+        if (const auto &processMappingOfBMIFile = r2.value();
+            fileToString(bmi.filePath) != processMappingOfBMIFile.file)
+        {
+            exitFailure(fmt::format("File Contents not similar for {}", bmi.filePath));
+        }
         if (const auto &r3 = IPCManagerCompiler::closeBMIFileMapping(r2.value()); !r3)
         {
             exitFailure(r3.error());
@@ -197,8 +191,38 @@ int runTest()
         manager = r2.value();
     }
 
-    if (lastMessage.errorOccurred == EXIT_SUCCESS)
+    ProcessMappingOfBMIFile bmi2Mapping;
     {
+        // We don't assign the file.fileSize this-time. This IPCManagerBS::createSharedMemoryBMIFile will return it as
+        // an out variable. This is used when build-system has to make a mapping for a file in rebuild as the compiler
+        // did not create any mapping. This case of opening mapping first time is little different from creating mapping
+        // when another process (the compiler) has already created one. Build-system preserves the out variable
+        // file.fileSize as it is passed to the later compilations to save them from one system call.
+
+        BMIFile bmi2;
+        bmi2.filePath = (std::filesystem::current_path() / "bmi2.txt").generic_string();
+        string bmi2Content = getRandomString();
+        std::ofstream(bmi2.filePath) << bmi2Content;
+
+        // creates server mapping to a new file.
+        if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(bmi2); !r2)
+        {
+            exitFailure(r2.error());
+        }
+        else
+        {
+            // This will be closed later-on after receiving the lastMessage. We need to close since the test is being
+            // repeated.
+            bmi2Mapping = r2.value();
+        }
+
+        if (bmi2.fileSize != bmi2Content.size())
+        {
+            exitFailure(fmt::format("file.fileSize is different from fileContent.size\n"));
+        }
+
+        // After receiving the next message, CompilerTest will check that bmi2.txt is same as the received mapping.
+
         constexpr BTCLastMessage btcLastMessage;
 
         if (const auto &r2 = oldManager.sendMessage(btcLastMessage); !r2)
@@ -210,10 +234,16 @@ int runTest()
     }
     oldManager.closeConnection();
 
+    // we delay the receiveMessage. Compiler in this duration has exited with error after connecting.
     std::this_thread::sleep_for(std::chrono::seconds(3));
 
     // CompilerTest would have exited by now
     if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+    {
+        exitFailure(r2.error());
+    }
+
+    if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(bmi2Mapping); !r2)
     {
         exitFailure(r2.error());
     }

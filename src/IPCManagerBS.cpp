@@ -290,9 +290,17 @@ tl::expected<void, std::string> IPCManagerBS::sendMessage(const BTCLastMessage &
 
 tl::expected<ProcessMappingOfBMIFile, std::string> IPCManagerBS::createSharedMemoryBMIFile(BMIFile &bmiFile)
 {
-    return {};
     ProcessMappingOfBMIFile sharedFile{};
 #ifdef _WIN32
+
+    std::string mappingName = bmiFile.filePath;
+    for (char &c : mappingName)
+    {
+        if (c == '\\')
+        {
+            c = '/';
+        }
+    }
 
     if (bmiFile.fileSize == UINT32_MAX)
     {
@@ -309,35 +317,25 @@ tl::expected<ProcessMappingOfBMIFile, std::string> IPCManagerBS::createSharedMem
         {
             return tl::unexpected(getErrorString());
         }
-        CloseHandle(hFile);
 
-        std::string str = bmiFile.filePath;
-        for (char &c : str)
-        {
-            if (c == '\\')
-            {
-                c = '/';
-            }
-        }
         sharedFile.mapping =
-            CreateFileMappingA(hFile, nullptr, PAGE_READONLY, fileSize.HighPart, fileSize.LowPart, str.c_str());
-        // Safe to close immediately
+            CreateFileMappingA(hFile, nullptr, PAGE_READONLY, fileSize.HighPart, fileSize.LowPart, mappingName.c_str());
+
         CloseHandle(hFile);
 
         if (!sharedFile.mapping)
         {
             return tl::unexpected(getErrorString());
         }
-        CloseHandle(sharedFile.mapping);
 
         bmiFile.fileSize = fileSize.QuadPart;
         return sharedFile;
     }
 
     // 1) Open the existing file‐mapping object (must have been created by another process)
-    sharedFile.mapping = OpenFileMappingA(FILE_MAP_READ,           // read‐only access
-                                          FALSE,                   // do not inherit handle
-                                          bmiFile.filePath.c_str() // name of mapping
+    sharedFile.mapping = OpenFileMappingA(FILE_MAP_READ,      // read‐only access
+                                          FALSE,              // do not inherit handle
+                                          mappingName.c_str() // name of mapping
     );
 
     if (sharedFile.mapping == nullptr)
@@ -369,7 +367,6 @@ tl::expected<ProcessMappingOfBMIFile, std::string> IPCManagerBS::createSharedMem
 tl::expected<void, std::string> IPCManagerBS::closeBMIFileMapping(
     const ProcessMappingOfBMIFile &processMappingOfBMIFile)
 {
-    return {};
 #ifdef _WIN32
     CloseHandle(processMappingOfBMIFile.mapping);
 #else

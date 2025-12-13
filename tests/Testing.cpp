@@ -1,16 +1,49 @@
 
 #include "Testing.hpp"
+#include <fstream>
+#include <sstream>
+
 #include "fmt/printf.h"
 
 using fmt::print;
-string getRandomString()
+
+void exitFailure(const string &str)
+{
+    print(stderr, "{}\n", str);
+    print("Test Failed\n");
+    exit(EXIT_FAILURE);
+}
+
+string fileToString(const string &file_name)
+{
+    std::ifstream file_stream{file_name};
+
+    if (file_stream.fail())
+    {
+        // Error opening file.
+        exitFailure(fmt::format("Error opening file {}\n", file_name));
+    }
+
+    const std::ostringstream str_stream;
+    file_stream >> str_stream.rdbuf(); // NOT str_stream << file_stream.rdbuf()
+
+    if (file_stream.fail() && !file_stream.eof())
+    {
+        // Error reading file.
+        exitFailure(fmt::format("Error reading file {}\n", file_name));
+    }
+
+    return str_stream.str();
+}
+
+string getRandomString(uint32_t length)
 {
     const string characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     std::uniform_int_distribution<> distribution(0, characters.size() - 1);
     std::uniform_int_distribution distribution2(0, 10000);
-    const uint64_t length = distribution2(generator);
-    string random_string(length, '\0');
-    for (int i = 0; i < length; ++i)
+    const uint64_t length2 = length ? length : distribution2(generator);
+    string random_string(length2, '\0');
+    for (int i = 0; i < length2; ++i)
     {
         random_string[i] = characters[distribution(generator)];
     }
@@ -63,16 +96,10 @@ BTCModule getBTCModule()
 BTCNonModule getBTCNonModule()
 {
     BTCNonModule nonModule;
-    nonModule.isHeaderUnit = getRandomBool();
+    nonModule.isHeaderUnit = false;
     nonModule.isSystem = getRandomBool();
     nonModule.filePath = getRandomString();
     nonModule.fileSize = 0;
-
-    uint32_t logicalNameSize = getRandomNumber(10);
-    for (uint32_t i = 0; i < logicalNameSize; ++i)
-    {
-        nonModule.logicalNames.emplace_back(getRandomString());
-    }
 
     const uint32_t headerFilesSize = getRandomNumber(10);
     for (uint32_t i = 0; i < headerFilesSize; ++i)
@@ -82,23 +109,6 @@ BTCNonModule getBTCNonModule()
         h.isSystem = getRandomBool();
         h.filePath = getRandomString();
         nonModule.headerFiles.emplace_back(std::move(h));
-    }
-
-    const uint32_t huDepSize = getRandomNumber(10);
-    for (uint32_t i = 0; i < huDepSize; ++i)
-    {
-        HuDep huDep;
-        huDep.file.filePath = getRandomString();
-        huDep.file.fileSize = 0;
-
-        logicalNameSize = getRandomNumber(10);
-        huDep.logicalNames.emplace_back(getRandomString());
-        for (uint32_t j = 0; j < logicalNameSize; ++j)
-        {
-            huDep.logicalNames.emplace_back(getRandomString());
-        }
-        huDep.isSystem = getRandomBool();
-        nonModule.huDeps.emplace_back(std::move(huDep));
     }
 
     return nonModule;

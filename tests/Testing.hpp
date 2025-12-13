@@ -12,7 +12,9 @@ using namespace N2978;
 inline std::random_device rd;
 inline std::mt19937 generator(rd());
 
-string getRandomString();
+void exitFailure(const string &str);
+string fileToString(const string &file_name);
+string getRandomString(uint32_t length = 0);
 bool getRandomBool();
 uint32_t getRandomNumber(uint32_t max);
 BTCModule getBTCModule();

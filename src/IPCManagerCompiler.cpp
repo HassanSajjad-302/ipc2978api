@@ -438,11 +438,10 @@ tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const std
 
 tl::expected<ProcessMappingOfBMIFile, std::string> IPCManagerCompiler::readSharedMemoryBMIFile(const BMIFile &file)
 {
-    return {};
     ProcessMappingOfBMIFile f{};
 #ifdef _WIN32
-    std::string str = file.filePath;
-    for (char &c : str)
+    std::string mappingName = file.filePath;
+    for (char &c : mappingName)
     {
         if (c == '\\')
         {
@@ -450,9 +449,9 @@ tl::expected<ProcessMappingOfBMIFile, std::string> IPCManagerCompiler::readShare
         }
     }
     // 1) Open the existing file‐mapping object (must have been created by another process)
-    const HANDLE mapping = OpenFileMappingA(FILE_MAP_READ, // read‐only access
-                                            FALSE,         // do not inherit a handle
-                                            str.c_str()    // name of mapping
+    const HANDLE mapping = OpenFileMappingA(FILE_MAP_READ,      // read‐only access
+                                            FALSE,              // do not inherit a handle
+                                            mappingName.c_str() // name of mapping
     );
 
     if (mapping == nullptr)
