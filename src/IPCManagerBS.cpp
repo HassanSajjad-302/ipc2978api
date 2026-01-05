@@ -249,9 +249,9 @@ tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[3
 
 tl::expected<void, std::string> IPCManagerBS::sendMessage(const BTCModule &moduleFile) const
 {
-    std::vector<char> buffer;
+    std::string buffer;
     writeProcessMappingOfBMIFile(buffer, moduleFile.requested);
-    buffer.emplace_back(moduleFile.isSystem);
+    buffer.push_back(moduleFile.isSystem);
     writeVectorOfModuleDep(buffer, moduleFile.modDeps);
     if (const auto &r = writeInternal(buffer); !r)
     {
@@ -262,9 +262,9 @@ tl::expected<void, std::string> IPCManagerBS::sendMessage(const BTCModule &modul
 
 tl::expected<void, std::string> IPCManagerBS::sendMessage(const BTCNonModule &nonModule) const
 {
-    std::vector<char> buffer;
-    buffer.emplace_back(nonModule.isHeaderUnit);
-    buffer.emplace_back(nonModule.isSystem);
+    std::string buffer;
+    buffer.push_back(nonModule.isHeaderUnit);
+    buffer.push_back(nonModule.isSystem);
     writeString(buffer, nonModule.filePath);
     writeUInt32(buffer, nonModule.fileSize);
     writeVectorOfStrings(buffer, nonModule.logicalNames);
@@ -279,8 +279,8 @@ tl::expected<void, std::string> IPCManagerBS::sendMessage(const BTCNonModule &no
 
 tl::expected<void, std::string> IPCManagerBS::sendMessage(const BTCLastMessage &) const
 {
-    std::vector<char> buffer;
-    buffer.emplace_back(true);
+    std::string buffer;
+    buffer.push_back(true);
     if (const auto &r = writeInternal(buffer); !r)
     {
         return tl::unexpected(r.error());

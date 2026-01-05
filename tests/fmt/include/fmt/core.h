@@ -2852,7 +2852,7 @@ auto vformat_to(OutputIt out, string_view fmt, format_args args) -> OutputIt {
 
  **Example**::
 
-   auto out = std::vector<char>();
+   auto out = std::string();
    fmt::format_to(std::back_inserter(out), "{}", 42);
  \endrst
  */

@@ -567,7 +567,7 @@ auto vformat_to(OutputIt out, const text_style& ts,
 
   **Example**::
 
-    std::vector<char> out;
+    std::string out;
     fmt::format_to(std::back_inserter(out),
                    fmt::emphasis::bold | fg(fmt::color::red), "{}", 42);
   \endrst

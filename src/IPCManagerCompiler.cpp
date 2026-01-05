@@ -121,7 +121,7 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCLastMessage() cons
 
 tl::expected<BTCModule, std::string> IPCManagerCompiler::receiveBTCModule(const CTBModule &moduleName)
 {
-    std::vector<char> buffer = getBufferWithType(CTB::MODULE);
+    std::string buffer = getBufferWithType(CTB::MODULE);
     writeString(buffer, moduleName.moduleName);
     // This call sends the CTBModule to the build-system.
     if (const auto &r = writeInternal(buffer); !r)
@@ -192,8 +192,8 @@ tl::expected<BTCModule, std::string> IPCManagerCompiler::receiveBTCModule(const 
 
 tl::expected<BTCNonModule, std::string> IPCManagerCompiler::receiveBTCNonModule(const CTBNonModule &nonModule)
 {
-    std::vector<char> buffer = getBufferWithType(CTB::NON_MODULE);
-    buffer.emplace_back(nonModule.isHeaderUnit);
+    std::string buffer = getBufferWithType(CTB::NON_MODULE);
+    buffer.push_back(nonModule.isHeaderUnit);
     writeString(buffer, nonModule.logicalName);
     // This call sends the CTBNonModule to the build-system.
     if (const auto &r = writeInternal(buffer); !r)
@@ -321,8 +321,8 @@ tl::expected<Response, std::string> IPCManagerCompiler::findResponse(std::string
 
 tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage() const
 {
-    std::vector<char> buffer = getBufferWithType(CTB::LAST_MESSAGE);
-    buffer.emplace_back(lastMessage.errorOccurred);
+    std::string buffer = getBufferWithType(CTB::LAST_MESSAGE);
+    buffer.push_back(lastMessage.errorOccurred);
     writeString(buffer, lastMessage.output);
     writeString(buffer, lastMessage.errorOutput);
     writeString(buffer, lastMessage.logicalName);

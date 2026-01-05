@@ -131,7 +131,7 @@ tl::expected<void, std::string> writeAll(const int fd, const char *buffer, const
 }
 #endif
 
-tl::expected<void, std::string> Manager::writeInternal(const std::vector<char> &buffer) const
+tl::expected<void, std::string> Manager::writeInternal(const std::string &buffer) const
 {
 #ifdef _WIN32
     const bool success = WriteFile(hPipe,         // pipe handle
@@ -152,54 +152,54 @@ tl::expected<void, std::string> Manager::writeInternal(const std::vector<char> &
     return {};
 }
 
-std::vector<char> Manager::getBufferWithType(CTB type)
+std::string Manager::getBufferWithType(CTB type)
 {
-    std::vector<char> buffer;
-    buffer.emplace_back(static_cast<uint8_t>(type));
+    std::string buffer;
+    buffer.push_back(static_cast<uint8_t>(type));
     return buffer;
 }
 
-void Manager::writeUInt32(std::vector<char> &buffer, const uint32_t value)
+void Manager::writeUInt32(std::string &buffer, const uint32_t value)
 {
     const auto ptr = reinterpret_cast<const char *>(&value);
-    buffer.insert(buffer.end(), ptr, ptr + 4);
+    buffer.append(ptr, ptr + 4);
 }
 
-void Manager::writeString(std::vector<char> &buffer, const std::string &str)
+void Manager::writeString(std::string &buffer, const std::string &str)
 {
     writeUInt32(buffer, str.size());
-    buffer.insert(buffer.end(), str.begin(), str.end()); // Insert all characters
+    buffer.append(str.begin(), str.end()); // Insert all characters
 }
 
-void Manager::writeProcessMappingOfBMIFile(std::vector<char> &buffer, const BMIFile &file)
+void Manager::writeProcessMappingOfBMIFile(std::string &buffer, const BMIFile &file)
 {
     writeString(buffer, file.filePath);
     writeUInt32(buffer, file.fileSize);
 }
 
-void Manager::writeModuleDep(std::vector<char> &buffer, const ModuleDep &dep)
+void Manager::writeModuleDep(std::string &buffer, const ModuleDep &dep)
 {
-    buffer.emplace_back(dep.isHeaderUnit);
+    buffer.push_back(dep.isHeaderUnit);
     writeProcessMappingOfBMIFile(buffer, dep.file);
     writeVectorOfStrings(buffer, dep.logicalNames);
-    buffer.emplace_back(dep.isSystem);
+    buffer.push_back(dep.isSystem);
 }
 
-void Manager::writeHuDep(std::vector<char> &buffer, const HuDep &dep)
+void Manager::writeHuDep(std::string &buffer, const HuDep &dep)
 {
     writeProcessMappingOfBMIFile(buffer, dep.file);
     writeVectorOfStrings(buffer, dep.logicalNames);
-    buffer.emplace_back(dep.isSystem);
+    buffer.push_back(dep.isSystem);
 }
 
-void Manager::writeHeaderFile(std::vector<char> &buffer, const HeaderFile &dep)
+void Manager::writeHeaderFile(std::string &buffer, const HeaderFile &dep)
 {
     writeString(buffer, dep.logicalName);
     writeString(buffer, dep.filePath);
-    buffer.emplace_back(dep.isSystem);
+    buffer.push_back(dep.isSystem);
 }
 
-void Manager::writeVectorOfStrings(std::vector<char> &buffer, const std::vector<std::string> &strs)
+void Manager::writeVectorOfStrings(std::string &buffer, const std::vector<std::string> &strs)
 {
     writeUInt32(buffer, strs.size());
     for (const std::string &str : strs)
@@ -208,7 +208,7 @@ void Manager::writeVectorOfStrings(std::vector<char> &buffer, const std::vector<
     }
 }
 
-void Manager::writeVectorOfProcessMappingOfBMIFiles(std::vector<char> &buffer, const std::vector<BMIFile> &files)
+void Manager::writeVectorOfProcessMappingOfBMIFiles(std::string &buffer, const std::vector<BMIFile> &files)
 {
     writeUInt32(buffer, files.size());
     for (const BMIFile &file : files)
@@ -217,7 +217,7 @@ void Manager::writeVectorOfProcessMappingOfBMIFiles(std::vector<char> &buffer, c
     }
 }
 
-void Manager::writeVectorOfModuleDep(std::vector<char> &buffer, const std::vector<ModuleDep> &deps)
+void Manager::writeVectorOfModuleDep(std::string &buffer, const std::vector<ModuleDep> &deps)
 {
     writeUInt32(buffer, deps.size());
     for (const ModuleDep &dep : deps)
@@ -226,7 +226,7 @@ void Manager::writeVectorOfModuleDep(std::vector<char> &buffer, const std::vecto
     }
 }
 
-void Manager::writeVectorOfHuDeps(std::vector<char> &buffer, const std::vector<HuDep> &deps)
+void Manager::writeVectorOfHuDeps(std::string &buffer, const std::vector<HuDep> &deps)
 {
     writeUInt32(buffer, deps.size());
     for (const HuDep &dep : deps)
@@ -235,7 +235,7 @@ void Manager::writeVectorOfHuDeps(std::vector<char> &buffer, const std::vector<H
     }
 }
 
-void Manager::writeVectorOfHeaderFiles(std::vector<char> &buffer, const std::vector<HeaderFile> &headerFiles)
+void Manager::writeVectorOfHeaderFiles(std::string &buffer, const std::vector<HeaderFile> &headerFiles)
 {
     writeUInt32(buffer, headerFiles.size());
     for (const HeaderFile &headerFile : headerFiles)
