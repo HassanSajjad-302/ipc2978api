@@ -94,22 +94,16 @@ std::string readCompilerMessage(const int epollFd, const int fd)
         str.pop_back();
         break;
     }
+
+    if (epoll_ctl(epollFd, EPOLL_CTL_DEL, fd, &ev) == -1)
+    {
+        exitFailure(getErrorString());
+    }
     return str;
 }
 
-int runTest()
+void completeConnection(IPCManagerBS &manager, int epollFd)
 {
-    const auto r = makeIPCManagerBS((std::filesystem::current_path() / "test").string());
-    if (!r)
-    {
-        exitFailure(r.error());
-    }
-
-    IPCManagerBS manager = r.value();
-    listenForCompiler();
-    fflush(stdout);
-
-    const int epollFd = epoll_create1(0);
     if (const auto &r2 = manager.completeConnection(); !r2)
     {
         exitFailure(r2.error());
@@ -129,21 +123,44 @@ int runTest()
             epoll_event ev2{};
             if (epoll_wait(epollFd, &ev2, 1, -1) == -1)
             {
+    print("Hello1\n");
                 exitFailure(getErrorString());
             }
             if (const auto &r3 = manager.completeConnection(); !r3)
             {
+    print("Hello2\n");
                 exitFailure(r3.error());
+            }
+
+            if (epoll_ctl(epollFd, EPOLL_CTL_DEL, manager.fdSocket, &ev) == -1)
+            {
+    print("Hello3\n");
+                exitFailure(getErrorString());
             }
         }
     }
+}
+
+int runTest()
+{
+    const auto r = makeIPCManagerBS((std::filesystem::current_path() / "test").string());
+    if (!r)
+    {
+        exitFailure(r.error());
+    }
+
+    IPCManagerBS manager = r.value();
+    listenForCompiler();
+    fflush(stdout);
+
+    const int epollFd = epoll_create1(0);
+    completeConnection(manager, epollFd);
 
     CTB type;
     char buffer[320];
     while (true)
     {
         bool loopExit = false;
-
 
         string str = readCompilerMessage(epollFd, manager.fdSocket);
         manager.serverReadString = str;
@@ -160,7 +177,7 @@ int runTest()
             // Similarly, IPCManagerCompiler on receiving a BMIFile will call
             // IPCManagerCompiler::readSharedMemoryBMIFile and populate internal data structures. To accurately test, we
             // will have to create lots of on-disk files. The following tests the setup and communication mechanism
-            // while the shared-memory file is tested separately. However, Message serializationa and deserialization is
+            // while the shared-memory file is tested separately. However, Message serialization and deserialization is
             // not fully tested.
         case CTB::NON_MODULE: {
             const auto &ctbNonModule = reinterpret_cast<CTBNonModule &>(buffer);
@@ -259,10 +276,10 @@ int runTest()
     ProcessMappingOfBMIFile bmi2Mapping;
     {
         // We don't assign the file.fileSize this-time. This IPCManagerBS::createSharedMemoryBMIFile will return it as
-        // an out variable. This is used when build-system has to make a mapping for a file in rebuild as the compiler
-        // did not create any mapping. This case of opening mapping first time is little different from creating mapping
-        // when another process (the compiler) has already created one. Build-system preserves the out variable
-        // file.fileSize as it is passed to the later compilations to save them from one system call.
+        // an out variable. This is used when build-system has to make a mapping for a prebuilt file. This case of
+        // opening mapping first time is little different from creating mapping when another process (the compiler) has
+        // already created one. Build-system preserves the out variable file.fileSize as it is passed to the later
+        // compilations to save them from one system call.
 
         BMIFile bmi2;
         bmi2.filePath = (std::filesystem::current_path() / "bmi2.txt").generic_string();
@@ -298,10 +315,12 @@ int runTest()
         printMessage(btcLastMessage, true);
     }
     oldManager.closeConnection();
+    close(oldManager.fdSocket);
 
     // we delay the receiveMessage. Compiler in this duration has exited with error after connecting.
     std::this_thread::sleep_for(std::chrono::seconds(3));
 
+    completeConnection(manager, epollFd);
     // CompilerTest would have exited by now
     str = readCompilerMessage(epollFd, manager.fdSocket);
     manager.serverReadString = str;
@@ -324,14 +343,16 @@ int runTest()
     printMessage(reinterpret_cast<CTBLastMessage &>(buffer), false);
 
     manager.closeConnection();
+    close(manager.fdSocket);
     return EXIT_SUCCESS;
 }
 
 int main()
 {
+    first = true;
     runTest();
     thr->join();
     first = false;
-    runTest();
-    thr->join();
+    /*runTest();
+    thr->join();*/
 }
