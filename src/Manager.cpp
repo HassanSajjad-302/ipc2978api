@@ -72,6 +72,17 @@ std::string getErrorString(const ErrorCategory errorCategory_)
 
 tl::expected<uint32_t, std::string> Manager::readInternal(char (&buffer)[BUFFERSIZE]) const
 {
+    if (isServer)
+    {
+        const uint32_t bytesRead = std::min(serverReadString.size(), static_cast<uint64_t>(BUFFERSIZE));
+        for (uint32_t i = 0; i < bytesRead; ++i)
+        {
+            buffer[i] = serverReadString[i];
+        }
+        const_cast<std::string_view &>(serverReadString) =
+            std::string_view{serverReadString.data() + bytesRead, serverReadString.size() - bytesRead};
+        return bytesRead;
+    }
     int32_t bytesRead;
 
 #ifdef _WIN32

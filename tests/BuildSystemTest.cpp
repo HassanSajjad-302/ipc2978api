@@ -10,10 +10,8 @@
 #ifdef _WIN32
 #include <Windows.h>
 #else
-#include <cstring>
+#include "sys/epoll.h"
 #include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
 #include <unistd.h>
 #endif
 
@@ -66,6 +64,39 @@ void listenForCompiler()
     }
 }
 
+std::string readCompilerMessage(const int epollFd, const int fd)
+{
+    epoll_event ev{};
+    ev.events = EPOLLIN;
+    if (epoll_ctl(epollFd, EPOLL_CTL_ADD, fd, &ev) == -1)
+    {
+        exitFailure(getErrorString());
+    }
+
+    epoll_wait(epollFd, &ev, 1, -1);
+    string str;
+    while (true)
+    {
+        char buffer[4096];
+        const int readCount = read(fd, buffer, 4096);
+        if (readCount == 0 || readCount == -1)
+        {
+            exitFailure(getErrorString());
+        }
+        for (uint32_t i = 0; i < readCount; ++i)
+        {
+            str.push_back(buffer[i]);
+        }
+        if (str[str.size() - 1] != ';')
+        {
+            continue;
+        }
+        str.pop_back();
+        break;
+    }
+    return str;
+}
+
 int runTest()
 {
     const auto r = makeIPCManagerBS((std::filesystem::current_path() / "test").string());
@@ -77,13 +108,45 @@ int runTest()
     IPCManagerBS manager = r.value();
     listenForCompiler();
     fflush(stdout);
-    char buffer[320];
+
+    const int epollFd = epoll_create1(0);
+    if (const auto &r2 = manager.completeConnection(); !r2)
+    {
+        exitFailure(r2.error());
+    }
+    else
+    {
+        if (!*r2)
+        {
+            epoll_event ev{};
+            // Add stdout to epoll
+            ev.events = EPOLLIN;
+            if (epoll_ctl(epollFd, EPOLL_CTL_ADD, manager.fdSocket, &ev) == -1)
+            {
+                exitFailure(getErrorString());
+            }
+
+            epoll_event ev2{};
+            if (epoll_wait(epollFd, &ev2, 1, -1) == -1)
+            {
+                exitFailure(getErrorString());
+            }
+            if (const auto &r3 = manager.completeConnection(); !r3)
+            {
+                exitFailure(r3.error());
+            }
+        }
+    }
 
     CTB type;
+    char buffer[320];
     while (true)
     {
         bool loopExit = false;
 
+
+        string str = readCompilerMessage(epollFd, manager.fdSocket);
+        manager.serverReadString = str;
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             exitFailure(r2.error());
@@ -128,6 +191,8 @@ int runTest()
         }
     }
 
+    string str = readCompilerMessage(epollFd, manager.fdSocket);
+    manager.serverReadString = str;
     if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
     {
         exitFailure(r2.error());
@@ -238,6 +303,8 @@ int runTest()
     std::this_thread::sleep_for(std::chrono::seconds(3));
 
     // CompilerTest would have exited by now
+    str = readCompilerMessage(epollFd, manager.fdSocket);
+    manager.serverReadString = str;
     if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
     {
         exitFailure(r2.error());

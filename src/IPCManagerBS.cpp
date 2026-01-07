@@ -46,7 +46,7 @@ tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeader
     // and there needs to be bind, listen, accept calls which means that an extra fd is created is temporarily on the
     // server side. it can be closed immediately after.
 
-    const int fdSocket = socket(AF_UNIX, SOCK_STREAM, 0);
+    const int fdSocket = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
 
     // Create server socket
     if (fdSocket == -1)
@@ -93,50 +93,58 @@ tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeader
 IPCManagerBS::IPCManagerBS(void *hPipe_)
 {
     hPipe = hPipe_;
+    isServer = true;
 }
 #else
 IPCManagerBS::IPCManagerBS(const int fdSocket_)
 {
     fdSocket = fdSocket_;
+    isServer = true;
 }
 #endif
 
-tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType) const
+tl::expected<bool, std::string> IPCManagerBS::completeConnection() const
 {
-    if (!connectedToCompiler)
-    {
 #ifdef _WIN32
-        if (!ConnectNamedPipe(hPipe, nullptr))
+    if (!ConnectNamedPipe(hPipe, nullptr))
+    {
+        // Is the client already connected?
+        if (GetLastError() != ERROR_PIPE_CONNECTED)
         {
-            // Is the client already connected?
-            if (GetLastError() != ERROR_PIPE_CONNECTED)
+
+            DWORD bytesAvail = 0;
+            DWORD bytesLeftThisMessage = 0;
+
+            // PeekNamedPipe returns FALSE if pipe is disconnected
+            if (PeekNamedPipe(hPipe, nullptr, 0, nullptr, &bytesAvail, &bytesLeftThisMessage))
             {
-
-                DWORD bytesAvail = 0;
-                DWORD bytesLeftThisMessage = 0;
-
-                // PeekNamedPipe returns FALSE if pipe is disconnected
-                if (PeekNamedPipe(hPipe, nullptr, 0, nullptr, &bytesAvail, &bytesLeftThisMessage))
-                {
-                    // compiler process ended and has left a message for us.
-                }
-                else
-                {
-                    return tl::unexpected(getErrorString());
-                }
+                // compiler process ended and has left a message for us.
+            }
+            else
+            {
+                return tl::unexpected(getErrorString());
             }
         }
-#else
-        const int fd = accept(fdSocket, nullptr, nullptr);
-        close(fdSocket);
-        if (fd == -1)
-        {
-            return tl::unexpected(getErrorString());
-        }
-        const_cast<int &>(fdSocket) = fd;
-#endif
-        const_cast<bool &>(connectedToCompiler) = true;
     }
+#else
+    const int fd = accept4(fdSocket, nullptr, nullptr, O_NONBLOCK);
+    if (fd == -1)
+    {
+        if (errno == EAGAIN)
+        {
+            return false;
+        }
+        return tl::unexpected(getErrorString());
+    }
+    close(fdSocket);
+    const_cast<int &>(fdSocket) = fd;
+    return true;
+
+#endif
+}
+
+tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType) const
+{
     //    raise(SIGTRAP); // At the location of the BP.
 
     // Read from the pipe.

@@ -60,6 +60,9 @@ class Manager
     int fdSocket = 0;
 #endif
 
+    bool isServer = false;
+    std::string_view serverReadString;
+
     tl::expected<uint32_t, std::string> readInternal(char (&buffer)[BUFFERSIZE]) const;
     tl::expected<void, std::string> writeInternal(const std::string &buffer) const;
 

@@ -9,10 +9,9 @@ namespace N2978
 {
 
 // IPC Manager BuildSystem
-class IPCManagerBS : Manager
+class IPCManagerBS : public Manager
 {
     friend tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath);
-    bool connectedToCompiler = false;
 
 #ifdef _WIN32
     explicit IPCManagerBS(void *hPipe_);
@@ -25,6 +24,7 @@ class IPCManagerBS : Manager
     IPCManagerBS &operator=(const IPCManagerBS &) = default;
     IPCManagerBS(IPCManagerBS &&) = default;
     IPCManagerBS &operator=(IPCManagerBS &&) = default;
+    tl::expected<bool, std::string> completeConnection() const;
     tl::expected<void, std::string> receiveMessage(char (&ctbBuffer)[320], CTB &messageType) const;
     [[nodiscard]] tl::expected<void, std::string> sendMessage(const BTCModule &moduleFile) const;
     [[nodiscard]] tl::expected<void, std::string> sendMessage(const BTCNonModule &nonModule) const;
