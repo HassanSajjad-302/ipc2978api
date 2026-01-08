@@ -28,6 +28,7 @@ template <typename T> void printMessage(const T &, bool)
 #ifdef _WIN32
 #include <Windows.h>
 #else
+#include <sys/epoll.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #endif
@@ -44,6 +45,81 @@ using namespace std;
 
 namespace
 {
+
+std::string readCompilerMessage(const int epollFd, const IPCManagerBS &manager)
+{
+    epoll_event ev{};
+    ev.events = EPOLLIN;
+    if (epoll_ctl(epollFd, EPOLL_CTL_ADD, manager.fdSocket, &ev) == -1)
+    {
+        exitFailure(getErrorString());
+    }
+
+    epoll_wait(epollFd, &ev, 1, -1);
+    string str;
+    while (true)
+    {
+        char buffer[4096];
+        const int readCount = read(manager.fdSocket, buffer, 4096);
+        if (readCount == 0 || readCount == -1)
+        {
+            exitFailure(getErrorString());
+        }
+        for (uint32_t i = 0; i < readCount; ++i)
+        {
+            str.push_back(buffer[i]);
+        }
+        if (str[str.size() - 1] != ';')
+        {
+            continue;
+        }
+        str.pop_back();
+        break;
+    }
+
+    if (epoll_ctl(epollFd, EPOLL_CTL_DEL, manager.fdSocket, &ev) == -1)
+    {
+        exitFailure(getErrorString());
+    }
+    const_cast<string_view &>(manager.serverReadString) = *new string(str);
+    return str;
+}
+
+void completeConnection(const IPCManagerBS &manager, int epollFd)
+{
+    if (const auto &r2 = manager.completeConnection(); !r2)
+    {
+        exitFailure(r2.error());
+    }
+    else
+    {
+        if (!*r2)
+        {
+            epoll_event ev{};
+            // Add stdout to epoll
+            ev.events = EPOLLIN;
+            if (epoll_ctl(epollFd, EPOLL_CTL_ADD, manager.fdSocket, &ev) == -1)
+            {
+                exitFailure(getErrorString());
+            }
+
+            epoll_event ev2{};
+            if (epoll_wait(epollFd, &ev2, 1, -1) == -1)
+            {
+                exitFailure(getErrorString());
+            }
+            if (epoll_ctl(epollFd, EPOLL_CTL_DEL, manager.fdSocket, &ev) == -1)
+            {
+                exitFailure(getErrorString());
+            }
+            if (const auto &r3 = manager.completeConnection(); !r3)
+            {
+                exitFailure(r3.error());
+            }
+        }
+    }
+}
+
 #ifdef _WIN32
 PROCESS_INFORMATION pi;
 tl::expected<void, string> Run(const string &command)
@@ -331,8 +407,12 @@ tl::expected<int, string> runTest()
             return tl::unexpected(r2.error());
         }
 
+        const int epollFd = epoll_create1(0);
+        completeConnection(manager, epollFd);
+
         CTB type;
         char buffer[320];
+        readCompilerMessage(epollFd, manager);
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -352,6 +432,7 @@ tl::expected<int, string> runTest()
         }
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
+        close(epollFd);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -375,8 +456,12 @@ tl::expected<int, string> runTest()
             return tl::unexpected(r2.error());
         }
 
+        const int epollFd = epoll_create1(0);
+        completeConnection(manager, epollFd);
+
         CTB type;
         char buffer[320];
+        readCompilerMessage(epollFd, manager);
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -396,6 +481,7 @@ tl::expected<int, string> runTest()
         }
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
+        close(epollFd);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -419,8 +505,12 @@ tl::expected<int, string> runTest()
             return tl::unexpected(r2.error());
         }
 
+        const int epollFd = epoll_create1(0);
+        completeConnection(manager, epollFd);
+
         CTB type;
         char buffer[320];
+        readCompilerMessage(epollFd, manager);
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -479,6 +569,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
+        readCompilerMessage(epollFd, manager);
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -493,6 +584,7 @@ tl::expected<int, string> runTest()
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
+        close(epollFd);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -526,9 +618,13 @@ tl::expected<int, string> runTest()
             return tl::unexpected(r2.error());
         }
 
+        const int epollFd = epoll_create1(0);
+        completeConnection(manager, epollFd);
+
         CTB type;
         char buffer[320];
 
+        readCompilerMessage(epollFd, manager);
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -555,6 +651,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
+        readCompilerMessage(epollFd, manager);
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -569,6 +666,7 @@ tl::expected<int, string> runTest()
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
+        close(epollFd);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -592,8 +690,12 @@ tl::expected<int, string> runTest()
             return tl::unexpected(r2.error());
         }
 
+        const int epollFd = epoll_create1(0);
+        completeConnection(manager, epollFd);
+
         CTB type;
         char buffer[320];
+        readCompilerMessage(epollFd, manager);
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -619,6 +721,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
+        readCompilerMessage(epollFd, manager);
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -660,6 +763,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
+        readCompilerMessage(epollFd, manager);
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -673,6 +777,7 @@ tl::expected<int, string> runTest()
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
+        close(epollFd);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -702,8 +807,12 @@ tl::expected<int, string> runTest()
             return tl::unexpected(r2.error());
         }
 
+        const int epollFd = epoll_create1(0);
+        completeConnection(manager, epollFd);
+
         CTB type;
         char buffer[320];
+        readCompilerMessage(epollFd, manager);
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -729,6 +838,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
+        readCompilerMessage(epollFd, manager);
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -770,6 +880,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
+        readCompilerMessage(epollFd, manager);
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -783,6 +894,7 @@ tl::expected<int, string> runTest()
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
+        close(epollFd);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -811,8 +923,12 @@ tl::expected<int, string> runTest()
             return tl::unexpected(r2.error());
         }
 
+        const int epollFd = epoll_create1(0);
+        completeConnection(manager, epollFd);
+
         CTB type;
         char buffer[320];
+        readCompilerMessage(epollFd, manager);
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -850,6 +966,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
+        readCompilerMessage(epollFd, manager);
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -864,6 +981,7 @@ tl::expected<int, string> runTest()
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
+        close(epollFd);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -886,10 +1004,13 @@ tl::expected<int, string> runTest()
         {
             return tl::unexpected(r2.error());
         }
+ const int epollFd = epoll_create1(0);
+        completeConnection(manager, epollFd);
 
         CTB type;
         char buffer[320];
 
+        readCompilerMessage(epollFd, manager);
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -934,6 +1055,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
+        readCompilerMessage(epollFd, manager);
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -981,6 +1103,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
+        readCompilerMessage(epollFd, manager);
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -995,6 +1118,7 @@ tl::expected<int, string> runTest()
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
+        close(epollFd);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -1026,8 +1150,12 @@ tl::expected<int, string> runTest()
             return tl::unexpected(r2.error());
         }
 
+        const int epollFd = epoll_create1(0);
+        completeConnection(manager, epollFd);
+
         CTB type;
         char buffer[320];
+        readCompilerMessage(epollFd, manager);
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -1103,6 +1231,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
+        readCompilerMessage(epollFd, manager);
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
             string str = r2.error();
@@ -1122,6 +1251,7 @@ tl::expected<int, string> runTest()
 
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
+        close(epollFd);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
