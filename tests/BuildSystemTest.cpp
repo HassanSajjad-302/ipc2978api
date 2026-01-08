@@ -123,19 +123,15 @@ void completeConnection(IPCManagerBS &manager, int epollFd)
             epoll_event ev2{};
             if (epoll_wait(epollFd, &ev2, 1, -1) == -1)
             {
-    print("Hello1\n");
+                exitFailure(getErrorString());
+            }
+            if (epoll_ctl(epollFd, EPOLL_CTL_DEL, manager.fdSocket, &ev) == -1)
+            {
                 exitFailure(getErrorString());
             }
             if (const auto &r3 = manager.completeConnection(); !r3)
             {
-    print("Hello2\n");
                 exitFailure(r3.error());
-            }
-
-            if (epoll_ctl(epollFd, EPOLL_CTL_DEL, manager.fdSocket, &ev) == -1)
-            {
-    print("Hello3\n");
-                exitFailure(getErrorString());
             }
         }
     }
@@ -353,6 +349,6 @@ int main()
     runTest();
     thr->join();
     first = false;
-    /*runTest();
-    thr->join();*/
+    runTest();
+    thr->join();
 }
