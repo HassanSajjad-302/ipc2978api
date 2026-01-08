@@ -45,7 +45,15 @@ string getRandomString(uint32_t length)
     string random_string(length2, '\0');
     for (int i = 0; i < length2; ++i)
     {
-        random_string[i] = characters[distribution(generator)];
+        // ; is not added to string as it is being used as delimiter.
+        if (const char c = characters[distribution(generator)]; c != ';')
+        {
+            random_string[i] = c;
+        }
+        else
+        {
+            --i;
+        }
     }
 
     return random_string;
