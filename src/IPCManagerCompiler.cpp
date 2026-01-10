@@ -26,28 +26,28 @@ tl::expected<IPCManagerCompiler, std::string> makeIPCManagerCompiler(std::string
 {
 #ifdef _WIN32
     BMIIfHeaderUnitObjOtherwisePath = R"(\\.\pipe\)" + BMIIfHeaderUnitObjOtherwisePath;
-    HANDLE hPipe = CreateFileA(BMIIfHeaderUnitObjOtherwisePath.data(), // pipe name
-                               GENERIC_READ |                          // read and write access
-                                   GENERIC_WRITE,
-                               0,             // no sharing
-                               nullptr,       // default security attributes
-                               OPEN_EXISTING, // opens existing pipe
-                               0,             // default attributes
-                               nullptr);      // no template file
+    HANDLE fd = CreateFileA(BMIIfHeaderUnitObjOtherwisePath.data(), // pipe name
+                            GENERIC_READ |                          // read and write access
+                                GENERIC_WRITE,
+                            0,             // no sharing
+                            nullptr,       // default security attributes
+                            OPEN_EXISTING, // opens existing pipe
+                            0,             // default attributes
+                            nullptr);      // no template file
 
     // Break if the pipe handle is valid.
 
-    if (hPipe == INVALID_HANDLE_VALUE)
+    if (fd == INVALID_HANDLE_VALUE)
     {
         return tl::unexpected(getErrorString());
     }
 
-    return IPCManagerCompiler(hPipe);
+    return IPCManagerCompiler(fd);
 #else
 
-    const int fdSocket = socket(AF_UNIX, SOCK_STREAM, 0);
+    const int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
-    if (fdSocket == -1)
+    if (fd == -1)
     {
         return tl::unexpected(getErrorString());
     }
@@ -64,24 +64,24 @@ tl::expected<IPCManagerCompiler, std::string> makeIPCManagerCompiler(std::string
     prependDir.append(to16charHexString(hash));
     std::copy(prependDir.begin(), prependDir.end(), addr.sun_path);
 
-    if (connect(fdSocket, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == -1)
+    if (connect(fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == -1)
     {
         return tl::unexpected(getErrorString());
     }
-    return IPCManagerCompiler(fdSocket);
+    return IPCManagerCompiler(fd);
 
 #endif
 }
 
 #ifdef _WIN32
-IPCManagerCompiler::IPCManagerCompiler(void *hPipe_)
+IPCManagerCompiler::IPCManagerCompiler(void *fd_)
 {
-    hPipe = hPipe_;
+    fd = fd_;
 }
 #else
-IPCManagerCompiler::IPCManagerCompiler(const int fdSocket_)
+IPCManagerCompiler::IPCManagerCompiler(const int fd_)
 {
-    fdSocket = fdSocket_;
+    fd = fd_;
 }
 #endif
 
@@ -519,9 +519,9 @@ tl::expected<void, std::string> IPCManagerCompiler::closeBMIFileMapping(
 void IPCManagerCompiler::closeConnection() const
 {
 #ifdef _WIN32
-    CloseHandle(hPipe);
+    CloseHandle(fd);
 #else
-    close(fdSocket);
+    close(fd);
 #endif
 }
 

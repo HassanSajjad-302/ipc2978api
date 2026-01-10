@@ -115,7 +115,7 @@ void completeConnection(IPCManagerBS &manager, int epollFd)
             epoll_event ev{};
             // Add stdout to epoll
             ev.events = EPOLLIN;
-            if (epoll_ctl(epollFd, EPOLL_CTL_ADD, manager.fdSocket, &ev) == -1)
+            if (epoll_ctl(epollFd, EPOLL_CTL_ADD, manager.fd, &ev) == -1)
             {
                 exitFailure(getErrorString());
             }
@@ -125,7 +125,7 @@ void completeConnection(IPCManagerBS &manager, int epollFd)
             {
                 exitFailure(getErrorString());
             }
-            if (epoll_ctl(epollFd, EPOLL_CTL_DEL, manager.fdSocket, &ev) == -1)
+            if (epoll_ctl(epollFd, EPOLL_CTL_DEL, manager.fd, &ev) == -1)
             {
                 exitFailure(getErrorString());
             }
@@ -149,8 +149,8 @@ int runTest()
     listenForCompiler();
     fflush(stdout);
 
-    const int epollFd = epoll_create1(0);
-    completeConnection(manager, epollFd);
+    const int serverFd = epoll_create1(0);
+    completeConnection(manager, serverFd);
 
     CTB type;
     char buffer[320];
@@ -158,7 +158,7 @@ int runTest()
     {
         bool loopExit = false;
 
-        string str = readCompilerMessage(epollFd, manager.fdSocket);
+        string str = readCompilerMessage(serverFd, manager.fd);
         manager.serverReadString = str;
         if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
         {
@@ -204,7 +204,7 @@ int runTest()
         }
     }
 
-    string str = readCompilerMessage(epollFd, manager.fdSocket);
+    string str = readCompilerMessage(serverFd, manager.fd);
     manager.serverReadString = str;
     if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
     {
@@ -311,14 +311,14 @@ int runTest()
         printMessage(btcLastMessage, true);
     }
     oldManager.closeConnection();
-    close(oldManager.fdSocket);
+    close(oldManager.fd);
 
     // we delay the receiveMessage. Compiler in this duration has exited with error after connecting.
     std::this_thread::sleep_for(std::chrono::seconds(3));
 
-    completeConnection(manager, epollFd);
+    completeConnection(manager, serverFd);
     // CompilerTest would have exited by now
-    str = readCompilerMessage(epollFd, manager.fdSocket);
+    str = readCompilerMessage(serverFd, manager.fd);
     manager.serverReadString = str;
     if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
     {
@@ -339,7 +339,7 @@ int runTest()
     printMessage(reinterpret_cast<CTBLastMessage &>(buffer), false);
 
     manager.closeConnection();
-    close(manager.fdSocket);
+    close(manager.fd);
     return EXIT_SUCCESS;
 }
 

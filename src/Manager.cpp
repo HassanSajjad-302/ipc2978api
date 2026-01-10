@@ -70,11 +70,20 @@ std::string getErrorString(const ErrorCategory errorCategory_)
     return errorString;
 }
 
+static uint32_t minimum(uint32_t a, uint32_t b)
+{
+    if (a < b)
+    {
+        return a;
+    }
+    return b;
+}
+
 tl::expected<uint32_t, std::string> Manager::readInternal(char (&buffer)[BUFFERSIZE]) const
 {
     if (isServer)
     {
-        const uint32_t bytesRead = std::min(serverReadString.size(), static_cast<uint64_t>(BUFFERSIZE));
+        const uint32_t bytesRead = minimum(serverReadString.size(), static_cast<uint64_t>(BUFFERSIZE));
         for (uint32_t i = 0; i < bytesRead; ++i)
         {
             buffer[i] = serverReadString[i];
@@ -86,7 +95,7 @@ tl::expected<uint32_t, std::string> Manager::readInternal(char (&buffer)[BUFFERS
     int32_t bytesRead;
 
 #ifdef _WIN32
-    const bool success = ReadFile(hPipe,               // pipe handle
+    const bool success = ReadFile(fd,                  // pipe handle
                                   buffer,              // buffer to receive reply
                                   BUFFERSIZE,          // size of buffer
                                   LPDWORD(&bytesRead), // number of bytes read
@@ -98,7 +107,7 @@ tl::expected<uint32_t, std::string> Manager::readInternal(char (&buffer)[BUFFERS
     }
 
 #else
-    bytesRead = read(fdSocket, buffer, BUFFERSIZE);
+    bytesRead = read(fd, buffer, BUFFERSIZE);
     if (bytesRead == -1)
     {
         return tl::unexpected(getErrorString());
@@ -145,7 +154,7 @@ tl::expected<void, std::string> writeAll(const int fd, const char *buffer, const
 tl::expected<void, std::string> Manager::writeInternal(const std::string &buffer) const
 {
 #ifdef _WIN32
-    const bool success = WriteFile(hPipe,         // pipe handle
+    const bool success = WriteFile(fd,            // pipe handle
                                    buffer.data(), // message
                                    buffer.size(), // message length
                                    nullptr,       // bytes written
@@ -155,7 +164,7 @@ tl::expected<void, std::string> Manager::writeInternal(const std::string &buffer
         return tl::unexpected(getErrorString());
     }
 #else
-    if (const auto &r = writeAll(fdSocket, buffer.data(), buffer.size()); !r)
+    if (const auto &r = writeAll(fd, buffer.data(), buffer.size()); !r)
     {
         return tl::unexpected(r.error());
     }

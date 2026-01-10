@@ -50,7 +50,7 @@ std::string readCompilerMessage(const int epollFd, const IPCManagerBS &manager)
 {
     epoll_event ev{};
     ev.events = EPOLLIN;
-    if (epoll_ctl(epollFd, EPOLL_CTL_ADD, manager.fdSocket, &ev) == -1)
+    if (epoll_ctl(epollFd, EPOLL_CTL_ADD, manager.fd, &ev) == -1)
     {
         exitFailure(getErrorString());
     }
@@ -60,7 +60,7 @@ std::string readCompilerMessage(const int epollFd, const IPCManagerBS &manager)
     while (true)
     {
         char buffer[4096];
-        const int readCount = read(manager.fdSocket, buffer, 4096);
+        const int readCount = read(manager.fd, buffer, 4096);
         if (readCount == 0 || readCount == -1)
         {
             exitFailure(getErrorString());
@@ -77,7 +77,7 @@ std::string readCompilerMessage(const int epollFd, const IPCManagerBS &manager)
         break;
     }
 
-    if (epoll_ctl(epollFd, EPOLL_CTL_DEL, manager.fdSocket, &ev) == -1)
+    if (epoll_ctl(epollFd, EPOLL_CTL_DEL, manager.fd, &ev) == -1)
     {
         exitFailure(getErrorString());
     }
@@ -98,7 +98,7 @@ void completeConnection(const IPCManagerBS &manager, int epollFd)
             epoll_event ev{};
             // Add stdout to epoll
             ev.events = EPOLLIN;
-            if (epoll_ctl(epollFd, EPOLL_CTL_ADD, manager.fdSocket, &ev) == -1)
+            if (epoll_ctl(epollFd, EPOLL_CTL_ADD, manager.fd, &ev) == -1)
             {
                 exitFailure(getErrorString());
             }
@@ -108,7 +108,7 @@ void completeConnection(const IPCManagerBS &manager, int epollFd)
             {
                 exitFailure(getErrorString());
             }
-            if (epoll_ctl(epollFd, EPOLL_CTL_DEL, manager.fdSocket, &ev) == -1)
+            if (epoll_ctl(epollFd, EPOLL_CTL_DEL, manager.fd, &ev) == -1)
             {
                 exitFailure(getErrorString());
             }
@@ -1004,7 +1004,7 @@ tl::expected<int, string> runTest()
         {
             return tl::unexpected(r2.error());
         }
- const int epollFd = epoll_create1(0);
+        const int epollFd = epoll_create1(0);
         completeConnection(manager, epollFd);
 
         CTB type;

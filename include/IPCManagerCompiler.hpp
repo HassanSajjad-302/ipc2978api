@@ -67,9 +67,9 @@ class IPCManagerCompiler : Manager
 
     CTBLastMessage lastMessage{};
 #ifdef _WIN32
-    explicit IPCManagerCompiler(void *hPipe_);
+    explicit IPCManagerCompiler(void *fd_);
 #else
-    explicit IPCManagerCompiler(int fdSocket_);
+    explicit IPCManagerCompiler(int fd_);
 #endif
 
     // For FileType::HEADER_FILE, it can return FileType::HEADER_UNIT, otherwise it will return the request

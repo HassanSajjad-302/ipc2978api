@@ -14,9 +14,9 @@ class IPCManagerBS : public Manager
     friend tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath);
 
 #ifdef _WIN32
-    explicit IPCManagerBS(void *hPipe_);
+    explicit IPCManagerBS(void *fd_);
 #else
-    explicit IPCManagerBS(int fdSocket_);
+    explicit IPCManagerBS(int fd_);
 #endif
 
   public:

@@ -23,8 +23,8 @@ tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeader
 {
 #ifdef _WIN32
     BMIIfHeaderUnitObjOtherwisePath = R"(\\.\pipe\)" + BMIIfHeaderUnitObjOtherwisePath;
-    void *hPipe = CreateNamedPipeA(BMIIfHeaderUnitObjOtherwisePath.c_str(), // pipe name
-                                   PIPE_ACCESS_DUPLEX |                     // read/write access
+    void *fd = CreateNamedPipeA(BMIIfHeaderUnitObjOtherwisePath.c_str(), // pipe name
+                                PIPE_ACCESS_DUPLEX |                     // read/write access
                                        FILE_FLAG_FIRST_PIPE_INSTANCE,       // overlapped mode
                                    PIPE_TYPE_MESSAGE |                      // message-type pipe
                                        PIPE_READMODE_MESSAGE |              // message read mode
@@ -34,22 +34,23 @@ tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeader
                                    BUFFERSIZE * sizeof(TCHAR),              // input buffer size
                                    PIPE_TIMEOUT,                            // client time-out
                                    nullptr);                                // default security attributes
-    if (hPipe == INVALID_HANDLE_VALUE)
+    if (fd == INVALID_HANDLE_VALUE)
     {
         return tl::unexpected(getErrorString());
     }
-    return IPCManagerBS(hPipe);
+    return IPCManagerBS(fd);
 
+    CreateIoCompletionPort(fd, hIOCP, (ULONG_PTR)fd, 0);
 #else
 
     // Named Pipes are used but Unix Domain sockets could have been used as well. The tradeoff is that a file is created
     // and there needs to be bind, listen, accept calls which means that an extra fd is created is temporarily on the
     // server side. it can be closed immediately after.
 
-    const int fdSocket = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    const int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
 
     // Create server socket
-    if (fdSocket == -1)
+    if (fd == -1)
     {
         return tl::unexpected(getErrorString());
     }
@@ -69,7 +70,7 @@ tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeader
     unlink(prependDir.c_str());
 
     // Bind socket to the file system path
-    if (bind(fdSocket, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == -1)
+    if (bind(fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == -1)
     {
         return tl::unexpected(getErrorString());
     }
@@ -79,26 +80,26 @@ tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeader
     }
 
     // Listen for incoming connections
-    if (listen(fdSocket, 1) == -1)
+    if (listen(fd, 1) == -1)
     {
-        close(fdSocket);
+        close(fd);
         return tl::unexpected(getErrorString());
     }
 
-    return IPCManagerBS(fdSocket);
+    return IPCManagerBS(fd);
 #endif
 }
 
 #ifdef _WIN32
-IPCManagerBS::IPCManagerBS(void *hPipe_)
+IPCManagerBS::IPCManagerBS(void *fd_)
 {
-    hPipe = hPipe_;
+    fd = fd_;
     isServer = true;
 }
 #else
-IPCManagerBS::IPCManagerBS(const int fdSocket_)
+IPCManagerBS::IPCManagerBS(const int fd_)
 {
-    fdSocket = fdSocket_;
+    fd = fd_;
     isServer = true;
 }
 #endif
@@ -106,28 +107,33 @@ IPCManagerBS::IPCManagerBS(const int fdSocket_)
 tl::expected<bool, std::string> IPCManagerBS::completeConnection() const
 {
 #ifdef _WIN32
-    if (!ConnectNamedPipe(hPipe, nullptr))
+    // For IOCP, we need to use overlapped I/O
+    OVERLAPPED overlapped = {0};
+
+    if (BOOL result = ConnectNamedPipe(fd, &overlapped))
     {
-        // Is the client already connected?
-        if (GetLastError() != ERROR_PIPE_CONNECTED)
-        {
-
-            DWORD bytesAvail = 0;
-            DWORD bytesLeftThisMessage = 0;
-
-            // PeekNamedPipe returns FALSE if pipe is disconnected
-            if (PeekNamedPipe(hPipe, nullptr, 0, nullptr, &bytesAvail, &bytesLeftThisMessage))
-            {
-                // compiler process ended and has left a message for us.
-            }
-            else
-            {
-                return tl::unexpected(getErrorString());
-            }
-        }
+        // Connection completed synchronously (rare)
+        return true;
     }
+
+    DWORD error = GetLastError();
+
+    if (error == ERROR_IO_PENDING)
+    {
+        // Connection is pending - need to wait for IOCP notification
+        // This is the normal case for async operation
+        return false;
+    }
+    if (error == ERROR_PIPE_CONNECTED)
+    {
+        // Client connected before we called ConnectNamedPipe
+        // This can happen if client connects very quickly
+        return true;
+    }
+    // Actual error occurred
+    return tl::unexpected(getErrorString());
 #else
-    const int fd = accept4(fdSocket, nullptr, nullptr, O_NONBLOCK);
+    const int fd = accept4(fd, nullptr, nullptr, O_NONBLOCK);
     if (fd == -1)
     {
         if (errno == EAGAIN)
@@ -136,8 +142,8 @@ tl::expected<bool, std::string> IPCManagerBS::completeConnection() const
         }
         return tl::unexpected(getErrorString());
     }
-    close(fdSocket);
-    const_cast<int &>(fdSocket) = fd;
+    close(fd);
+    const_cast<int &>(fd) = fd;
     return true;
 
 #endif
@@ -399,9 +405,9 @@ tl::expected<void, std::string> IPCManagerBS::closeBMIFileMapping(
 void IPCManagerBS::closeConnection() const
 {
 #ifdef _WIN32
-    CloseHandle(hPipe);
+    CloseHandle(fd);
 #else
-    close(fdSocket);
+    close(fd);
 #endif
 }
 

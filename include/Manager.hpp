@@ -55,9 +55,9 @@ class Manager
 {
   public:
 #ifdef _WIN32
-    void *hPipe = nullptr;
+    void *fd = nullptr;
 #else
-    int fdSocket = 0;
+    int fd = 0;
 #endif
 
     bool isServer = false;
