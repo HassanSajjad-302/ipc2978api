@@ -64,7 +64,7 @@ void listenForCompiler()
     }
 }
 
-std::string readCompilerMessage(const int epollFd, const int fd)
+std::string readCompilerMessage(const uint64_t serverFd, const uint64_t fd)
 {
     epoll_event ev{};
     ev.events = EPOLLIN;
@@ -101,9 +101,49 @@ std::string readCompilerMessage(const int epollFd, const int fd)
     }
     return str;
 }
-
-void completeConnection(IPCManagerBS &manager, int epollFd)
+void completeConnection(IPCManagerBS &manager, int serverFd)
 {
+#ifdef _WIN32
+    HANDLE hIOCP = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(serverFd));
+    HANDLE hPipe = reinterpret_cast<HANDLE>(manager.fd);
+
+    if (const auto &r2 = manager.completeConnection(); !r2)
+    {
+        exitFailure(r2.error());
+    }
+    else
+    {
+        if (!*r2)
+        {
+            // Connection is pending (ERROR_IO_PENDING)
+            // Wait for IOCP to signal completion
+
+            DWORD bytesTransferred = 0;
+            ULONG_PTR completionKey = 0;
+            LPOVERLAPPED overlapped = nullptr;
+
+            if (!GetQueuedCompletionStatus(
+                    hIOCP,
+                    &bytesTransferred,
+                    &completionKey,
+                    &overlapped,
+                    INFINITE))  // Wait indefinitely
+            {
+                exitFailure(getErrorString());
+            }
+
+            // Verify this completion is for our pipe
+            if (completionKey != (ULONG_PTR)hPipe)
+            {
+                exitFailure("Unexpected completion key");
+            }
+
+            // Connection is now complete - no need to call completeConnection again
+            // The ConnectNamedPipe operation has finished
+        }
+        // else: connection completed synchronously, already done
+    }
+#else
     if (const auto &r2 = manager.completeConnection(); !r2)
     {
         exitFailure(r2.error());
@@ -113,19 +153,18 @@ void completeConnection(IPCManagerBS &manager, int epollFd)
         if (!*r2)
         {
             epoll_event ev{};
-            // Add stdout to epoll
             ev.events = EPOLLIN;
-            if (epoll_ctl(epollFd, EPOLL_CTL_ADD, manager.fd, &ev) == -1)
+            if (epoll_ctl(serverFd, EPOLL_CTL_ADD, manager.fd, &ev) == -1)
             {
                 exitFailure(getErrorString());
             }
 
             epoll_event ev2{};
-            if (epoll_wait(epollFd, &ev2, 1, -1) == -1)
+            if (epoll_wait(serverFd, &ev2, 1, -1) == -1)
             {
                 exitFailure(getErrorString());
             }
-            if (epoll_ctl(epollFd, EPOLL_CTL_DEL, manager.fd, &ev) == -1)
+            if (epoll_ctl(serverFd, EPOLL_CTL_DEL, manager.fd, &ev) == -1)
             {
                 exitFailure(getErrorString());
             }
@@ -135,11 +174,32 @@ void completeConnection(IPCManagerBS &manager, int epollFd)
             }
         }
     }
+#endif
+}
+
+uint64_t createMultiplex()
+{
+#ifdef _WIN32
+    HANDLE iocp = CreateIoCompletionPort(nullptr,                              // handle to associate
+                               nullptr,                               // existing IOCP handle
+                               0, // completion key (use pipe handle)
+                               0                                   // number of concurrent threads (0 = default)
+                               );
+    if (iocp == nullptr)
+    {
+        exitFailure(getErrorString());
+    }
+    return reinterpret_cast<uint64_t>(iocp);
+#else
+    return epoll_create1(0);
+#endif
 }
 
 int runTest()
 {
-    const auto r = makeIPCManagerBS((std::filesystem::current_path() / "test").string());
+    const uint64_t serverFd = createMultiplex();
+
+    const auto r = makeIPCManagerBS((std::filesystem::current_path() / "test").string(), serverFd);
     if (!r)
     {
         exitFailure(r.error());
@@ -149,7 +209,6 @@ int runTest()
     listenForCompiler();
     fflush(stdout);
 
-    const int serverFd = epoll_create1(0);
     completeConnection(manager, serverFd);
 
     CTB type;
@@ -260,7 +319,7 @@ int runTest()
     // To ensure that we make build-system manager before CompilerTest making compiler manager,
     // we make it here.
 
-    if (auto r2 = makeIPCManagerBS((std::filesystem::current_path() / "test1").string()); !r2)
+    if (auto r2 = makeIPCManagerBS((std::filesystem::current_path() / "test1").string(), serverFd); !r2)
     {
         exitFailure(r2.error());
     }

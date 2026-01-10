@@ -54,11 +54,7 @@ struct ProcessMappingOfBMIFile
 class Manager
 {
   public:
-#ifdef _WIN32
-    void *fd = nullptr;
-#else
-    int fd = 0;
-#endif
+    uint64_t fd = 0;
 
     bool isServer = false;
     std::string_view serverReadString;

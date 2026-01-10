@@ -11,7 +11,8 @@ namespace N2978
 // IPC Manager BuildSystem
 class IPCManagerBS : public Manager
 {
-    friend tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath);
+    friend tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath,
+                                                                    uint64_t iocp);
 
 #ifdef _WIN32
     explicit IPCManagerBS(void *fd_);
@@ -34,6 +35,6 @@ class IPCManagerBS : public Manager
     void closeConnection() const;
 };
 
-tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath);
+tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath, uint64_t iocp);
 } // namespace N2978
 #endif // IPC_MANAGER_BS_HPP

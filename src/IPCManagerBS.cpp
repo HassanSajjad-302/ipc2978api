@@ -19,28 +19,42 @@
 namespace N2978
 {
 
-tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath)
+tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath, uint64_t iocp)
 {
 #ifdef _WIN32
     BMIIfHeaderUnitObjOtherwisePath = R"(\\.\pipe\)" + BMIIfHeaderUnitObjOtherwisePath;
-    void *fd = CreateNamedPipeA(BMIIfHeaderUnitObjOtherwisePath.c_str(), // pipe name
-                                PIPE_ACCESS_DUPLEX |                     // read/write access
-                                       FILE_FLAG_FIRST_PIPE_INSTANCE,       // overlapped mode
-                                   PIPE_TYPE_MESSAGE |                      // message-type pipe
-                                       PIPE_READMODE_MESSAGE |              // message read mode
-                                       PIPE_WAIT,                           // blocking mode
-                                   1,                                       // unlimited instances
-                                   BUFFERSIZE * sizeof(TCHAR),              // output buffer size
-                                   BUFFERSIZE * sizeof(TCHAR),              // input buffer size
-                                   PIPE_TIMEOUT,                            // client time-out
-                                   nullptr);                                // default security attributes
-    if (fd == INVALID_HANDLE_VALUE)
+
+    HANDLE hPipe = CreateNamedPipeA(BMIIfHeaderUnitObjOtherwisePath.c_str(), // pipe name
+                                    PIPE_ACCESS_DUPLEX |                     // read/write access
+                                        FILE_FLAG_OVERLAPPED |               // overlapped mode for IOCP
+                                        FILE_FLAG_FIRST_PIPE_INSTANCE,       // first instance only
+                                    PIPE_TYPE_MESSAGE |                      // message-type pipe
+                                        PIPE_READMODE_MESSAGE |              // message read mode
+                                        PIPE_WAIT,                           // blocking mode (for sync operations)
+                                    1,                                       // max instances
+                                    BUFFERSIZE * sizeof(TCHAR),              // output buffer size
+                                    BUFFERSIZE * sizeof(TCHAR),              // input buffer size
+                                    PIPE_TIMEOUT,                            // client time-out
+                                    nullptr);                                // default security attributes
+
+    if (hPipe == INVALID_HANDLE_VALUE)
     {
         return tl::unexpected(getErrorString());
     }
-    return IPCManagerBS(fd);
 
-    CreateIoCompletionPort(fd, hIOCP, (ULONG_PTR)fd, 0);
+    // Associate the pipe with the existing IOCP handle
+    if (CreateIoCompletionPort(hPipe,                              // handle to associate
+                               iocp,                               // existing IOCP handle
+                               reinterpret_cast<ULONG_PTR>(hPipe), // completion key (use pipe handle)
+                               0                                   // number of concurrent threads (0 = default)
+                               ) == nullptr)
+    {
+        CloseHandle(hPipe);
+        return tl::unexpected(getErrorString());
+    }
+
+    return IPCManagerBS(hPipe);
+
 #else
 
     // Named Pipes are used but Unix Domain sockets could have been used as well. The tradeoff is that a file is created
@@ -110,7 +124,7 @@ tl::expected<bool, std::string> IPCManagerBS::completeConnection() const
     // For IOCP, we need to use overlapped I/O
     OVERLAPPED overlapped = {0};
 
-    if (BOOL result = ConnectNamedPipe(fd, &overlapped))
+    if (BOOL result = ConnectNamedPipe((HANDLE)fd, &overlapped))
     {
         // Connection completed synchronously (rare)
         return true;
