@@ -44,7 +44,7 @@ tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeader
 
     // Associate the pipe with the existing IOCP handle
     if (CreateIoCompletionPort(hPipe,                              // handle to associate
-                               iocp,                               // existing IOCP handle
+                               reinterpret_cast<HANDLE>(iocp),                               // existing IOCP handle
                                reinterpret_cast<ULONG_PTR>(hPipe), // completion key (use pipe handle)
                                0                                   // number of concurrent threads (0 = default)
                                ) == nullptr)
@@ -52,11 +52,7 @@ tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeader
         CloseHandle(hPipe);
         return tl::unexpected(getErrorString());
     }
-
-    return IPCManagerBS(hPipe);
-
 #else
-
     // Named Pipes are used but Unix Domain sockets could have been used as well. The tradeoff is that a file is created
     // and there needs to be bind, listen, accept calls which means that an extra fd is created is temporarily on the
     // server side. it can be closed immediately after.
@@ -99,13 +95,13 @@ tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeader
         close(fd);
         return tl::unexpected(getErrorString());
     }
-
-    return IPCManagerBS(fd);
 #endif
+
+    return IPCManagerBS(reinterpret_cast<uint64_t>(hPipe));
 }
 
 #ifdef _WIN32
-IPCManagerBS::IPCManagerBS(void *fd_)
+IPCManagerBS::IPCManagerBS(const uint64_t fd_)
 {
     fd = fd_;
     isServer = true;
@@ -419,7 +415,7 @@ tl::expected<void, std::string> IPCManagerBS::closeBMIFileMapping(
 void IPCManagerBS::closeConnection() const
 {
 #ifdef _WIN32
-    CloseHandle(fd);
+    CloseHandle(reinterpret_cast<HANDLE>(fd));
 #else
     close(fd);
 #endif

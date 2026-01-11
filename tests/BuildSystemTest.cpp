@@ -3,6 +3,7 @@
 #include "Testing.hpp"
 #include "fmt/printf.h"
 #include <chrono>
+#include <corecrt_io.h>
 #include <filesystem>
 #include <fstream>
 #include <thread>
@@ -66,15 +67,79 @@ void listenForCompiler()
 
 std::string readCompilerMessage(const uint64_t serverFd, const uint64_t fd)
 {
+
+#ifdef _WIN32
+    HANDLE hIOCP = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(serverFd));
+    HANDLE hPipe = reinterpret_cast<HANDLE>(fd);
+
+    std::string str;
+    while (true)
+    {
+        char buffer[4096];
+        DWORD bytesRead = 0;
+        OVERLAPPED overlapped = {0};
+
+        // Initiate async read
+        BOOL result = ReadFile(hPipe, buffer, sizeof(buffer), &bytesRead, &overlapped);
+
+        if (!result)
+        {
+            DWORD error = GetLastError();
+            if (error == ERROR_IO_PENDING)
+            {
+                // Wait for the read to complete
+                ULONG_PTR completionKey = 0;
+                LPOVERLAPPED completedOverlapped = nullptr;
+
+                if (!GetQueuedCompletionStatus(hIOCP, &bytesRead, &completionKey, &completedOverlapped, INFINITE))
+                {
+                    exitFailure(getErrorString());
+                }
+
+                // Verify completion is for our pipe
+                if (completionKey != (ULONG_PTR)hPipe)
+                {
+                    exitFailure("Unexpected completion key");
+                }
+            }
+            else
+            {
+                exitFailure(getErrorString());
+            }
+        }
+
+        if (bytesRead == 0)
+        {
+            exitFailure("Pipe closed or no data read");
+        }
+
+        // Append read data to string
+        for (DWORD i = 0; i < bytesRead; ++i)
+        {
+            str.push_back(buffer[i]);
+        }
+
+        // Check for terminator
+        if (str[str.size() - 1] == ';')
+        {
+            str.pop_back();
+            break;
+        }
+    }
+
+    return str;
+
+#else
+
     epoll_event ev{};
     ev.events = EPOLLIN;
-    if (epoll_ctl(epollFd, EPOLL_CTL_ADD, fd, &ev) == -1)
+    if (epoll_ctl(serverFd, EPOLL_CTL_ADD, fd, &ev) == -1)
     {
         exitFailure(getErrorString());
     }
 
-    epoll_wait(epollFd, &ev, 1, -1);
-    string str;
+    epoll_wait(serverFd, &ev, 1, -1);
+    std::string str;
     while (true)
     {
         char buffer[4096];
@@ -95,17 +160,19 @@ std::string readCompilerMessage(const uint64_t serverFd, const uint64_t fd)
         break;
     }
 
-    if (epoll_ctl(epollFd, EPOLL_CTL_DEL, fd, &ev) == -1)
+    if (epoll_ctl(serverFd, EPOLL_CTL_DEL, fd, &ev) == -1)
     {
         exitFailure(getErrorString());
     }
     return str;
+#endif
 }
 
 void closeHandle(uint64_t fd)
 {
 #ifdef _WIN32
-    if (CloseHandle((HANDLE)fd))
+    // CloseHandle returns non-zero on success, so we need to check for failure (zero)
+    if (!CloseHandle(reinterpret_cast<HANDLE>(fd)))
     {
         exitFailure(getErrorString());
     }
@@ -410,7 +477,7 @@ int runTest()
     printMessage(reinterpret_cast<CTBLastMessage &>(buffer), false);
 
     manager.closeConnection();
-    close(manager.fd);
+    closeHandle(manager.fd);
     return EXIT_SUCCESS;
 }
 

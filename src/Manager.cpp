@@ -95,7 +95,7 @@ tl::expected<uint32_t, std::string> Manager::readInternal(char (&buffer)[BUFFERS
     int32_t bytesRead;
 
 #ifdef _WIN32
-    const bool success = ReadFile(fd,                  // pipe handle
+    const bool success = ReadFile(reinterpret_cast<HANDLE>(fd),                  // pipe handle
                                   buffer,              // buffer to receive reply
                                   BUFFERSIZE,          // size of buffer
                                   LPDWORD(&bytesRead), // number of bytes read
@@ -154,7 +154,7 @@ tl::expected<void, std::string> writeAll(const int fd, const char *buffer, const
 tl::expected<void, std::string> Manager::writeInternal(const std::string &buffer) const
 {
 #ifdef _WIN32
-    const bool success = WriteFile(fd,            // pipe handle
+    const bool success = WriteFile(reinterpret_cast<HANDLE>(fd),            // pipe handle
                                    buffer.data(), // message
                                    buffer.size(), // message length
                                    nullptr,       // bytes written

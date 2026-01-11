@@ -14,11 +14,7 @@ class IPCManagerBS : public Manager
     friend tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath,
                                                                     uint64_t iocp);
 
-#ifdef _WIN32
-    explicit IPCManagerBS(void *fd_);
-#else
-    explicit IPCManagerBS(int fd_);
-#endif
+    explicit IPCManagerBS(uint64_t fd_);
 
   public:
     IPCManagerBS(const IPCManagerBS &) = default;

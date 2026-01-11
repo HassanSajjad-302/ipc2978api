@@ -67,7 +67,7 @@ class IPCManagerCompiler : Manager
 
     CTBLastMessage lastMessage{};
 #ifdef _WIN32
-    explicit IPCManagerCompiler(void *fd_);
+    explicit IPCManagerCompiler(uint64_t fd_);
 #else
     explicit IPCManagerCompiler(int fd_);
 #endif

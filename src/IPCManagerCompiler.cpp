@@ -41,10 +41,7 @@ tl::expected<IPCManagerCompiler, std::string> makeIPCManagerCompiler(std::string
     {
         return tl::unexpected(getErrorString());
     }
-
-    return IPCManagerCompiler(fd);
 #else
-
     const int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
     if (fd == -1)
@@ -68,13 +65,13 @@ tl::expected<IPCManagerCompiler, std::string> makeIPCManagerCompiler(std::string
     {
         return tl::unexpected(getErrorString());
     }
-    return IPCManagerCompiler(fd);
-
 #endif
+
+    return IPCManagerCompiler(reinterpret_cast<uint64_t>(fd));
 }
 
 #ifdef _WIN32
-IPCManagerCompiler::IPCManagerCompiler(void *fd_)
+IPCManagerCompiler::IPCManagerCompiler(const uint64_t fd_)
 {
     fd = fd_;
 }
@@ -519,7 +516,7 @@ tl::expected<void, std::string> IPCManagerCompiler::closeBMIFileMapping(
 void IPCManagerCompiler::closeConnection() const
 {
 #ifdef _WIN32
-    CloseHandle(fd);
+    CloseHandle(reinterpret_cast<HANDLE>(fd));
 #else
     close(fd);
 #endif
