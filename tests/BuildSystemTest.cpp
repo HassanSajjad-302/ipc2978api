@@ -101,6 +101,22 @@ std::string readCompilerMessage(const uint64_t serverFd, const uint64_t fd)
     }
     return str;
 }
+
+void closeHandle(uint64_t fd)
+{
+#ifdef _WIN32
+    if (CloseHandle((HANDLE)fd))
+    {
+        exitFailure(getErrorString());
+    }
+#else
+    if (close(fd) == -1)
+    {
+        exitFailure(getErrorString());
+    }
+#endif
+}
+
 void completeConnection(IPCManagerBS &manager, int serverFd)
 {
 #ifdef _WIN32
@@ -122,12 +138,8 @@ void completeConnection(IPCManagerBS &manager, int serverFd)
             ULONG_PTR completionKey = 0;
             LPOVERLAPPED overlapped = nullptr;
 
-            if (!GetQueuedCompletionStatus(
-                    hIOCP,
-                    &bytesTransferred,
-                    &completionKey,
-                    &overlapped,
-                    INFINITE))  // Wait indefinitely
+            if (!GetQueuedCompletionStatus(hIOCP, &bytesTransferred, &completionKey, &overlapped,
+                                           INFINITE)) // Wait indefinitely
             {
                 exitFailure(getErrorString());
             }
@@ -180,11 +192,11 @@ void completeConnection(IPCManagerBS &manager, int serverFd)
 uint64_t createMultiplex()
 {
 #ifdef _WIN32
-    HANDLE iocp = CreateIoCompletionPort(nullptr,                              // handle to associate
-                               nullptr,                               // existing IOCP handle
-                               0, // completion key (use pipe handle)
-                               0                                   // number of concurrent threads (0 = default)
-                               );
+    HANDLE iocp = CreateIoCompletionPort(nullptr, // handle to associate
+                                         nullptr, // existing IOCP handle
+                                         0,       // completion key (use pipe handle)
+                                         0        // number of concurrent threads (0 = default)
+    );
     if (iocp == nullptr)
     {
         exitFailure(getErrorString());
