@@ -259,7 +259,7 @@ void completeConnection(IPCManagerBS &manager, int serverFd)
 uint64_t createMultiplex()
 {
 #ifdef _WIN32
-    HANDLE iocp = CreateIoCompletionPort(nullptr, // handle to associate
+    HANDLE iocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, // handle to associate
                                          nullptr, // existing IOCP handle
                                          0,       // completion key (use pipe handle)
                                          0        // number of concurrent threads (0 = default)
