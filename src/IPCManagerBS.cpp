@@ -28,8 +28,8 @@ tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeader
                                     PIPE_ACCESS_DUPLEX |                     // read/write access
                                         FILE_FLAG_OVERLAPPED |               // overlapped mode for IOCP
                                         FILE_FLAG_FIRST_PIPE_INSTANCE,       // first instance only
-                                    PIPE_TYPE_MESSAGE |                      // message-type pipe
-                                        PIPE_READMODE_MESSAGE |              // message read mode
+                                    PIPE_TYPE_BYTE |                      // message-type pipe
+                                        PIPE_READMODE_BYTE |              // message read mode
                                         PIPE_WAIT,                           // blocking mode (for sync operations)
                                     1,                                       // max instances
                                     BUFFERSIZE * sizeof(TCHAR),              // output buffer size

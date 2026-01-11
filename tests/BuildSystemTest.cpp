@@ -449,7 +449,6 @@ int runTest()
         printMessage(btcLastMessage, true);
     }
     oldManager.closeConnection();
-    close(oldManager.fd);
 
     // we delay the receiveMessage. Compiler in this duration has exited with error after connecting.
     std::this_thread::sleep_for(std::chrono::seconds(3));
@@ -477,7 +476,6 @@ int runTest()
     printMessage(reinterpret_cast<CTBLastMessage &>(buffer), false);
 
     manager.closeConnection();
-    closeHandle(manager.fd);
     return EXIT_SUCCESS;
 }
 
