@@ -62,16 +62,6 @@ int main()
     }
 
     manager.lastMessage.errorOccurred = false;
-    if (const auto &r2 = manager.sendCTBLastMessage(); !r2)
-    {
-        exitFailure(r2.error());
-    }
-
-    print("First ");
-    printMessage(manager.lastMessage, true);
-
-    manager.lastMessage = CTBLastMessage{};
-    manager.lastMessage.errorOccurred = false;
     string bmi1Content = getRandomString();
     manager.lastMessage.fileSize = bmi1Content.size();
     print("Second ");

@@ -272,6 +272,7 @@ uint64_t createMultiplex()
 
 int runTest()
 {
+    CTBLastMessage lastMessage;
     const uint64_t serverFd = createMultiplex();
 
     const auto r = makeIPCManagerBS((std::filesystem::current_path() / "test").string(), serverFd);
@@ -323,7 +324,7 @@ int runTest()
         break;
 
         case CTB::LAST_MESSAGE: {
-            const auto &lastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
+            lastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
             print("First ");
             printMessage(lastMessage, false);
             loopExit = true;
@@ -337,17 +338,6 @@ int runTest()
             break;
         }
     }
-
-    string str = readCompilerMessage(serverFd, manager.fd);
-    manager.serverReadString = str;
-    if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-    {
-        exitFailure(r2.error());
-    }
-
-    const auto &lastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
-    print("Second ");
-    printMessage(lastMessage, false);
 
     // We have received a message for memory mapped BMI File. We will first create the server memory mapping. And then
     // close that mapping. And then create the client memory mapping, print out the file contents. And then close that
@@ -450,7 +440,7 @@ int runTest()
     std::this_thread::sleep_for(std::chrono::seconds(3));
 
     // CompilerTest would have exited by now
-    str = readCompilerMessage(serverFd, manager.fd);
+    string str = readCompilerMessage(serverFd, manager.fd);
     manager.serverReadString = str;
     if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
     {
