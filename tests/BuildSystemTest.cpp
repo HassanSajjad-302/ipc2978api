@@ -165,7 +165,7 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
     }
 }
 
-void closeHandle(uint64_t fd)
+void closeHandle(const uint64_t fd)
 {
 #ifdef _WIN32
     // CloseHandle returns non-zero on success, so we need to check for failure (zero)

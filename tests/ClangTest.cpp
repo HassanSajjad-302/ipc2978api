@@ -46,17 +46,83 @@ using namespace std;
 namespace
 {
 
-std::string readCompilerMessage(const int epollFd, const IPCManagerBS &manager)
+void exitFailure(const string &str)
 {
+#ifdef IS_THIS_CLANG_REPO
+    FAIL() << str + '\n';
+#else
+    fmt::print(stderr, "{}\n", str);
+    exit(EXIT_FAILURE);
+#endif
+}
+
+void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, char (&buffer)[320], CTB &type)
+{
+    std::string str;
+
+#ifdef _WIN32
+    HANDLE hIOCP = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(serverFd));
+    HANDLE hPipe = reinterpret_cast<HANDLE>(manager.fd);
+
+    while (true)
+    {
+        char buffer[4096];
+        DWORD bytesRead = 0;
+        OVERLAPPED overlapped = {0};
+
+        // Initiate async read. Even if it is completed successfully, we will get the completion packet. We don't get
+        // the packet only if it fails immediately with error other than ERROR_IO_PENDING
+        BOOL result = ReadFile(hPipe, buffer, sizeof(buffer), &bytesRead, &overlapped);
+
+        DWORD error = GetLastError();
+        if (!result && error != ERROR_IO_PENDING)
+        {
+            exitFailure(getErrorString());
+        }
+
+        // Wait for the read to complete.
+        ULONG_PTR completionKey = 0;
+        LPOVERLAPPED completedOverlapped = nullptr;
+
+        if (!GetQueuedCompletionStatus(hIOCP, &bytesRead, &completionKey, &completedOverlapped, INFINITE))
+        {
+            exitFailure(getErrorString());
+        }
+
+        // Verify completion is for our pipe
+        if (completionKey != (ULONG_PTR)hPipe)
+        {
+            exitFailure("Unexpected completion key");
+        }
+
+        if (bytesRead == 0)
+        {
+            exitFailure("Pipe closed or no data read");
+        }
+
+        // Append read data to string
+        for (DWORD i = 0; i < bytesRead; ++i)
+        {
+            str.push_back(buffer[i]);
+        }
+
+        // Check for terminator
+        if (str[str.size() - 1] == ';')
+        {
+            str.pop_back();
+            break;
+        }
+    }
+#else
+
     epoll_event ev{};
     ev.events = EPOLLIN;
-    if (epoll_ctl(epollFd, EPOLL_CTL_ADD, manager.fd, &ev) == -1)
+    if (epoll_ctl(serverFd, EPOLL_CTL_ADD, manager.fd, &ev) == -1)
     {
         exitFailure(getErrorString());
     }
 
-    epoll_wait(epollFd, &ev, 1, -1);
-    string str;
+    epoll_wait(serverFd, &ev, 1, -1);
     while (true)
     {
         char buffer[4096];
@@ -77,16 +143,74 @@ std::string readCompilerMessage(const int epollFd, const IPCManagerBS &manager)
         break;
     }
 
-    if (epoll_ctl(epollFd, EPOLL_CTL_DEL, manager.fd, &ev) == -1)
+    if (epoll_ctl(serverFd, EPOLL_CTL_DEL, manager.fd, &ev) == -1)
     {
         exitFailure(getErrorString());
     }
+#endif
+
     const_cast<string_view &>(manager.serverReadString) = *new string(str);
-    return str;
+    if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+    {
+        exitFailure(r2.error());
+    }
 }
 
-void completeConnection(const IPCManagerBS &manager, int epollFd)
+void closeHandle(uint64_t fd)
 {
+#ifdef _WIN32
+    // CloseHandle returns non-zero on success, so we need to check for failure (zero)
+    if (!CloseHandle(reinterpret_cast<HANDLE>(fd)))
+    {
+        exitFailure(getErrorString());
+    }
+#else
+    if (close(fd) == -1)
+    {
+        exitFailure(getErrorString());
+    }
+#endif
+}
+
+void completeConnection(IPCManagerBS &manager, int serverFd)
+{
+#ifdef _WIN32
+    HANDLE hIOCP = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(serverFd));
+    HANDLE hPipe = reinterpret_cast<HANDLE>(manager.fd);
+
+    if (const auto &r2 = manager.completeConnection(); !r2)
+    {
+        exitFailure(r2.error());
+    }
+    else
+    {
+        if (!*r2)
+        {
+            // Connection is pending (ERROR_IO_PENDING)
+            // Wait for IOCP to signal completion
+
+            DWORD bytesTransferred = 0;
+            ULONG_PTR completionKey = 0;
+            LPOVERLAPPED overlapped = nullptr;
+
+            if (!GetQueuedCompletionStatus(hIOCP, &bytesTransferred, &completionKey, &overlapped,
+                                           INFINITE)) // Wait indefinitely
+            {
+                exitFailure(getErrorString());
+            }
+
+            // Verify this completion is for our pipe
+            if (completionKey != (ULONG_PTR)hPipe)
+            {
+                exitFailure("Unexpected completion key");
+            }
+
+            // Connection is now complete - no need to call completeConnection again
+            // The ConnectNamedPipe operation has finished
+        }
+        // else: connection completed synchronously, already done
+    }
+#else
     if (const auto &r2 = manager.completeConnection(); !r2)
     {
         exitFailure(r2.error());
@@ -96,19 +220,18 @@ void completeConnection(const IPCManagerBS &manager, int epollFd)
         if (!*r2)
         {
             epoll_event ev{};
-            // Add stdout to epoll
             ev.events = EPOLLIN;
-            if (epoll_ctl(epollFd, EPOLL_CTL_ADD, manager.fd, &ev) == -1)
+            if (epoll_ctl(serverFd, EPOLL_CTL_ADD, manager.fd, &ev) == -1)
             {
                 exitFailure(getErrorString());
             }
 
             epoll_event ev2{};
-            if (epoll_wait(epollFd, &ev2, 1, -1) == -1)
+            if (epoll_wait(serverFd, &ev2, 1, -1) == -1)
             {
                 exitFailure(getErrorString());
             }
-            if (epoll_ctl(epollFd, EPOLL_CTL_DEL, manager.fd, &ev) == -1)
+            if (epoll_ctl(serverFd, EPOLL_CTL_DEL, manager.fd, &ev) == -1)
             {
                 exitFailure(getErrorString());
             }
@@ -118,6 +241,25 @@ void completeConnection(const IPCManagerBS &manager, int epollFd)
             }
         }
     }
+#endif
+}
+
+uint64_t createMultiplex()
+{
+#ifdef _WIN32
+    HANDLE iocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, // handle to associate
+                                         nullptr,              // existing IOCP handle
+                                         0,                    // completion key (use pipe handle)
+                                         0                     // number of concurrent threads (0 = default)
+    );
+    if (iocp == nullptr)
+    {
+        exitFailure(getErrorString());
+    }
+    return reinterpret_cast<uint64_t>(iocp);
+#else
+    return epoll_create1(0);
+#endif
 }
 
 #ifdef _WIN32
@@ -392,13 +534,14 @@ tl::expected<int, string> runTest()
 
     // compiling a-c.cpp
     {
-        const auto &r = makeIPCManagerBS(aCObj);
+        const uint64_t serverFd = createMultiplex();
+        auto r = makeIPCManagerBS(aCObj, serverFd);
         if (!r)
         {
             return tl::unexpected("creating manager failed" + r.error() + "\n");
         }
 
-        const IPCManagerBS &manager = *r;
+        IPCManagerBS &manager = *r;
 
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aCObj +
                                 "\" -noScanIPC -c -xc++-module a-c.cpp -fmodule-output=\"" + aCPcm + "\"";
@@ -407,18 +550,11 @@ tl::expected<int, string> runTest()
             return tl::unexpected(r2.error());
         }
 
-        const int epollFd = epoll_create1(0);
-        completeConnection(manager, epollFd);
+        completeConnection(manager, serverFd);
 
         CTB type;
         char buffer[320];
-        readCompilerMessage(epollFd, manager);
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
+        readCompilerMessage(serverFd, manager, buffer, type);
         if (type != CTB::LAST_MESSAGE)
         {
             return tl::unexpected("received message of wrong type");
@@ -432,7 +568,6 @@ tl::expected<int, string> runTest()
         }
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
-        close(epollFd);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -441,13 +576,14 @@ tl::expected<int, string> runTest()
 
     // compiling a-b.cpp
     {
-        const auto &r = makeIPCManagerBS(aBObj);
+        const uint64_t serverFd = createMultiplex();
+        auto r = makeIPCManagerBS(aBObj, serverFd);
         if (!r)
         {
             return tl::unexpected("creating manager failed" + r.error() + "\n");
         }
 
-        const IPCManagerBS &manager = *r;
+        IPCManagerBS &manager = *r;
 
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aBObj +
                                 "\" -noScanIPC -c -xc++-module a-b.cpp -fmodule-output=\"" + aBPcm + "\"";
@@ -456,18 +592,11 @@ tl::expected<int, string> runTest()
             return tl::unexpected(r2.error());
         }
 
-        const int epollFd = epoll_create1(0);
-        completeConnection(manager, epollFd);
+        completeConnection(manager, serverFd);
 
         CTB type;
         char buffer[320];
-        readCompilerMessage(epollFd, manager);
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
+        readCompilerMessage(serverFd, manager, buffer, type);
         if (type != CTB::LAST_MESSAGE)
         {
             return tl::unexpected("received message of wrong type");
@@ -481,7 +610,6 @@ tl::expected<int, string> runTest()
         }
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
-        close(epollFd);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -490,13 +618,14 @@ tl::expected<int, string> runTest()
 
     // compiling a.cpp
     {
-        const auto &r = makeIPCManagerBS(aObj);
+        const uint64_t serverFd = createMultiplex();
+        auto r = makeIPCManagerBS(aObj, serverFd);
         if (!r)
         {
             return tl::unexpected("creating manager failed" + r.error() + "\n");
         }
 
-        const IPCManagerBS &manager = *r;
+        IPCManagerBS &manager = *r;
 
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aObj +
                                 "\" -noScanIPC -c -xc++-module a.cpp -fmodule-output=\"" + aPcm + "\"";
@@ -505,18 +634,11 @@ tl::expected<int, string> runTest()
             return tl::unexpected(r2.error());
         }
 
-        const int epollFd = epoll_create1(0);
-        completeConnection(manager, epollFd);
+        completeConnection(manager, serverFd);
 
         CTB type;
         char buffer[320];
-        readCompilerMessage(epollFd, manager);
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
+        readCompilerMessage(serverFd, manager, buffer, type);
         if (type != CTB::MODULE)
         {
             return tl::unexpected("received message of wrong type");
@@ -569,13 +691,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
-        readCompilerMessage(epollFd, manager);
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
+        readCompilerMessage(serverFd, manager, buffer, type);
         if (type != CTB::LAST_MESSAGE)
         {
             return tl::unexpected("received message of wrong type");
@@ -584,7 +700,6 @@ tl::expected<int, string> runTest()
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
-        close(epollFd);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -603,13 +718,14 @@ tl::expected<int, string> runTest()
 
     // compiling n.hpp
     {
-        const auto &r = makeIPCManagerBS(nPcm);
+        const uint64_t serverFd = createMultiplex();
+        auto r = makeIPCManagerBS(nPcm, serverFd);
         if (!r)
         {
             return tl::unexpected("creating manager failed" + r.error() + "\n");
         }
 
-        const IPCManagerBS &manager = *r;
+        IPCManagerBS &manager = *r;
 
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + nPcm +
                                 "\" -noScanIPC -xc++-header n.hpp -DCOMMAND_MACRO";
@@ -618,19 +734,12 @@ tl::expected<int, string> runTest()
             return tl::unexpected(r2.error());
         }
 
-        const int epollFd = epoll_create1(0);
-        completeConnection(manager, epollFd);
+        completeConnection(manager, serverFd);
 
         CTB type;
         char buffer[320];
 
-        readCompilerMessage(epollFd, manager);
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
+        readCompilerMessage(serverFd, manager, buffer, type);
         if (type != CTB::NON_MODULE)
         {
             return tl::unexpected("received message of wrong type");
@@ -651,13 +760,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
-        readCompilerMessage(epollFd, manager);
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
+        readCompilerMessage(serverFd, manager, buffer, type);
         if (type != CTB::LAST_MESSAGE)
         {
             return tl::unexpected("received message of wrong type");
@@ -666,7 +769,6 @@ tl::expected<int, string> runTest()
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
-        close(epollFd);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -675,13 +777,14 @@ tl::expected<int, string> runTest()
 
     // compiling o.hpp
     {
-        const auto &r = makeIPCManagerBS(oPcm);
+        const uint64_t serverFd = createMultiplex();
+        auto r = makeIPCManagerBS(oPcm, serverFd);
         if (!r)
         {
             return tl::unexpected("creating manager failed" + r.error() + "\n");
         }
 
-        const IPCManagerBS &manager = *r;
+        IPCManagerBS &manager = *r;
 
         string compileCommand =
             CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm + "\" -noScanIPC -xc++-header o.hpp";
@@ -690,18 +793,11 @@ tl::expected<int, string> runTest()
             return tl::unexpected(r2.error());
         }
 
-        const int epollFd = epoll_create1(0);
-        completeConnection(manager, epollFd);
+        completeConnection(manager, serverFd);
 
         CTB type;
         char buffer[320];
-        readCompilerMessage(epollFd, manager);
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
+        readCompilerMessage(serverFd, manager, buffer, type);
         if (type != CTB::NON_MODULE)
         {
             return tl::unexpected("received message of wrong type");
@@ -721,13 +817,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
-        readCompilerMessage(epollFd, manager);
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
+        readCompilerMessage(serverFd, manager, buffer, type);
         if (type != CTB::NON_MODULE)
         {
             return tl::unexpected("received message of wrong type");
@@ -763,13 +853,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
-        readCompilerMessage(epollFd, manager);
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
+        readCompilerMessage(serverFd, manager, buffer, type);
         if (type != CTB::LAST_MESSAGE)
         {
             return tl::unexpected("received message of wrong type");
@@ -777,7 +861,6 @@ tl::expected<int, string> runTest()
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
-        close(epollFd);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -792,13 +875,14 @@ tl::expected<int, string> runTest()
     // compiling o.hpp with include-translation. BTCNonModule for n.hpp will be received with
     // isHeaderUnit = true.
     {
-        const auto &r = makeIPCManagerBS(oPcm);
+        const uint64_t serverFd = createMultiplex();
+        auto r = makeIPCManagerBS(oPcm, serverFd);
         if (!r)
         {
             return tl::unexpected("creating manager failed" + r.error() + "\n");
         }
 
-        const IPCManagerBS &manager = *r;
+        IPCManagerBS &manager = *r;
 
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm +
                                 "\" -noScanIPC -xc++-header o.hpp -DTRANSLATING";
@@ -807,18 +891,11 @@ tl::expected<int, string> runTest()
             return tl::unexpected(r2.error());
         }
 
-        const int epollFd = epoll_create1(0);
-        completeConnection(manager, epollFd);
+        completeConnection(manager, serverFd);
 
         CTB type;
         char buffer[320];
-        readCompilerMessage(epollFd, manager);
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
+        readCompilerMessage(serverFd, manager, buffer, type);
         if (type != CTB::NON_MODULE)
         {
             return tl::unexpected("received message of wrong type");
@@ -838,13 +915,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
-        readCompilerMessage(epollFd, manager);
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
+        readCompilerMessage(serverFd, manager, buffer, type);
         if (type != CTB::NON_MODULE)
         {
             return tl::unexpected("received message of wrong type");
@@ -880,13 +951,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
-        readCompilerMessage(epollFd, manager);
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
+        readCompilerMessage(serverFd, manager, buffer, type);
         if (type != CTB::LAST_MESSAGE)
         {
             return tl::unexpected("received message of wrong type");
@@ -894,7 +959,6 @@ tl::expected<int, string> runTest()
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
-        close(epollFd);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -908,13 +972,14 @@ tl::expected<int, string> runTest()
 
     // compiling big.hpp
     {
-        const auto &r = makeIPCManagerBS(bigPcm);
+        const uint64_t serverFd = createMultiplex();
+        auto r = makeIPCManagerBS(bigPcm, serverFd);
         if (!r)
         {
             return tl::unexpected("creating manager failed" + r.error() + "\n");
         }
 
-        const IPCManagerBS &manager = *r;
+        IPCManagerBS &manager = *r;
 
         string compileCommand =
             CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + bigPcm + "\" -noScanIPC -xc++-header big.hpp";
@@ -923,18 +988,11 @@ tl::expected<int, string> runTest()
             return tl::unexpected(r2.error());
         }
 
-        const int epollFd = epoll_create1(0);
-        completeConnection(manager, epollFd);
+        completeConnection(manager, serverFd);
 
         CTB type;
         char buffer[320];
-        readCompilerMessage(epollFd, manager);
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
+        readCompilerMessage(serverFd, manager, buffer, type);
         if (type != CTB::NON_MODULE)
         {
             return tl::unexpected("received message of wrong type");
@@ -966,13 +1024,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
-        readCompilerMessage(epollFd, manager);
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
+        readCompilerMessage(serverFd, manager, buffer, type);
         if (type != CTB::LAST_MESSAGE)
         {
             return tl::unexpected("received message of wrong type");
@@ -981,7 +1033,6 @@ tl::expected<int, string> runTest()
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
-        close(epollFd);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -990,13 +1041,14 @@ tl::expected<int, string> runTest()
 
     // compiling foo.cpp
     {
-        const auto &r = makeIPCManagerBS(fooObj);
+        const uint64_t serverFd = createMultiplex();
+        auto r = makeIPCManagerBS(fooObj, serverFd);
         if (!r)
         {
             return tl::unexpected("creating manager failed" + r.error() + "\n");
         }
 
-        const IPCManagerBS &manager = *r;
+        IPCManagerBS &manager = *r;
 
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + fooObj +
                                 "\" -noScanIPC -c -xc++-module foo.cpp -fmodule-output=\"" + fooPcm + "\"";
@@ -1004,19 +1056,12 @@ tl::expected<int, string> runTest()
         {
             return tl::unexpected(r2.error());
         }
-        const int epollFd = epoll_create1(0);
-        completeConnection(manager, epollFd);
+        completeConnection(manager, serverFd);
 
         CTB type;
         char buffer[320];
 
-        readCompilerMessage(epollFd, manager);
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
+        readCompilerMessage(serverFd, manager, buffer, type);
         if (type != CTB::NON_MODULE)
         {
             return tl::unexpected("received message of wrong type");
@@ -1055,13 +1100,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
-        readCompilerMessage(epollFd, manager);
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
+        readCompilerMessage(serverFd, manager, buffer, type);
         if (type != CTB::MODULE)
         {
             return tl::unexpected("received message of wrong type");
@@ -1103,13 +1142,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
-        readCompilerMessage(epollFd, manager);
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
+        readCompilerMessage(serverFd, manager, buffer, type);
         if (type != CTB::LAST_MESSAGE)
         {
             return tl::unexpected("received message of wrong type");
@@ -1118,7 +1151,6 @@ tl::expected<int, string> runTest()
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
-        close(epollFd);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -1136,13 +1168,14 @@ tl::expected<int, string> runTest()
 
     // compiling main.cpp
     auto compileMain = [&](bool shouldFail) -> tl::expected<int, string> {
-        const auto &r = makeIPCManagerBS(mainObj);
+        const uint64_t serverFd = createMultiplex();
+        auto r = makeIPCManagerBS(mainObj, serverFd);
         if (!r)
         {
             return tl::unexpected("creating manager failed" + r.error() + "\n");
         }
 
-        const IPCManagerBS &manager = *r;
+        IPCManagerBS &manager = *r;
 
         string compileCommand = CLANG_CMD R"( -std=c++20 -o ")" + mainObj + "\" -noScanIPC -c main.cpp";
         if (const auto &r2 = Run(compileCommand); !r2)
@@ -1150,18 +1183,11 @@ tl::expected<int, string> runTest()
             return tl::unexpected(r2.error());
         }
 
-        const int epollFd = epoll_create1(0);
-        completeConnection(manager, epollFd);
+        completeConnection(manager, serverFd);
 
         CTB type;
         char buffer[320];
-        readCompilerMessage(epollFd, manager);
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
+        readCompilerMessage(serverFd, manager, buffer, type);
         if (type != CTB::MODULE)
         {
             return tl::unexpected("received message of wrong type");
@@ -1231,13 +1257,7 @@ tl::expected<int, string> runTest()
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
-        readCompilerMessage(epollFd, manager);
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            string str = r2.error();
-            return tl::unexpected("manager receive message failed" + r2.error() + "\n");
-        }
-
+        readCompilerMessage(serverFd, manager, buffer, type);
         if (type != CTB::LAST_MESSAGE)
         {
             return tl::unexpected("received message of wrong type");
@@ -1251,7 +1271,6 @@ tl::expected<int, string> runTest()
 
         printMessage(ctbLastMessage, false);
         manager.closeConnection();
-        close(epollFd);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -1283,6 +1302,7 @@ tl::expected<int, string> runTest()
     return {};
 }
 } // namespace
+
 #ifdef IS_THIS_CLANG_REPO
 TEST(IPC2978Test, IPC2978Test)
 {
