@@ -118,9 +118,9 @@ tl::expected<bool, std::string> IPCManagerBS::completeConnection() const
 {
 #ifdef _WIN32
     // For IOCP, we need to use overlapped I/O
-    OVERLAPPED overlapped = {0};
+    OVERLAPPED overlapped = {};
 
-    if (BOOL result = ConnectNamedPipe((HANDLE)fd, &overlapped))
+    if (ConnectNamedPipe((HANDLE)fd, &overlapped))
     {
         // Connection completed synchronously (rare)
         return true;

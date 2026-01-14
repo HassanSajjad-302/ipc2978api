@@ -68,7 +68,7 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
     {
         char buffer[4096];
         DWORD bytesRead = 0;
-        OVERLAPPED overlapped = {0};
+        OVERLAPPED overlapped = {};
 
         // Initiate async read. Even if it is completed successfully, we will get the completion packet. We don't get
         // the packet only if it fails immediately with error other than ERROR_IO_PENDING
@@ -154,22 +154,6 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
     {
         exitFailure(r2.error());
     }
-}
-
-void closeHandle(uint64_t fd)
-{
-#ifdef _WIN32
-    // CloseHandle returns non-zero on success, so we need to check for failure (zero)
-    if (!CloseHandle(reinterpret_cast<HANDLE>(fd)))
-    {
-        exitFailure(getErrorString());
-    }
-#else
-    if (close(fd) == -1)
-    {
-        exitFailure(getErrorString());
-    }
-#endif
 }
 
 void completeConnection(IPCManagerBS &manager, int serverFd)
