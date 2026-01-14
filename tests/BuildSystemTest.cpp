@@ -65,14 +65,14 @@ void listenForCompiler()
     }
 }
 
-std::string readCompilerMessage(const uint64_t serverFd, const uint64_t fd)
+void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, char (&buffer)[320], CTB &type)
 {
+    std::string str;
 
 #ifdef _WIN32
     HANDLE hIOCP = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(serverFd));
-    HANDLE hPipe = reinterpret_cast<HANDLE>(fd);
+    HANDLE hPipe = reinterpret_cast<HANDLE>(manager.fd);
 
-    std::string str;
     while (true)
     {
         char buffer[4096];
@@ -122,24 +122,20 @@ std::string readCompilerMessage(const uint64_t serverFd, const uint64_t fd)
             break;
         }
     }
-
-    return str;
-
 #else
 
     epoll_event ev{};
     ev.events = EPOLLIN;
-    if (epoll_ctl(serverFd, EPOLL_CTL_ADD, fd, &ev) == -1)
+    if (epoll_ctl(serverFd, EPOLL_CTL_ADD, manager.fd, &ev) == -1)
     {
         exitFailure(getErrorString());
     }
 
     epoll_wait(serverFd, &ev, 1, -1);
-    std::string str;
     while (true)
     {
         char buffer[4096];
-        const int readCount = read(fd, buffer, 4096);
+        const int readCount = read(manager.fd, buffer, 4096);
         if (readCount == 0 || readCount == -1)
         {
             exitFailure(getErrorString());
@@ -156,12 +152,17 @@ std::string readCompilerMessage(const uint64_t serverFd, const uint64_t fd)
         break;
     }
 
-    if (epoll_ctl(serverFd, EPOLL_CTL_DEL, fd, &ev) == -1)
+    if (epoll_ctl(serverFd, EPOLL_CTL_DEL, manager.fd, &ev) == -1)
     {
         exitFailure(getErrorString());
     }
-    return str;
 #endif
+
+    const_cast<string_view &>(manager.serverReadString) = *new string(str);
+    if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+    {
+        exitFailure(r2.error());
+    }
 }
 
 void closeHandle(uint64_t fd)
@@ -293,12 +294,7 @@ int runTest()
     {
         bool loopExit = false;
 
-        string str = readCompilerMessage(serverFd, manager.fd);
-        manager.serverReadString = str;
-        if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-        {
-            exitFailure(r2.error());
-        }
+        readCompilerMessage(serverFd, manager, buffer, type);
 
         switch (type)
         {
@@ -440,12 +436,7 @@ int runTest()
     std::this_thread::sleep_for(std::chrono::seconds(3));
 
     // CompilerTest would have exited by now
-    string str = readCompilerMessage(serverFd, manager.fd);
-    manager.serverReadString = str;
-    if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-    {
-        exitFailure(r2.error());
-    }
+    readCompilerMessage(serverFd, manager, buffer, type);
 
     if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(bmi2Mapping); !r2)
     {
