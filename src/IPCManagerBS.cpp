@@ -140,6 +140,11 @@ tl::expected<bool, std::string> IPCManagerBS::completeConnection() const
         // This can happen if client connects very quickly
         return true;
     }
+    if (error == ERROR_NO_DATA)
+    {
+        // Client connected and exited before we called ConnectnamedPipe
+        return true;
+    }
     // Actual error occurred
     return tl::unexpected(getErrorString());
 #else

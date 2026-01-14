@@ -79,33 +79,29 @@ std::string readCompilerMessage(const uint64_t serverFd, const uint64_t fd)
         DWORD bytesRead = 0;
         OVERLAPPED overlapped = {0};
 
-        // Initiate async read
+        // Initiate async read. Even if it is completed successfully, we will get the completion packet. We don't get
+        // the packet only if it fails immediately with error other than ERROR_IO_PENDING
         BOOL result = ReadFile(hPipe, buffer, sizeof(buffer), &bytesRead, &overlapped);
 
-        if (!result)
+        DWORD error = GetLastError();
+        if (!result && error != ERROR_IO_PENDING)
         {
-            DWORD error = GetLastError();
-            if (error == ERROR_IO_PENDING)
-            {
-                // Wait for the read to complete
-                ULONG_PTR completionKey = 0;
-                LPOVERLAPPED completedOverlapped = nullptr;
+            exitFailure(getErrorString());
+        }
 
-                if (!GetQueuedCompletionStatus(hIOCP, &bytesRead, &completionKey, &completedOverlapped, INFINITE))
-                {
-                    exitFailure(getErrorString());
-                }
+        // Wait for the read to complete.
+        ULONG_PTR completionKey = 0;
+        LPOVERLAPPED completedOverlapped = nullptr;
 
-                // Verify completion is for our pipe
-                if (completionKey != (ULONG_PTR)hPipe)
-                {
-                    exitFailure("Unexpected completion key");
-                }
-            }
-            else
-            {
-                exitFailure(getErrorString());
-            }
+        if (!GetQueuedCompletionStatus(hIOCP, &bytesRead, &completionKey, &completedOverlapped, INFINITE))
+        {
+            exitFailure(getErrorString());
+        }
+
+        // Verify completion is for our pipe
+        if (completionKey != (ULONG_PTR)hPipe)
+        {
+            exitFailure("Unexpected completion key");
         }
 
         if (bytesRead == 0)
@@ -260,9 +256,9 @@ uint64_t createMultiplex()
 {
 #ifdef _WIN32
     HANDLE iocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, // handle to associate
-                                         nullptr, // existing IOCP handle
-                                         0,       // completion key (use pipe handle)
-                                         0        // number of concurrent threads (0 = default)
+                                         nullptr,              // existing IOCP handle
+                                         0,                    // completion key (use pipe handle)
+                                         0                     // number of concurrent threads (0 = default)
     );
     if (iocp == nullptr)
     {
@@ -453,7 +449,6 @@ int runTest()
     // we delay the receiveMessage. Compiler in this duration has exited with error after connecting.
     std::this_thread::sleep_for(std::chrono::seconds(3));
 
-    completeConnection(manager, serverFd);
     // CompilerTest would have exited by now
     str = readCompilerMessage(serverFd, manager.fd);
     manager.serverReadString = str;
