@@ -31,6 +31,7 @@ class IPCManagerBS : public Manager
     void closeConnection() const;
 };
 
-tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath, uint64_t iocp, uint64_t completionKey = 0);
+tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath, uint64_t iocp,
+                                                         uint64_t completionKey);
 } // namespace N2978
 #endif // IPC_MANAGER_BS_HPP

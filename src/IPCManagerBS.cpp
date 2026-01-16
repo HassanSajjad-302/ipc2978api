@@ -46,8 +46,9 @@ tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeader
     // Associate the pipe with the existing IOCP handle
     if (CreateIoCompletionPort(hPipe,                          // handle to associate
                                reinterpret_cast<HANDLE>(iocp), // existing IOCP handle
-                               completionKey,                  // completion key (use pipe handle)
-                               0                               // number of concurrent threads (0 = default)
+                               completionKey ? completionKey
+                                             : reinterpret_cast<uint64_t>(hPipe), // completion key (use pipe handle)
+                               0 // number of concurrent threads (0 = default)
                                ) == nullptr)
     {
         CloseHandle(hPipe);

@@ -520,7 +520,7 @@ tl::expected<int, string> runTest()
     // compiling a-c.cpp
     {
         const uint64_t serverFd = createMultiplex();
-        auto r = makeIPCManagerBS(aCObj, serverFd);
+        auto r = makeIPCManagerBS(aCObj, serverFd, 0);
         if (!r)
         {
             return tl::unexpected("creating manager failed" + r.error() + "\n");
@@ -562,7 +562,7 @@ tl::expected<int, string> runTest()
     // compiling a-b.cpp
     {
         const uint64_t serverFd = createMultiplex();
-        auto r = makeIPCManagerBS(aBObj, serverFd);
+        auto r = makeIPCManagerBS(aBObj, serverFd, 0);
         if (!r)
         {
             return tl::unexpected("creating manager failed" + r.error() + "\n");
@@ -604,7 +604,7 @@ tl::expected<int, string> runTest()
     // compiling a.cpp
     {
         const uint64_t serverFd = createMultiplex();
-        auto r = makeIPCManagerBS(aObj, serverFd);
+        auto r = makeIPCManagerBS(aObj, serverFd, 0);
         if (!r)
         {
             return tl::unexpected("creating manager failed" + r.error() + "\n");
@@ -704,7 +704,7 @@ tl::expected<int, string> runTest()
     // compiling n.hpp
     {
         const uint64_t serverFd = createMultiplex();
-        auto r = makeIPCManagerBS(nPcm, serverFd);
+        auto r = makeIPCManagerBS(nPcm, serverFd, 0);
         if (!r)
         {
             return tl::unexpected("creating manager failed" + r.error() + "\n");
@@ -763,7 +763,7 @@ tl::expected<int, string> runTest()
     // compiling o.hpp
     {
         const uint64_t serverFd = createMultiplex();
-        auto r = makeIPCManagerBS(oPcm, serverFd);
+        auto r = makeIPCManagerBS(oPcm, serverFd, 0);
         if (!r)
         {
             return tl::unexpected("creating manager failed" + r.error() + "\n");
@@ -861,7 +861,7 @@ tl::expected<int, string> runTest()
     // isHeaderUnit = true.
     {
         const uint64_t serverFd = createMultiplex();
-        auto r = makeIPCManagerBS(oPcm, serverFd);
+        auto r = makeIPCManagerBS(oPcm, serverFd, 0);
         if (!r)
         {
             return tl::unexpected("creating manager failed" + r.error() + "\n");
@@ -958,7 +958,7 @@ tl::expected<int, string> runTest()
     // compiling big.hpp
     {
         const uint64_t serverFd = createMultiplex();
-        auto r = makeIPCManagerBS(bigPcm, serverFd);
+        auto r = makeIPCManagerBS(bigPcm, serverFd, 0);
         if (!r)
         {
             return tl::unexpected("creating manager failed" + r.error() + "\n");
@@ -1027,7 +1027,7 @@ tl::expected<int, string> runTest()
     // compiling foo.cpp
     {
         const uint64_t serverFd = createMultiplex();
-        auto r = makeIPCManagerBS(fooObj, serverFd);
+        auto r = makeIPCManagerBS(fooObj, serverFd, 0);
         if (!r)
         {
             return tl::unexpected("creating manager failed" + r.error() + "\n");
@@ -1154,7 +1154,7 @@ tl::expected<int, string> runTest()
     // compiling main.cpp
     auto compileMain = [&](bool shouldFail) -> tl::expected<int, string> {
         const uint64_t serverFd = createMultiplex();
-        auto r = makeIPCManagerBS(mainObj, serverFd);
+        auto r = makeIPCManagerBS(mainObj, serverFd, 0);
         if (!r)
         {
             return tl::unexpected("creating manager failed" + r.error() + "\n");
