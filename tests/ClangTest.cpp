@@ -80,6 +80,8 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
             exitFailure(getErrorString());
         }
 
+        bytesRead = 0;
+
         // Wait for the read to complete.
         ULONG_PTR completionKey = 0;
         LPOVERLAPPED completedOverlapped = nullptr;
@@ -192,7 +194,6 @@ void completeConnection(IPCManagerBS &manager, int serverFd)
             // Connection is now complete - no need to call completeConnection again
             // The ConnectNamedPipe operation has finished
         }
-        // else: connection completed synchronously, already done
     }
 #else
     if (const auto &r2 = manager.completeConnection(); !r2)

@@ -19,7 +19,8 @@
 namespace N2978
 {
 
-tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath, uint64_t iocp)
+tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath,
+                                                         const uint64_t iocp, uint64_t completionKey)
 {
 #ifdef _WIN32
     BMIIfHeaderUnitObjOtherwisePath = R"(\\.\pipe\)" + BMIIfHeaderUnitObjOtherwisePath;
@@ -28,8 +29,8 @@ tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeader
                                     PIPE_ACCESS_DUPLEX |                     // read/write access
                                         FILE_FLAG_OVERLAPPED |               // overlapped mode for IOCP
                                         FILE_FLAG_FIRST_PIPE_INSTANCE,       // first instance only
-                                    PIPE_TYPE_BYTE |                      // message-type pipe
-                                        PIPE_READMODE_BYTE |              // message read mode
+                                    PIPE_TYPE_BYTE |                         // message-type pipe
+                                        PIPE_READMODE_BYTE |                 // message read mode
                                         PIPE_WAIT,                           // blocking mode (for sync operations)
                                     1,                                       // max instances
                                     BUFFERSIZE * sizeof(TCHAR),              // output buffer size
@@ -43,10 +44,10 @@ tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeader
     }
 
     // Associate the pipe with the existing IOCP handle
-    if (CreateIoCompletionPort(hPipe,                              // handle to associate
-                               reinterpret_cast<HANDLE>(iocp),     // existing IOCP handle
-                               reinterpret_cast<ULONG_PTR>(hPipe), // completion key (use pipe handle)
-                               0                                   // number of concurrent threads (0 = default)
+    if (CreateIoCompletionPort(hPipe,                          // handle to associate
+                               reinterpret_cast<HANDLE>(iocp), // existing IOCP handle
+                               completionKey,                  // completion key (use pipe handle)
+                               0                               // number of concurrent threads (0 = default)
                                ) == nullptr)
     {
         CloseHandle(hPipe);
@@ -122,8 +123,7 @@ tl::expected<bool, std::string> IPCManagerBS::completeConnection() const
 
     if (ConnectNamedPipe((HANDLE)fd, &overlapped))
     {
-        // Connection completed synchronously (rare)
-        return true;
+        return tl::unexpected("ConnectNamedPipe should not complete synchronously\n");
     }
 
     DWORD error = GetLastError();
