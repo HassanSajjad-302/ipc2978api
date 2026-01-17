@@ -20,7 +20,7 @@ namespace N2978
 {
 
 tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath,
-                                                         const uint64_t iocp, uint64_t completionKey)
+                                                         const uint64_t serverFd, uint64_t completionKey)
 {
 #ifdef _WIN32
     BMIIfHeaderUnitObjOtherwisePath = R"(\\.\pipe\)" + BMIIfHeaderUnitObjOtherwisePath;
@@ -45,7 +45,7 @@ tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeader
 
     // Associate the pipe with the existing IOCP handle
     if (CreateIoCompletionPort(hPipe,                          // handle to associate
-                               reinterpret_cast<HANDLE>(iocp), // existing IOCP handle
+                               reinterpret_cast<HANDLE>(serverFd), // existing IOCP handle
                                completionKey ? completionKey
                                              : reinterpret_cast<uint64_t>(hPipe), // completion key (use pipe handle)
                                0 // number of concurrent threads (0 = default)
