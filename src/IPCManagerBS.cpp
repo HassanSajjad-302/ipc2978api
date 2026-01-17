@@ -20,7 +20,7 @@ namespace N2978
 {
 
 tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath,
-                                                         const uint64_t serverFd, uint64_t completionKey)
+                                                         const uint64_t serverFd, const uint64_t completionKey)
 {
 #ifdef _WIN32
     BMIIfHeaderUnitObjOtherwisePath = R"(\\.\pipe\)" + BMIIfHeaderUnitObjOtherwisePath;
