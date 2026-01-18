@@ -20,7 +20,7 @@ class IPCManagerBS : public Manager
     IPCManagerBS &operator=(const IPCManagerBS &) = default;
     IPCManagerBS(IPCManagerBS &&) = default;
     IPCManagerBS &operator=(IPCManagerBS &&) = default;
-    tl::expected<void, std::string> registerManager( uint64_t serverFd, uint64_t completionKey) const;
+    tl::expected<void, std::string> registerManager(uint64_t serverFd, uint64_t completionKey) const;
     tl::expected<bool, std::string> completeConnection() const;
     tl::expected<void, std::string> receiveMessage(char (&ctbBuffer)[320], CTB &messageType) const;
     [[nodiscard]] tl::expected<void, std::string> sendMessage(const BTCModule &moduleFile) const;
