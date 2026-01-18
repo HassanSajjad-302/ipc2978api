@@ -11,8 +11,7 @@ namespace N2978
 // IPC Manager BuildSystem
 class IPCManagerBS : public Manager
 {
-    friend tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath,
-                                                                    uint64_t serverFd, uint64_t completionKey);
+    friend tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath);
 
     explicit IPCManagerBS(uint64_t fd_);
 
@@ -21,6 +20,7 @@ class IPCManagerBS : public Manager
     IPCManagerBS &operator=(const IPCManagerBS &) = default;
     IPCManagerBS(IPCManagerBS &&) = default;
     IPCManagerBS &operator=(IPCManagerBS &&) = default;
+    tl::expected<void, std::string> registerManager( uint64_t serverFd, uint64_t completionKey) const;
     tl::expected<bool, std::string> completeConnection() const;
     tl::expected<void, std::string> receiveMessage(char (&ctbBuffer)[320], CTB &messageType) const;
     [[nodiscard]] tl::expected<void, std::string> sendMessage(const BTCModule &moduleFile) const;
@@ -31,7 +31,6 @@ class IPCManagerBS : public Manager
     void closeConnection() const;
 };
 
-tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath, uint64_t serverFd,
-                                                         uint64_t completionKey);
+tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath);
 } // namespace N2978
 #endif // IPC_MANAGER_BS_HPP

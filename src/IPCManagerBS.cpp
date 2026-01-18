@@ -19,8 +19,7 @@
 namespace N2978
 {
 
-tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath,
-                                                         const uint64_t serverFd, const uint64_t completionKey)
+tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath)
 {
 #ifdef _WIN32
     BMIIfHeaderUnitObjOtherwisePath = R"(\\.\pipe\)" + BMIIfHeaderUnitObjOtherwisePath;
@@ -43,17 +42,6 @@ tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeader
         return tl::unexpected(getErrorString());
     }
 
-    // Associate the pipe with the existing IOCP handle
-    if (CreateIoCompletionPort(hPipe,                          // handle to associate
-                               reinterpret_cast<HANDLE>(serverFd), // existing IOCP handle
-                               completionKey ? completionKey
-                                             : reinterpret_cast<uint64_t>(hPipe), // completion key (use pipe handle)
-                               0 // number of concurrent threads (0 = default)
-                               ) == nullptr)
-    {
-        CloseHandle(hPipe);
-        return tl::unexpected(getErrorString());
-    }
 #else
     // Named Pipes are used but Unix Domain sockets could have been used as well. The tradeoff is that a file is created
     // and there needs to be bind, listen, accept calls which means that an extra fd is created is temporarily on the
@@ -100,6 +88,27 @@ tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeader
 #endif
 
     return IPCManagerBS(reinterpret_cast<uint64_t>(hPipe));
+}
+
+tl::expected<void, std::string> IPCManagerBS::registerManager(const uint64_t serverFd,
+                                                              const uint64_t completionKey) const
+{
+#ifdef _WIN32
+    // Associate the pipe with the existing IOCP handle. completionKey is either 0 or a legit value. if 0 then we pass
+    // the fd as completion-key. Test checks after the GetQueuedCompletionStatus() call to ensure that the completionKey
+    // is same as the fd.
+    HANDLE h = CreateIoCompletionPort((HANDLE)fd,                         // handle to associate
+                                      reinterpret_cast<HANDLE>(serverFd), // existing IOCP handle
+                                      completionKey,                      // completion key
+                                      0                                   // number of concurrent threads (0 = default)
+    );
+    if (h == nullptr)
+    {
+        CloseHandle((HANDLE)fd);
+        return tl::unexpected(getErrorString());
+    }
+    return {};
+#endif
 }
 
 #ifdef _WIN32
