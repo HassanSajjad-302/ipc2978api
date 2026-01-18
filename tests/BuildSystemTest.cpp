@@ -272,7 +272,7 @@ uint64_t createMultiplex()
 #endif
 }
 
-IPCManagerBS &makeBuildSystemManager(const string &filePath, uint64_t serverFd)
+IPCManagerBS makeBuildSystemManager(const string &filePath, uint64_t serverFd)
 {
     auto r = makeIPCManagerBS(filePath);
     if (!r)
