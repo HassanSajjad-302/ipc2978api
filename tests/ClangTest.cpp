@@ -536,7 +536,7 @@ tl::expected<int, string> runTest()
     // compiling a-c.cpp
     {
         const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager =makeBuildSystemManager(aCObj, serverFd);
+        IPCManagerBS manager = makeBuildSystemManager(aCObj, serverFd);
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aCObj +
                                 "\" -noScanIPC -c -xc++-module a-c.cpp -fmodule-output=\"" + aCPcm + "\"";
         if (const auto &r2 = Run(compileCommand); !r2)
@@ -571,7 +571,7 @@ tl::expected<int, string> runTest()
     // compiling a-b.cpp
     {
         const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager =makeBuildSystemManager(aBObj, serverFd);
+        IPCManagerBS manager = makeBuildSystemManager(aBObj, serverFd);
 
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aBObj +
                                 "\" -noScanIPC -c -xc++-module a-b.cpp -fmodule-output=\"" + aBPcm + "\"";
@@ -607,7 +607,7 @@ tl::expected<int, string> runTest()
     // compiling a.cpp
     {
         const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager =makeBuildSystemManager(aObj, serverFd);
+        IPCManagerBS manager = makeBuildSystemManager(aObj, serverFd);
 
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aObj +
                                 "\" -noScanIPC -c -xc++-module a.cpp -fmodule-output=\"" + aPcm + "\"";
@@ -701,7 +701,7 @@ tl::expected<int, string> runTest()
     // compiling n.hpp
     {
         const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager =makeBuildSystemManager(nPcm, serverFd);
+        IPCManagerBS manager = makeBuildSystemManager(nPcm, serverFd);
 
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + nPcm +
                                 "\" -noScanIPC -xc++-header n.hpp -DCOMMAND_MACRO";
@@ -754,7 +754,7 @@ tl::expected<int, string> runTest()
     // compiling o.hpp
     {
         const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager =makeBuildSystemManager(oPcm, serverFd);
+        IPCManagerBS manager = makeBuildSystemManager(oPcm, serverFd);
 
         string compileCommand =
             CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm + "\" -noScanIPC -xc++-header o.hpp";
@@ -846,7 +846,7 @@ tl::expected<int, string> runTest()
     // isHeaderUnit = true.
     {
         const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager =makeBuildSystemManager(oPcm, serverFd);
+        IPCManagerBS manager = makeBuildSystemManager(oPcm, serverFd);
 
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm +
                                 "\" -noScanIPC -xc++-header o.hpp -DTRANSLATING";
@@ -937,7 +937,7 @@ tl::expected<int, string> runTest()
     // compiling big.hpp
     {
         const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager =makeBuildSystemManager(bigPcm, serverFd);
+        IPCManagerBS manager = makeBuildSystemManager(bigPcm, serverFd);
 
         string compileCommand =
             CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + bigPcm + "\" -noScanIPC -xc++-header big.hpp";
@@ -1000,7 +1000,7 @@ tl::expected<int, string> runTest()
     // compiling foo.cpp
     {
         const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager =makeBuildSystemManager(fooObj, serverFd);
+        IPCManagerBS manager = makeBuildSystemManager(fooObj, serverFd);
 
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + fooObj +
                                 "\" -noScanIPC -c -xc++-module foo.cpp -fmodule-output=\"" + fooPcm + "\"";
@@ -1121,7 +1121,7 @@ tl::expected<int, string> runTest()
     // compiling main.cpp
     auto compileMain = [&](bool shouldFail) -> tl::expected<int, string> {
         const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager =makeBuildSystemManager(mainObj, serverFd);
+        IPCManagerBS manager = makeBuildSystemManager(mainObj, serverFd);
 
         string compileCommand = CLANG_CMD R"( -std=c++20 -o ")" + mainObj + "\" -noScanIPC -c main.cpp";
         if (const auto &r2 = Run(compileCommand); !r2)
