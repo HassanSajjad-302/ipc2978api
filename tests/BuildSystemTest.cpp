@@ -277,7 +277,7 @@ int runTest()
     CTBLastMessage lastMessage;
     const uint64_t serverFd = createMultiplex();
 
-    const auto r = makeIPCManagerBS((std::filesystem::current_path() / "test").string(), serverFd);
+    const auto r = makeIPCManagerBS((std::filesystem::current_path() / "test").string(), serverFd,  0);
     if (!r)
     {
         exitFailure(r.error());
@@ -381,7 +381,7 @@ int runTest()
     // To ensure that we make build-system manager before CompilerTest making compiler manager,
     // we make it here.
 
-    if (auto r2 = makeIPCManagerBS((std::filesystem::current_path() / "test1").string(), serverFd); !r2)
+    if (auto r2 = makeIPCManagerBS((std::filesystem::current_path() / "test1").string(), serverFd, 0); !r2)
     {
         exitFailure(r2.error());
     }
