@@ -386,7 +386,6 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
             continue;
         }
 
-        str.pop_back();
         break;
     }
 
