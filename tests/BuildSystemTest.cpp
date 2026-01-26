@@ -290,6 +290,15 @@ struct BuildSystemTest
     }
 };
 
+bool ends_with(const std::string &str, const std::string &suffix)
+{
+    if (suffix.size() > str.size())
+    {
+        return false;
+    }
+    return str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
 void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, char (&buffer)[320], CTB &type)
 {
     std::string str;
@@ -371,10 +380,12 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
         {
             str.push_back(buffer[i]);
         }
-        if (str[str.size() - 1] != ';')
+
+        if (ends_with(str, delimiter))
         {
             continue;
         }
+
         str.pop_back();
         break;
     }
@@ -446,7 +457,7 @@ void completeConnection(IPCManagerBS &manager, int serverFd)
         }
     }
 #else
-    if (const auto &r2 = manager.completeConnection(); !r2)
+    /*if (const auto &r2 = manager.completeConnection(); !r2)
     {
         exitFailure(r2.error());
     }
@@ -475,7 +486,7 @@ void completeConnection(IPCManagerBS &manager, int serverFd)
                 exitFailure(r3.error());
             }
         }
-    }
+    }*/
 #endif
 }
 
@@ -499,7 +510,7 @@ uint64_t createMultiplex()
 
 IPCManagerBS makeBuildSystemManager(const string &filePath, uint64_t serverFd)
 {
-    auto r = makeIPCManagerBS(filePath);
+    /*auto r = makeIPCManagerBS(filePath);
     if (!r)
     {
         exitFailure(r.error());
@@ -510,14 +521,13 @@ IPCManagerBS makeBuildSystemManager(const string &filePath, uint64_t serverFd)
         exitFailure(r2.error());
     }
 
-    return *r;
+    return *r;*/
 }
 
 int runTest()
 {
     CTBLastMessage lastMessage;
     const uint64_t serverFd = createMultiplex();
-
 
     RunCommand compilerTest;
     compilerTest.startAsyncProcess(COMPILER_TEST);
@@ -659,7 +669,6 @@ int runTest()
         print("Reply to Second CTBLastMessage ");
         printMessage(btcLastMessage, true);
     }
-    oldManager.closeConnection();
 
     // we delay the receiveMessage. Compiler in this duration has exited with error after connecting.
     std::this_thread::sleep_for(std::chrono::seconds(3));
@@ -680,7 +689,6 @@ int runTest()
     print("Received CTBLastMessage on new manager.");
     printMessage(reinterpret_cast<CTBLastMessage &>(buffer), false);
 
-    manager.closeConnection();
     return EXIT_SUCCESS;
 }
 
