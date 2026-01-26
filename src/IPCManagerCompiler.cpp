@@ -22,66 +22,6 @@
 namespace N2978
 {
 
-tl::expected<IPCManagerCompiler, std::string> makeIPCManagerCompiler(std::string BMIIfHeaderUnitObjOtherwisePath)
-{
-#ifdef _WIN32
-    BMIIfHeaderUnitObjOtherwisePath = R"(\\.\pipe\)" + BMIIfHeaderUnitObjOtherwisePath;
-    HANDLE fd = CreateFileA(BMIIfHeaderUnitObjOtherwisePath.data(), // pipe name
-                            GENERIC_READ |                          // read and write access
-                                GENERIC_WRITE,
-                            0,             // no sharing
-                            nullptr,       // default security attributes
-                            OPEN_EXISTING, // opens existing pipe
-                            0,             // default attributes
-                            nullptr);      // no template file
-
-    // Break if the pipe handle is valid.
-
-    if (fd == INVALID_HANDLE_VALUE)
-    {
-        return tl::unexpected(getErrorString());
-    }
-#else
-    const int fd = socket(AF_UNIX, SOCK_STREAM, 0);
-
-    if (fd == -1)
-    {
-        return tl::unexpected(getErrorString());
-    }
-
-    // Prepare address structure
-    sockaddr_un addr{};
-    addr.sun_family = AF_UNIX;
-
-    // We use file hash to make a file path smaller, since there is a limit of NAME_MAX that is generally 108 bytes.
-    // TODO
-    // Have an option to receive this path in constructor to make it compatible with Android and IOS.
-    std::string prependDir = "/tmp/";
-    const uint64_t hash = rapidhash(BMIIfHeaderUnitObjOtherwisePath.c_str(), BMIIfHeaderUnitObjOtherwisePath.size());
-    prependDir.append(to16charHexString(hash));
-    std::copy(prependDir.begin(), prependDir.end(), addr.sun_path);
-
-    if (connect(fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == -1)
-    {
-        return tl::unexpected(getErrorString());
-    }
-#endif
-
-    return IPCManagerCompiler(reinterpret_cast<uint64_t>(fd));
-}
-
-#ifdef _WIN32
-IPCManagerCompiler::IPCManagerCompiler(const uint64_t fd_)
-{
-    fd = fd_;
-}
-#else
-IPCManagerCompiler::IPCManagerCompiler(const int fd_)
-{
-    fd = fd_;
-}
-#endif
-
 Response::Response(std::string filePath_, const ProcessMappingOfBMIFile &mapping_, const FileType type_,
                    const bool isSystem_)
     : filePath(std::move(filePath_)), mapping(mapping_), type(type_), isSystem(isSystem_)
@@ -511,15 +451,6 @@ tl::expected<void, std::string> IPCManagerCompiler::closeBMIFileMapping(
     }
 #endif
     return {};
-}
-
-void IPCManagerCompiler::closeConnection() const
-{
-#ifdef _WIN32
-    CloseHandle(reinterpret_cast<HANDLE>(fd));
-#else
-    close(fd);
-#endif
 }
 
 bool operator==(const CTBNonModule &lhs, const CTBNonModule &rhs)

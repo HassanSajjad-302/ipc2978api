@@ -35,13 +35,8 @@ struct CompilerTest
 
 int main()
 {
-    const auto r = makeIPCManagerCompiler((filesystem::current_path() / "test").string());
-    if (!r)
-    {
-        exitFailure(r.error());
-    }
 
-    IPCManagerCompiler manager = r.value();
+    IPCManagerCompiler manager;
     CompilerTest t(&manager);
     std::uniform_int_distribution distribution(0, 20);
     for (uint64_t i = 0; i < distribution(generator); ++i)
@@ -69,7 +64,7 @@ int main()
             manager.sendCTBLastMessage(bmi1Content, (std::filesystem::current_path() / "bmi.txt").generic_string());
         !r2)
     {
-        exitFailure(r.error());
+        exitFailure(r2.error());
     }
 
     printMessage(manager.lastMessage, true);
@@ -96,17 +91,17 @@ int main()
         }
     }
 
-    manager.closeConnection();
-
     // Build-system will create the new manager before sending the last-message so we can safely connect. However, it
     // wil wait for us to send the lastMessage with error before it wil receiving imitating a situation where compiler
     // has already exited even before the build-system call receiveMessage.
+    /*
     const auto r2 = makeIPCManagerCompiler((filesystem::current_path() / "test1").string());
     if (!r2)
     {
         exitFailure(r2.error());
     }
     manager = r2.value();
+    */
 
     manager.lastMessage = CTBLastMessage{};
     manager.lastMessage.errorOccurred = true;
@@ -117,6 +112,4 @@ int main()
 
     print("BTCLastMessage received on new manager.\n");
     printMessage(manager.lastMessage, true);
-
-    manager.closeConnection();
 }
