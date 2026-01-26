@@ -383,10 +383,8 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
 
         if (ends_with(str, delimiter))
         {
-            continue;
+            break;
         }
-
-        break;
     }
 
     if (epoll_ctl(serverFd, EPOLL_CTL_DEL, manager.fd, &ev) == -1)
@@ -394,8 +392,8 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
         exitFailure(getErrorString());
     }
 #endif
-
-    const_cast<string_view &>(manager.serverReadString) = *new string(str);
+    string *str2 = new string(std::move(str));
+    const_cast<string_view &>(manager.serverReadString) = string_view{str2->data(), str2->size() - strlen(delimiter)};
     if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
     {
         exitFailure(r2.error());
