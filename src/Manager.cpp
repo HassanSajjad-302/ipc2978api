@@ -164,7 +164,7 @@ tl::expected<void, std::string> Manager::writeInternal(const std::string &buffer
         return tl::unexpected(getErrorString());
     }
 #else
-    if (const auto &r = writeAll(fd, buffer.data(), buffer.size()); !r)
+    if (const auto &r = writeAll(isServer ? fd : STDOUT_FILENO, buffer.data(), buffer.size()); !r)
     {
         return tl::unexpected(r.error());
     }

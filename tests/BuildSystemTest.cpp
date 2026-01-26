@@ -508,22 +508,6 @@ uint64_t createMultiplex()
 #endif
 }
 
-IPCManagerBS makeBuildSystemManager(const string &filePath, uint64_t serverFd)
-{
-    /*auto r = makeIPCManagerBS(filePath);
-    if (!r)
-    {
-        exitFailure(r.error());
-    }
-
-    if (const auto &r2 = (*r).registerManager(serverFd, r->fd); !r2)
-    {
-        exitFailure(r2.error());
-    }
-
-    return *r;*/
-}
-
 int runTest()
 {
     CTBLastMessage lastMessage;
@@ -532,7 +516,7 @@ int runTest()
     RunCommand compilerTest;
     compilerTest.startAsyncProcess(COMPILER_TEST);
 
-    IPCManagerBS manager{compilerTest.pid};
+    IPCManagerBS manager{compilerTest.stdPipe};
 
     CTB type;
     char buffer[320];
@@ -626,7 +610,7 @@ int runTest()
     // To ensure that we make build-system manager before CompilerTest making compiler manager,
     // we make it here.
 
-    manager = makeBuildSystemManager((std::filesystem::current_path() / "test1").string(), serverFd);
+    // manager = makeBuildSystemManager((std::filesystem::current_path() / "test1").string(), serverFd);
 
     ProcessMappingOfBMIFile bmi2Mapping;
     {
