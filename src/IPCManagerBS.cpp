@@ -19,159 +19,10 @@
 namespace N2978
 {
 
-tl::expected<IPCManagerBS, std::string> makeIPCManagerBS(std::string BMIIfHeaderUnitObjOtherwisePath)
-{
-#ifdef _WIN32
-    BMIIfHeaderUnitObjOtherwisePath = R"(\\.\pipe\)" + BMIIfHeaderUnitObjOtherwisePath;
-
-    HANDLE hPipe = CreateNamedPipeA(BMIIfHeaderUnitObjOtherwisePath.c_str(), // pipe name
-                                    PIPE_ACCESS_DUPLEX |                     // read/write access
-                                        FILE_FLAG_OVERLAPPED |               // overlapped mode for IOCP
-                                        FILE_FLAG_FIRST_PIPE_INSTANCE,       // first instance only
-                                    PIPE_TYPE_BYTE |                         // message-type pipe
-                                        PIPE_READMODE_BYTE |                 // message read mode
-                                        PIPE_WAIT,                           // blocking mode (for sync operations)
-                                    1,                                       // max instances
-                                    BUFFERSIZE * sizeof(TCHAR),              // output buffer size
-                                    BUFFERSIZE * sizeof(TCHAR),              // input buffer size
-                                    PIPE_TIMEOUT,                            // client time-out
-                                    nullptr);                                // default security attributes
-
-    if (hPipe == INVALID_HANDLE_VALUE)
-    {
-        return tl::unexpected(getErrorString());
-    }
-
-#else
-    // Named Pipes are used but Unix Domain sockets could have been used as well. The tradeoff is that a file is created
-    // and there needs to be bind, listen, accept calls which means that an extra fd is created is temporarily on the
-    // server side. it can be closed immediately after.
-
-    const int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
-
-    // Create server socket
-    if (fd == -1)
-    {
-        return tl::unexpected(getErrorString());
-    }
-
-    // Prepare address structure
-    sockaddr_un addr{};
-    addr.sun_family = AF_UNIX;
-    // We use file hash to make a file path smaller, since there is a limit of NAME_MAX that is generally 108 bytes.
-    // TODO
-    // Have an option to receive this path in constructor to make it compatible with Android and IOS.
-    std::string prependDir = "/tmp/";
-    const uint64_t hash = rapidhash(BMIIfHeaderUnitObjOtherwisePath.c_str(), BMIIfHeaderUnitObjOtherwisePath.size());
-    prependDir.append(to16charHexString(hash));
-    std::copy(prependDir.begin(), prependDir.end(), addr.sun_path);
-
-    // Remove any existing socket
-    unlink(prependDir.c_str());
-
-    // Bind socket to the file system path
-    if (bind(fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == -1)
-    {
-        return tl::unexpected(getErrorString());
-    }
-    if (chmod(prependDir.c_str(), 0666) == -1)
-    {
-        return tl::unexpected(getErrorString());
-    }
-
-    // Listen for incoming connections
-    if (listen(fd, 1) == -1)
-    {
-        close(fd);
-        return tl::unexpected(getErrorString());
-    }
-#endif
-
-    return IPCManagerBS(reinterpret_cast<uint64_t>(hPipe));
-}
-
-tl::expected<void, std::string> IPCManagerBS::registerManager(const uint64_t serverFd,
-                                                              const uint64_t completionKey) const
-{
-#ifdef _WIN32
-    // Associate the pipe with the existing IOCP handle. completionKey is either 0 or a legit value. if 0 then we pass
-    // the fd as completion-key. Test checks after the GetQueuedCompletionStatus() call to ensure that the completionKey
-    // is same as the fd.
-    HANDLE h = CreateIoCompletionPort((HANDLE)fd,                         // handle to associate
-                                      reinterpret_cast<HANDLE>(serverFd), // existing IOCP handle
-                                      completionKey,                      // completion key
-                                      0                                   // number of concurrent threads (0 = default)
-    );
-    if (h == nullptr)
-    {
-        CloseHandle((HANDLE)fd);
-        return tl::unexpected(getErrorString());
-    }
-    return {};
-#endif
-}
-
-#ifdef _WIN32
 IPCManagerBS::IPCManagerBS(const uint64_t fd_)
 {
     fd = fd_;
     isServer = true;
-}
-#else
-IPCManagerBS::IPCManagerBS(const int fd_)
-{
-    fd = fd_;
-    isServer = true;
-}
-#endif
-
-tl::expected<bool, std::string> IPCManagerBS::completeConnection() const
-{
-#ifdef _WIN32
-    // For IOCP, we need to use overlapped I/O
-    OVERLAPPED overlapped = {};
-
-    if (ConnectNamedPipe((HANDLE)fd, &overlapped))
-    {
-        return tl::unexpected("ConnectNamedPipe should not complete synchronously\n");
-    }
-
-    DWORD error = GetLastError();
-
-    if (error == ERROR_IO_PENDING)
-    {
-        // Connection is pending - need to wait for IOCP notification
-        // This is the normal case for async operation
-        return false;
-    }
-    if (error == ERROR_PIPE_CONNECTED)
-    {
-        // Client connected before we called ConnectNamedPipe
-        // This can happen if client connects very quickly
-        return true;
-    }
-    if (error == ERROR_NO_DATA)
-    {
-        // Client connected and exited before we called ConnectnamedPipe
-        return true;
-    }
-    // Actual error occurred
-    return tl::unexpected(getErrorString());
-#else
-    const int fd = accept4(fd, nullptr, nullptr, O_NONBLOCK);
-    if (fd == -1)
-    {
-        if (errno == EAGAIN)
-        {
-            return false;
-        }
-        return tl::unexpected(getErrorString());
-    }
-    close(fd);
-    const_cast<int &>(fd) = fd;
-    return true;
-
-#endif
 }
 
 tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType) const
@@ -425,15 +276,6 @@ tl::expected<void, std::string> IPCManagerBS::closeBMIFileMapping(
     }
 #endif
     return {};
-}
-
-void IPCManagerBS::closeConnection() const
-{
-#ifdef _WIN32
-    CloseHandle(reinterpret_cast<HANDLE>(fd));
-#else
-    close(fd);
-#endif
 }
 
 } // namespace N2978

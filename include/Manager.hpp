@@ -23,6 +23,11 @@ template <typename T, typename U> class expected;
 namespace N2978
 {
 
+// 32-byte delimiter
+const char *delimiter = "DELIMITER"
+                        "\x5A\xA5\x5A\xA5\x5A\xA5\x5A\xA5\x5A\xA5\x5A\xA5\x5A\xA5"
+                        "DELIMITER";
+
 enum class ErrorCategory : uint8_t
 {
     NONE,
