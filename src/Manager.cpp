@@ -107,7 +107,7 @@ tl::expected<uint32_t, std::string> Manager::readInternal(char (&buffer)[BUFFERS
     }
 
 #else
-    bytesRead = read(fd, buffer, BUFFERSIZE);
+    bytesRead = read(STDIN_FILENO, buffer, BUFFERSIZE);
     if (bytesRead == -1)
     {
         return tl::unexpected(getErrorString());

@@ -31,8 +31,9 @@ enum class ProcessState
 struct RunCommand
 {
     string output;
-    uint64_t stdPipe;
     uint64_t pid;
+    uint64_t stdoutPipe;
+    uint64_t stdinPipe;
     int exitStatus;
 #ifdef _WIN32
     ProcessState processState = ProcessState::LAUNCHED;
@@ -136,7 +137,7 @@ uint64_t RunCommand::startAsyncProcess(const char *command, Builder &builder, BT
 
     CloseHandle(process_info.hThread);
 
-    stdPipe = (uint64_t)pipe_;
+    stdoutPipe = (uint64_t)pipe_;
     pid = (uint64_t)process_info.hProcess;
 
     return eventDataIndex;
@@ -180,7 +181,7 @@ void RunCommand::reapProcess() const
         printErrorMessage(N2978::getErrorString());
     }
 
-    if (!CloseHandle((HANDLE)pid) || !CloseHandle((HANDLE)stdPipe))
+    if (!CloseHandle((HANDLE)pid) || !CloseHandle((HANDLE)stdoutPipe))
     {
         printErrorMessage(N2978::getErrorString());
     }
@@ -204,13 +205,21 @@ void RunCommand::killModuleProcess(const string &processName) const
 uint64_t RunCommand::startAsyncProcess(const char *command)
 {
     // Create pipes for stdout and stderr
-    int stdPipesLocal[2];
-    if (pipe(stdPipesLocal) == -1)
+    int stdoutPipesLocal[2];
+    if (pipe(stdoutPipesLocal) == -1)
     {
         exitFailure(getErrorString());
     }
 
-    stdPipe = stdPipesLocal[0];
+    // Create pipe for stdin
+    int stdinPipesLocal[2];
+    if (pipe(stdinPipesLocal) == -1)
+    {
+        exitFailure(getErrorString());
+    }
+
+    stdoutPipe = stdoutPipesLocal[0];
+    stdinPipe = stdinPipesLocal[1];
 
     pid = fork();
     if (pid == -1)
@@ -221,13 +230,18 @@ uint64_t RunCommand::startAsyncProcess(const char *command)
     {
         // Child process
 
+        // Redirect stdin from the pipe
+        dup2(stdinPipesLocal[0], STDIN_FILENO);
+
         // Redirect stdout and stderr to the pipes
-        dup2(stdPipesLocal[1], STDOUT_FILENO); // Redirect stdout to stdout_pipe
-        dup2(stdPipesLocal[1], STDERR_FILENO); // Redirect stderr to stderr_pipe
+        dup2(stdoutPipesLocal[1], STDOUT_FILENO); // Redirect stdout to stdout_pipe
+        dup2(stdoutPipesLocal[1], STDERR_FILENO); // Redirect stderr to stderr_pipe
 
         // Close unused pipe ends
-        close(stdPipesLocal[0]);
-        close(stdPipesLocal[1]);
+        close(stdoutPipesLocal[0]);
+        close(stdoutPipesLocal[1]);
+        close(stdinPipesLocal[0]);
+        close(stdinPipesLocal[1]);
 
         wordexp_t p;
         if (wordexp(command, &p, 0) != 0)
@@ -250,25 +264,28 @@ uint64_t RunCommand::startAsyncProcess(const char *command)
 
     // Parent process
     // Close unused pipe ends
-    close(stdPipesLocal[1]);
-    return stdPipe;
+    close(stdoutPipesLocal[1]);
+    close(stdinPipesLocal[0]);
+    return stdoutPipe;
 }
 
 bool RunCommand::wasProcessLaunchIncomplete(uint64_t index)
 {
     return false;
 }
+
 void RunCommand::reapProcess()
 {
     if (waitpid(pid, &exitStatus, 0) < 0)
     {
         exitFailure(getErrorString());
     }
-    if (close(stdPipe) == -1)
+    if (close(stdoutPipe) == -1)
     {
         exitFailure(getErrorString());
     }
 }
+
 #endif
 
 bool first = true;
@@ -513,7 +530,7 @@ int runTest()
     RunCommand compilerTest;
     compilerTest.startAsyncProcess(COMPILER_TEST);
 
-    IPCManagerBS manager{compilerTest.stdPipe};
+    IPCManagerBS manager{compilerTest.stdoutPipe};
 
     CTB type;
     char buffer[320];
