@@ -42,6 +42,7 @@ struct RunCommand
 
     RunCommand() = default;
     uint64_t startAsyncProcess(const char *command, uint64_t serverFd);
+    void reapProcess() const;
 };
 
 #ifdef _WIN32
@@ -54,10 +55,8 @@ uint64_t RunCommand::startAsyncProcess(const char *command, uint64_t serverFd)
     const string write_pipe_name = R"(\\.\pipe\write{}{})";
 
     // ===== CREATE READ PIPE (for reading child's stdout/stderr - ASYNC) =====
-    HANDLE readPipe_ = CreateNamedPipeA(read_pipe_name.c_str(),
-                                         PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED,
-                                         PIPE_TYPE_BYTE,
-                                         PIPE_UNLIMITED_INSTANCES, 0, 0, INFINITE, NULL);
+    HANDLE readPipe_ = CreateNamedPipeA(read_pipe_name.c_str(), PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED,
+                                        PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES, 0, 0, INFINITE, NULL);
     if (readPipe_ == INVALID_HANDLE_VALUE)
     {
         exitFailure(getErrorString());
@@ -82,6 +81,20 @@ uint64_t RunCommand::startAsyncProcess(const char *command, uint64_t serverFd)
         exitFailure(getErrorString());
     }
 
+    {
+        char buffer[4096];
+        DWORD bytesRead = 0;
+        OVERLAPPED overlapped = {0};
+
+        // Wait for the read to complete.
+        ULONG_PTR completionKey = 0;
+        LPOVERLAPPED completedOverlapped = nullptr;
+        if (!GetQueuedCompletionStatus((HANDLE)serverFd, &bytesRead, &completionKey, &completedOverlapped, INFINITE))
+        {
+            exitFailure(getErrorString());
+        }
+    }
+
     HANDLE childStdoutPipe;
     if (!DuplicateHandle(GetCurrentProcess(), outputWriteHandle, GetCurrentProcess(), &childStdoutPipe, 0, TRUE,
                          DUPLICATE_SAME_ACCESS))
@@ -93,18 +106,9 @@ uint64_t RunCommand::startAsyncProcess(const char *command, uint64_t serverFd)
     // ===== CREATE WRITE PIPE (for writing to child's stdin - SYNC) =====
     // Note: No FILE_FLAG_OVERLAPPED - this makes it synchronous
     HANDLE writePipe_ = CreateNamedPipeA(write_pipe_name.c_str(),
-                                          PIPE_ACCESS_OUTBOUND,  // No FILE_FLAG_OVERLAPPED
-                                          PIPE_TYPE_BYTE,
-                                          PIPE_UNLIMITED_INSTANCES, 0, 0, INFINITE, NULL);
+                                         PIPE_ACCESS_OUTBOUND, // No FILE_FLAG_OVERLAPPED
+                                         PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES, 0, 0, INFINITE, NULL);
     if (writePipe_ == INVALID_HANDLE_VALUE)
-    {
-        exitFailure(getErrorString());
-    }
-
-    // DO NOT register write pipe with IOCP - we want synchronous writes
-
-    OVERLAPPED writeOverlappedIO = {};
-    if (!ConnectNamedPipe(writePipe_, &writeOverlappedIO) && GetLastError() != ERROR_IO_PENDING)
     {
         exitFailure(getErrorString());
     }
@@ -162,6 +166,24 @@ uint64_t RunCommand::startAsyncProcess(const char *command, uint64_t serverFd)
     pid = (uint64_t)process_info.hProcess;
 
     return readPipe;
+}
+
+void RunCommand::reapProcess() const
+{
+    if (WaitForSingleObject((HANDLE)pid, INFINITE) == WAIT_FAILED)
+    {
+        exitFailure(getErrorString());
+    }
+
+    if (!GetExitCodeProcess((HANDLE)pid, (LPDWORD)&exitStatus))
+    {
+        exitFailure(getErrorString());
+    }
+
+    if (!CloseHandle((HANDLE)pid) || !CloseHandle((HANDLE)readPipe) || !CloseHandle((HANDLE)writePipe))
+    {
+        exitFailure(getErrorString());
+    }
 }
 
 #else
@@ -262,8 +284,7 @@ bool ends_with(const std::string &str, const std::string &suffix)
     return str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
-void readCompilerMessage(IPCManagerBS &manager, const uint64_t serverFd, const uint64_t readFd, char (&buffer)[320],
-                         CTB &type)
+void readCompilerMessage(const uint64_t serverFd, const uint64_t readFd)
 {
 #ifdef _WIN32
     HANDLE hIOCP = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(serverFd));
@@ -282,6 +303,11 @@ void readCompilerMessage(IPCManagerBS &manager, const uint64_t serverFd, const u
         DWORD error = GetLastError();
         if (!result && error != ERROR_IO_PENDING)
         {
+            if (error == ERROR_BROKEN_PIPE)
+            {
+                // read complete
+                return;
+            }
             exitFailure(getErrorString());
         }
 
@@ -293,6 +319,11 @@ void readCompilerMessage(IPCManagerBS &manager, const uint64_t serverFd, const u
 
         if (!GetQueuedCompletionStatus(hIOCP, &bytesRead, &completionKey, &completedOverlapped, INFINITE))
         {
+            if (GetLastError() == ERROR_BROKEN_PIPE)
+            {
+                // completed
+                return;
+            }
             exitFailure(getErrorString());
         }
 
@@ -304,7 +335,8 @@ void readCompilerMessage(IPCManagerBS &manager, const uint64_t serverFd, const u
 
         if (bytesRead == 0)
         {
-            exitFailure("Pipe closed or no data read");
+            // completed
+            return;
         }
 
         // Append read data to string
@@ -316,7 +348,7 @@ void readCompilerMessage(IPCManagerBS &manager, const uint64_t serverFd, const u
         // Check for terminator
         if (ends_with(compilerTestPrunedOutput, delimiter))
         {
-            break;
+            return;
         }
     }
 #else
@@ -352,9 +384,11 @@ void readCompilerMessage(IPCManagerBS &manager, const uint64_t serverFd, const u
     {
         exitFailure(getErrorString());
     }
-
 #endif
+}
 
+void pruneCompilerOutput(IPCManagerBS &manager, char (&buffer)[320], CTB &type)
+{
     // Prune the compiler output. and make a new string of the compiler-message output.
     const uint32_t prunedSize = compilerTestPrunedOutput.size();
     if (prunedSize < 4 + strlen(delimiter))
@@ -422,7 +456,12 @@ int runTest()
     {
         bool loopExit = false;
 
-        readCompilerMessage(manager, serverFd, compilerTest.readPipe, buffer, type);
+        readCompilerMessage(serverFd, compilerTest.readPipe);
+        if (!ends_with(compilerTestPrunedOutput, delimiter))
+        {
+            exitFailure("early exit by CompilerTest");
+        }
+        pruneCompilerOutput(manager, buffer, type);
 
         switch (type)
         {
@@ -544,6 +583,17 @@ int runTest()
         printMessage(btcLastMessage, true);
     }
 
+    // As CompilerTest will output some print statements.
+    readCompilerMessage(serverFd, compilerTest.readPipe);
+
+    compilerTest.reapProcess();
+    if (compilerTest.exitStatus != EXIT_SUCCESS)
+    {
+        print("CompilerTest did not exit successfully. ExitCode {}\n", compilerTest.exitStatus);
+    }
+
+    // Only after reaping process, we close the file mapping, so the CompilerTest check the mapping content with the
+    // file content.
     if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(bmi2Mapping); !r2)
     {
         exitFailure(r2.error());
