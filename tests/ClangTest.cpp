@@ -464,18 +464,20 @@ tl::expected<int, string> runTest()
 
     // compiling a-c.cpp
     {
-        const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager = makeBuildSystemManager(aCObj, serverFd);
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aCObj +
                                 "\" -noScanIPC -c -xc++-module a-c.cpp -fmodule-output=\"" + aCPcm + "\"";
+
+        CTB type;
+        char buffer[320];
+
+        const uint64_t serverFd = createMultiplex();
+        IPCManagerBS manager = makeBuildSystemManager(aCObj, serverFd);
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
         }
-
-        CTB type;
-        char buffer[320];
         readCompilerMessage(serverFd, manager, buffer, type);
+
         if (type != CTB::LAST_MESSAGE)
         {
             return tl::unexpected("received message of wrong type");
@@ -496,19 +498,20 @@ tl::expected<int, string> runTest()
 
     // compiling a-b.cpp
     {
-        const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager = makeBuildSystemManager(aBObj, serverFd);
-
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aBObj +
                                 "\" -noScanIPC -c -xc++-module a-b.cpp -fmodule-output=\"" + aBPcm + "\"";
+
+        CTB type;
+        char buffer[320];
+
+        const uint64_t serverFd = createMultiplex();
+        IPCManagerBS manager = makeBuildSystemManager(aBObj, serverFd);
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
         }
-
-        CTB type;
-        char buffer[320];
         readCompilerMessage(serverFd, manager, buffer, type);
+
         if (type != CTB::LAST_MESSAGE)
         {
             return tl::unexpected("received message of wrong type");
@@ -529,19 +532,20 @@ tl::expected<int, string> runTest()
 
     // compiling a.cpp
     {
-        const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager = makeBuildSystemManager(aObj, serverFd);
-
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aObj +
                                 "\" -noScanIPC -c -xc++-module a.cpp -fmodule-output=\"" + aPcm + "\"";
+
+        CTB type;
+        char buffer[320];
+
+        const uint64_t serverFd = createMultiplex();
+        IPCManagerBS manager = makeBuildSystemManager(aObj, serverFd);
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
         }
-
-        CTB type;
-        char buffer[320];
         readCompilerMessage(serverFd, manager, buffer, type);
+
         if (type != CTB::MODULE)
         {
             return tl::unexpected("received message of wrong type");
@@ -620,20 +624,20 @@ tl::expected<int, string> runTest()
 
     // compiling n.hpp
     {
-        const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager = makeBuildSystemManager(nPcm, serverFd);
-
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + nPcm +
                                 "\" -noScanIPC -xc++-header n.hpp -DCOMMAND_MACRO";
-        if (const auto &r2 = Run(compileCommand); !r2)
-        {
-            return tl::unexpected(r2.error());
-        }
 
         CTB type;
         char buffer[320];
 
+        const uint64_t serverFd = createMultiplex();
+        IPCManagerBS manager = makeBuildSystemManager(nPcm, serverFd);
+        if (const auto &r2 = Run(compileCommand); !r2)
+        {
+            return tl::unexpected(r2.error());
+        }
         readCompilerMessage(serverFd, manager, buffer, type);
+
         if (type != CTB::NON_MODULE)
         {
             return tl::unexpected("received message of wrong type");
@@ -670,19 +674,20 @@ tl::expected<int, string> runTest()
 
     // compiling o.hpp
     {
-        const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager = makeBuildSystemManager(oPcm, serverFd);
-
         string compileCommand =
             CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm + "\" -noScanIPC -xc++-header o.hpp";
+
+        CTB type;
+        char buffer[320];
+
+        const uint64_t serverFd = createMultiplex();
+        IPCManagerBS manager = makeBuildSystemManager(oPcm, serverFd);
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
         }
-
-        CTB type;
-        char buffer[320];
         readCompilerMessage(serverFd, manager, buffer, type);
+
         if (type != CTB::NON_MODULE)
         {
             return tl::unexpected("received message of wrong type");
@@ -759,19 +764,20 @@ tl::expected<int, string> runTest()
     // compiling o.hpp with include-translation. BTCNonModule for n.hpp will be received with
     // isHeaderUnit = true.
     {
-        const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager = makeBuildSystemManager(oPcm, serverFd);
-
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm +
                                 "\" -noScanIPC -xc++-header o.hpp -DTRANSLATING";
+
+        CTB type;
+        char buffer[320];
+
+        const uint64_t serverFd = createMultiplex();
+        IPCManagerBS manager = makeBuildSystemManager(oPcm, serverFd);
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
         }
-
-        CTB type;
-        char buffer[320];
         readCompilerMessage(serverFd, manager, buffer, type);
+
         if (type != CTB::NON_MODULE)
         {
             return tl::unexpected("received message of wrong type");
@@ -847,19 +853,20 @@ tl::expected<int, string> runTest()
 
     // compiling big.hpp
     {
-        const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager = makeBuildSystemManager(bigPcm, serverFd);
-
         string compileCommand =
             CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + bigPcm + "\" -noScanIPC -xc++-header big.hpp";
+
+        CTB type;
+        char buffer[320];
+
+        const uint64_t serverFd = createMultiplex();
+        IPCManagerBS manager = makeBuildSystemManager(bigPcm, serverFd);
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
         }
-
-        CTB type;
-        char buffer[320];
         readCompilerMessage(serverFd, manager, buffer, type);
+
         if (type != CTB::NON_MODULE)
         {
             return tl::unexpected("received message of wrong type");
@@ -907,20 +914,20 @@ tl::expected<int, string> runTest()
 
     // compiling foo.cpp
     {
-        const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager = makeBuildSystemManager(fooObj, serverFd);
-
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + fooObj +
                                 "\" -noScanIPC -c -xc++-module foo.cpp -fmodule-output=\"" + fooPcm + "\"";
-        if (const auto &r2 = Run(compileCommand); !r2)
-        {
-            return tl::unexpected(r2.error());
-        }
 
         CTB type;
         char buffer[320];
 
+        const uint64_t serverFd = createMultiplex();
+        IPCManagerBS manager = makeBuildSystemManager(fooObj, serverFd);
+        if (const auto &r2 = Run(compileCommand); !r2)
+        {
+            return tl::unexpected(r2.error());
+        }
         readCompilerMessage(serverFd, manager, buffer, type);
+
         if (type != CTB::NON_MODULE)
         {
             return tl::unexpected("received message of wrong type");
@@ -1026,18 +1033,19 @@ tl::expected<int, string> runTest()
 
     // compiling main.cpp
     auto compileMain = [&](bool shouldFail) -> tl::expected<int, string> {
+        string compileCommand = CLANG_CMD R"( -std=c++20 -o ")" + mainObj + "\" -noScanIPC -c main.cpp";
+
+        CTB type;
+        char buffer[320];
+
         const uint64_t serverFd = createMultiplex();
         IPCManagerBS manager = makeBuildSystemManager(mainObj, serverFd);
-
-        string compileCommand = CLANG_CMD R"( -std=c++20 -o ")" + mainObj + "\" -noScanIPC -c main.cpp";
         if (const auto &r2 = Run(compileCommand); !r2)
         {
             return tl::unexpected(r2.error());
         }
-
-        CTB type;
-        char buffer[320];
         readCompilerMessage(serverFd, manager, buffer, type);
+
         if (type != CTB::MODULE)
         {
             return tl::unexpected("received message of wrong type");
