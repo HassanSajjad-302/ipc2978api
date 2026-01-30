@@ -5,7 +5,6 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
-#include <thread>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -405,12 +404,21 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
 #endif
 
     // Prune the compiler output. and make a new string of the compiler-message output.
-    string *str2 = new string(std::move(str));
-    const_cast<string_view &>(manager.serverReadString) = string_view{str2->data(), str2->size() - strlen(delimiter)};
+    const uint32_t prunedSize = compilerTestPrunedOutput.size();
+    if (prunedSize < 4 + strlen(delimiter))
+    {
+        exitFailure("received string only has delimiter but not the size of payload\n");
+    }
+
+    const uint32_t payloadSize =
+        *reinterpret_cast<uint32_t *>(compilerTestPrunedOutput.data() + (prunedSize - (4 + strlen(delimiter))));
+    const char *payloadStart = compilerTestPrunedOutput.data() + (prunedSize - (4 + strlen(delimiter) + payloadSize));
+    const_cast<string_view &>(manager.serverReadString) = string_view(payloadStart, payloadSize);
     if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
     {
         exitFailure(r2.error());
     }
+    compilerTestPrunedOutput.resize(prunedSize - (4 + strlen(delimiter) + payloadSize));
 }
 
 void closeHandle(const uint64_t fd)
@@ -596,5 +604,8 @@ int runTest()
 int main()
 {
     runTest();
+    print("CompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
+    compilerTestPrunedOutput.clear();
     runTest();
+    print("CompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
 }

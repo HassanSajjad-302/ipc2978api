@@ -35,7 +35,6 @@ struct CompilerTest
 
 int main()
 {
-    std::this_thread::sleep_for(std::chrono::milliseconds(3000));
     IPCManagerCompiler manager;
     CompilerTest t(&manager);
     std::uniform_int_distribution distribution(0, 20);
