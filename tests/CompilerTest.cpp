@@ -78,7 +78,7 @@ int main()
     }
     else
     {
-        if (const auto &[file] = r2.value(); bmi2Content != file)
+        if (const auto &processMapping = r2.value(); bmi2Content != processMapping.file)
         {
             exitFailure(fmt::format("File Contents not similar for {}", bmi2.filePath));
         }

@@ -32,7 +32,7 @@ tl::expected<uint32_t, std::string> IPCManagerCompiler::readInternal(char (&buff
 {
     int32_t bytesRead;
 #ifdef _WIN32
-    const bool success = ReadFile(reinterpret_cast<HANDLE>(fd), // pipe handle
+    const bool success = ReadFile((HANDLE)STD_INPUT_HANDLE, // pipe handle
                                   buffer,                       // buffer to receive reply
                                   BUFFERSIZE,                   // size of buffer
                                   LPDWORD(&bytesRead),          // number of bytes read
@@ -62,7 +62,7 @@ tl::expected<uint32_t, std::string> IPCManagerCompiler::readInternal(char (&buff
 tl::expected<void, std::string> IPCManagerCompiler::writeInternal(const std::string &buffer) const
 {
 #ifdef _WIN32
-    const bool success = WriteFile(reinterpret_cast<HANDLE>(fd), // pipe handle
+    const bool success = WriteFile(reinterpret_cast<HANDLE>(STD_OUTPUT_HANDLE), // pipe handle
                                    buffer.data(),                // message
                                    buffer.size(),                // message length
                                    nullptr,                      // bytes written

@@ -50,46 +50,79 @@ struct RunCommand
 uint64_t RunCommand::startAsyncProcess(const char *command, uint64_t serverFd)
 {
     // One BTarget can launch multiple processes so we also append the clock::now().
-    const string pipe_name = R"(\\.\pipe\{}{})";
-    HANDLE pipe_ = CreateNamedPipeA(pipe_name.c_str(), PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED, PIPE_TYPE_BYTE,
-                                    PIPE_UNLIMITED_INSTANCES, 0, 0, INFINITE, NULL);
-    if (pipe_ == INVALID_HANDLE_VALUE)
+    const string read_pipe_name = R"(\\.\pipe\read{}{})";
+    const string write_pipe_name = R"(\\.\pipe\write{}{})";
+
+    // ===== CREATE READ PIPE (for reading child's stdout/stderr - ASYNC) =====
+    HANDLE readPipe_ = CreateNamedPipeA(read_pipe_name.c_str(),
+                                         PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED,
+                                         PIPE_TYPE_BYTE,
+                                         PIPE_UNLIMITED_INSTANCES, 0, 0, INFINITE, NULL);
+    if (readPipe_ == INVALID_HANDLE_VALUE)
     {
         exitFailure(getErrorString());
     }
 
-    if (!CreateIoCompletionPort(pipe_, (HANDLE)serverFd, (ULONG_PTR)pipe_, 0))
+    // Register read pipe with IOCP for async operations
+    if (!CreateIoCompletionPort(readPipe_, (HANDLE)serverFd, (ULONG_PTR)readPipe_, 0))
     {
         exitFailure(getErrorString());
     }
 
-    OVERLAPPED overlappedIO = {};
-    if (!ConnectNamedPipe(pipe_, &reinterpret_cast<OVERLAPPED &>(overlappedIO)) && GetLastError() != ERROR_IO_PENDING)
+    OVERLAPPED readOverlappedIO = {};
+    if (!ConnectNamedPipe(readPipe_, &readOverlappedIO) && GetLastError() != ERROR_IO_PENDING)
     {
         exitFailure(getErrorString());
     }
 
-    // Get the write end of the pipe as a handle inheritable across processes.
-    HANDLE output_write_handle = CreateFileA(pipe_name.c_str(), GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
-    HANDLE child_pipe;
-    if (!DuplicateHandle(GetCurrentProcess(), output_write_handle, GetCurrentProcess(), &child_pipe, 0, TRUE,
+    // Get the write end for child's stdout/stderr
+    HANDLE outputWriteHandle = CreateFileA(read_pipe_name.c_str(), GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+    if (outputWriteHandle == INVALID_HANDLE_VALUE)
+    {
+        exitFailure(getErrorString());
+    }
+
+    HANDLE childStdoutPipe;
+    if (!DuplicateHandle(GetCurrentProcess(), outputWriteHandle, GetCurrentProcess(), &childStdoutPipe, 0, TRUE,
                          DUPLICATE_SAME_ACCESS))
     {
         exitFailure(getErrorString());
     }
-    CloseHandle(output_write_handle);
+    CloseHandle(outputWriteHandle);
 
-    SECURITY_ATTRIBUTES security_attributes;
-    memset(&security_attributes, 0, sizeof(SECURITY_ATTRIBUTES));
-    security_attributes.nLength = sizeof(SECURITY_ATTRIBUTES);
-    security_attributes.bInheritHandle = TRUE;
-    // Must be inheritable so subprocesses can dup to children.
-    HANDLE nul = CreateFileA("NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                             &security_attributes, OPEN_EXISTING, 0, NULL);
-    if (nul == INVALID_HANDLE_VALUE)
+    // ===== CREATE WRITE PIPE (for writing to child's stdin - SYNC) =====
+    // Note: No FILE_FLAG_OVERLAPPED - this makes it synchronous
+    HANDLE writePipe_ = CreateNamedPipeA(write_pipe_name.c_str(),
+                                          PIPE_ACCESS_OUTBOUND,  // No FILE_FLAG_OVERLAPPED
+                                          PIPE_TYPE_BYTE,
+                                          PIPE_UNLIMITED_INSTANCES, 0, 0, INFINITE, NULL);
+    if (writePipe_ == INVALID_HANDLE_VALUE)
     {
         exitFailure(getErrorString());
     }
+
+    // DO NOT register write pipe with IOCP - we want synchronous writes
+
+    OVERLAPPED writeOverlappedIO = {};
+    if (!ConnectNamedPipe(writePipe_, &writeOverlappedIO) && GetLastError() != ERROR_IO_PENDING)
+    {
+        exitFailure(getErrorString());
+    }
+
+    // Get the read end for child's stdin
+    HANDLE inputReadHandle = CreateFileA(write_pipe_name.c_str(), GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+    if (inputReadHandle == INVALID_HANDLE_VALUE)
+    {
+        exitFailure(getErrorString());
+    }
+
+    HANDLE childStdinPipe;
+    if (!DuplicateHandle(GetCurrentProcess(), inputReadHandle, GetCurrentProcess(), &childStdinPipe, 0, TRUE,
+                         DUPLICATE_SAME_ACCESS))
+    {
+        exitFailure(getErrorString());
+    }
+    CloseHandle(inputReadHandle);
 
     STARTUPINFOA startup_info;
     memset(&startup_info, 0, sizeof(startup_info));
@@ -99,12 +132,10 @@ uint64_t RunCommand::startAsyncProcess(const char *command, uint64_t serverFd)
     if (!use_console_)
     {
         startup_info.dwFlags = STARTF_USESTDHANDLES;
-        startup_info.hStdInput = nul;
-        startup_info.hStdOutput = child_pipe;
-        startup_info.hStdError = child_pipe;
+        startup_info.hStdInput = childStdinPipe;   // Child reads from this
+        startup_info.hStdOutput = childStdoutPipe; // Child writes to this
+        startup_info.hStdError = childStdoutPipe;  // Child writes to this
     }
-    // In the console case, child_pipe is still inherited by the child and closed
-    // when the subprocess finishes, which then notifies ninja.
 
     PROCESS_INFORMATION process_info;
     memset(&process_info, 0, sizeof(process_info));
@@ -120,16 +151,14 @@ uint64_t RunCommand::startAsyncProcess(const char *command, uint64_t serverFd)
         exitFailure(getErrorString());
     }
 
-    // Close pipe channel only used by the child.
-    if (child_pipe)
-    {
-        CloseHandle(child_pipe);
-    }
-    CloseHandle(nul);
+    // Close pipe channels only used by the child.
+    CloseHandle(childStdoutPipe);
+    CloseHandle(childStdinPipe);
 
     CloseHandle(process_info.hThread);
 
-    readPipe = (uint64_t)pipe_;
+    readPipe = (uint64_t)readPipe_;   // Parent reads child's output from this (ASYNC)
+    writePipe = (uint64_t)writePipe_; // Parent writes to child's input via this (SYNC)
     pid = (uint64_t)process_info.hProcess;
 
     return readPipe;
@@ -238,7 +267,7 @@ void readCompilerMessage(IPCManagerBS &manager, const uint64_t serverFd, const u
 {
 #ifdef _WIN32
     HANDLE hIOCP = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(serverFd));
-    HANDLE hPipe = reinterpret_cast<HANDLE>(manager.readFd);
+    HANDLE hPipe = reinterpret_cast<HANDLE>(readFd);
 
     while (true)
     {
@@ -281,13 +310,12 @@ void readCompilerMessage(IPCManagerBS &manager, const uint64_t serverFd, const u
         // Append read data to string
         for (DWORD i = 0; i < bytesRead; ++i)
         {
-            str.push_back(buffer[i]);
+            compilerTestPrunedOutput.push_back(buffer[i]);
         }
 
         // Check for terminator
-        if (str[str.size() - 1] == ';')
+        if (ends_with(compilerTestPrunedOutput, delimiter))
         {
-            str.pop_back();
             break;
         }
     }
@@ -385,7 +413,7 @@ int runTest()
     const uint64_t serverFd = createMultiplex();
 
     RunCommand compilerTest;
-    compilerTest.startAsyncProcess(COMPILER_TEST);
+    compilerTest.startAsyncProcess(COMPILER_TEST, serverFd);
     IPCManagerBS manager{compilerTest.writePipe};
 
     CTB type;
