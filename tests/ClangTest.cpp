@@ -62,7 +62,7 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
 
 #ifdef _WIN32
     HANDLE hIOCP = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(serverFd));
-    HANDLE hPipe = reinterpret_cast<HANDLE>(manager.fd);
+    HANDLE hPipe = reinterpret_cast<HANDLE>(manager.readFd);
 
     while (true)
     {
@@ -119,7 +119,7 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
 
     epoll_event ev{};
     ev.events = EPOLLIN;
-    if (epoll_ctl(serverFd, EPOLL_CTL_ADD, manager.fd, &ev) == -1)
+    if (epoll_ctl(serverFd, EPOLL_CTL_ADD, manager.readFd, &ev) == -1)
     {
         exitFailure(getErrorString());
     }
@@ -128,7 +128,7 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
     while (true)
     {
         char buffer[4096];
-        const int readCount = read(manager.fd, buffer, 4096);
+        const int readCount = read(manager.readFd, buffer, 4096);
         if (readCount == 0 || readCount == -1)
         {
             exitFailure(getErrorString());
@@ -145,7 +145,7 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
         break;
     }
 
-    if (epoll_ctl(serverFd, EPOLL_CTL_DEL, manager.fd, &ev) == -1)
+    if (epoll_ctl(serverFd, EPOLL_CTL_DEL, manager.readFd, &ev) == -1)
     {
         exitFailure(getErrorString());
     }
@@ -162,7 +162,7 @@ void completeConnection(IPCManagerBS &manager, int serverFd)
 {
 #ifdef _WIN32
     HANDLE hIOCP = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(serverFd));
-    HANDLE hPipe = reinterpret_cast<HANDLE>(manager.fd);
+    HANDLE hPipe = reinterpret_cast<HANDLE>(manager.readFd);
 
     if (const auto &r2 = manager.completeConnection(); !r2)
     {
@@ -206,7 +206,7 @@ void completeConnection(IPCManagerBS &manager, int serverFd)
         {
             epoll_event ev{};
             ev.events = EPOLLIN;
-            if (epoll_ctl(serverFd, EPOLL_CTL_ADD, manager.fd, &ev) == -1)
+            if (epoll_ctl(serverFd, EPOLL_CTL_ADD, manager.readFd, &ev) == -1)
             {
                 exitFailure(getErrorString());
             }
@@ -216,7 +216,7 @@ void completeConnection(IPCManagerBS &manager, int serverFd)
             {
                 exitFailure(getErrorString());
             }
-            if (epoll_ctl(serverFd, EPOLL_CTL_DEL, manager.fd, &ev) == -1)
+            if (epoll_ctl(serverFd, EPOLL_CTL_DEL, manager.readFd, &ev) == -1)
             {
                 exitFailure(getErrorString());
             }

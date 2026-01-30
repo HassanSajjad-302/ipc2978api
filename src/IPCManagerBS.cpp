@@ -35,17 +35,17 @@ tl::expected<uint32_t, std::string> IPCManagerBS::readInternal(char (&buffer)[40
 tl::expected<void, std::string> IPCManagerBS::writeInternal(const std::string &buffer) const
 {
 #ifdef _WIN32
-    const bool success = WriteFile(reinterpret_cast<HANDLE>(fd), // pipe handle
-                                   buffer.data(),                // message
-                                   buffer.size(),                // message length
-                                   nullptr,                      // bytes written
-                                   nullptr);                     // not overlapped
+    const bool success = WriteFile(reinterpret_cast<HANDLE>(writeFd), // pipe handle
+                                   buffer.data(),                    // message
+                                   buffer.size(),                    // message length
+                                   nullptr,                          // bytes written
+                                   nullptr);                         // not overlapped
     if (!success)
     {
         return tl::unexpected(getErrorString());
     }
 #else
-    if (const auto &r = writeAll(fd, buffer.data(), buffer.size()); !r)
+    if (const auto &r = writeAll(writeFd, buffer.data(), buffer.size()); !r)
     {
         return tl::unexpected(r.error());
     }
@@ -53,9 +53,8 @@ tl::expected<void, std::string> IPCManagerBS::writeInternal(const std::string &b
     return {};
 }
 
-IPCManagerBS::IPCManagerBS(const uint64_t fd_)
+IPCManagerBS::IPCManagerBS(const uint64_t readFd_, const uint64_t writeFd_) : readFd(readFd_), writeFd(writeFd_)
 {
-    fd = fd_;
 }
 
 tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType) const

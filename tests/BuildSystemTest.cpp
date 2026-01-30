@@ -32,8 +32,8 @@ struct RunCommand
 {
     string output;
     uint64_t pid;
-    uint64_t stdoutPipe;
-    uint64_t stdinPipe;
+    uint64_t readPipe;
+    uint64_t writePipe;
     int exitStatus;
 #ifdef _WIN32
     ProcessState processState = ProcessState::LAUNCHED;
@@ -137,7 +137,7 @@ uint64_t RunCommand::startAsyncProcess(const char *command, Builder &builder, BT
 
     CloseHandle(process_info.hThread);
 
-    stdoutPipe = (uint64_t)pipe_;
+    readPipe = (uint64_t)pipe_;
     pid = (uint64_t)process_info.hProcess;
 
     return eventDataIndex;
@@ -181,7 +181,7 @@ void RunCommand::reapProcess() const
         printErrorMessage(N2978::getErrorString());
     }
 
-    if (!CloseHandle((HANDLE)pid) || !CloseHandle((HANDLE)stdoutPipe))
+    if (!CloseHandle((HANDLE)pid) || !CloseHandle((HANDLE)readPipe))
     {
         printErrorMessage(N2978::getErrorString());
     }
@@ -218,8 +218,8 @@ uint64_t RunCommand::startAsyncProcess(const char *command)
         exitFailure(getErrorString());
     }
 
-    stdoutPipe = stdoutPipesLocal[0];
-    stdinPipe = stdinPipesLocal[1];
+    readPipe = stdoutPipesLocal[0];
+    writePipe = stdinPipesLocal[1];
 
     pid = fork();
     if (pid == -1)
@@ -266,7 +266,7 @@ uint64_t RunCommand::startAsyncProcess(const char *command)
     // Close unused pipe ends
     close(stdoutPipesLocal[1]);
     close(stdinPipesLocal[0]);
-    return stdoutPipe;
+    return readPipe;
 }
 
 bool RunCommand::wasProcessLaunchIncomplete(uint64_t index)
@@ -280,7 +280,7 @@ void RunCommand::reapProcess()
     {
         exitFailure(getErrorString());
     }
-    if (close(stdoutPipe) == -1)
+    if (close(readPipe) == -1)
     {
         exitFailure(getErrorString());
     }
@@ -322,7 +322,7 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
 
 #ifdef _WIN32
     HANDLE hIOCP = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(serverFd));
-    HANDLE hPipe = reinterpret_cast<HANDLE>(manager.fd);
+    HANDLE hPipe = reinterpret_cast<HANDLE>(manager.readFd);
 
     while (true)
     {
@@ -379,7 +379,7 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
 
     epoll_event ev{};
     ev.events = EPOLLIN;
-    if (epoll_ctl(serverFd, EPOLL_CTL_ADD, manager.fd, &ev) == -1)
+    if (epoll_ctl(serverFd, EPOLL_CTL_ADD, manager.readFd, &ev) == -1)
     {
         exitFailure(getErrorString());
     }
@@ -388,7 +388,7 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
     while (true)
     {
         char buffer[4096];
-        const int readCount = read(manager.fd, buffer, 4096);
+        const int readCount = read(manager.readFd, buffer, 4096);
         if (readCount == 0 || readCount == -1)
         {
             exitFailure(getErrorString());
@@ -404,7 +404,7 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
         }
     }
 
-    if (epoll_ctl(serverFd, EPOLL_CTL_DEL, manager.fd, &ev) == -1)
+    if (epoll_ctl(serverFd, EPOLL_CTL_DEL, manager.readFd, &ev) == -1)
     {
         exitFailure(getErrorString());
     }
@@ -437,7 +437,7 @@ void completeConnection(IPCManagerBS &manager, int serverFd)
 {
 #ifdef _WIN32
     HANDLE hIOCP = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(serverFd));
-    HANDLE hPipe = reinterpret_cast<HANDLE>(manager.fd);
+    HANDLE hPipe = reinterpret_cast<HANDLE>(manager.readFd);
 
     if (const auto &r2 = manager.completeConnection(); !r2)
     {
@@ -530,7 +530,7 @@ int runTest()
     RunCommand compilerTest;
     compilerTest.startAsyncProcess(COMPILER_TEST);
 
-    IPCManagerBS manager{compilerTest.stdoutPipe};
+    IPCManagerBS manager{compilerTest.readPipe, compilerTest.writePipe};
 
     CTB type;
     char buffer[320];
