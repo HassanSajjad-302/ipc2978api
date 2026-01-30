@@ -291,7 +291,8 @@ bool ends_with(const std::string &str, const std::string &suffix)
     return str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
-void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, char (&buffer)[320], CTB &type)
+void readCompilerMessage(IPCManagerBS &manager, const uint64_t serverFd, const uint64_t readFd, char (&buffer)[320],
+                         CTB &type)
 {
 #ifdef _WIN32
     HANDLE hIOCP = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(serverFd));
@@ -352,7 +353,7 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
 
     epoll_event ev{};
     ev.events = EPOLLIN;
-    if (epoll_ctl(serverFd, EPOLL_CTL_ADD, manager.readFd, &ev) == -1)
+    if (epoll_ctl(serverFd, EPOLL_CTL_ADD, readFd, &ev) == -1)
     {
         exitFailure(getErrorString());
     }
@@ -361,7 +362,7 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
     while (true)
     {
         char buffer[4096];
-        const int readCount = read(manager.readFd, buffer, 4096);
+        const int readCount = read(readFd, buffer, 4096);
         if (readCount == 0 || readCount == -1)
         {
             exitFailure(getErrorString());
@@ -377,7 +378,7 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
         }
     }
 
-    if (epoll_ctl(serverFd, EPOLL_CTL_DEL, manager.readFd, &ev) == -1)
+    if (epoll_ctl(serverFd, EPOLL_CTL_DEL, readFd, &ev) == -1)
     {
         exitFailure(getErrorString());
     }
@@ -394,7 +395,7 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
     const uint32_t payloadSize =
         *reinterpret_cast<uint32_t *>(compilerTestPrunedOutput.data() + (prunedSize - (4 + strlen(delimiter))));
     const char *payloadStart = compilerTestPrunedOutput.data() + (prunedSize - (4 + strlen(delimiter) + payloadSize));
-    const_cast<string_view &>(manager.serverReadString) = string_view(payloadStart, payloadSize);
+    manager.serverReadString = string_view(payloadStart, payloadSize);
     if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
     {
         exitFailure(r2.error());
@@ -443,8 +444,7 @@ int runTest()
 
     RunCommand compilerTest;
     compilerTest.startAsyncProcess(COMPILER_TEST);
-
-    IPCManagerBS manager{compilerTest.readPipe, compilerTest.writePipe};
+    IPCManagerBS manager{compilerTest.writePipe};
 
     CTB type;
     char buffer[320];
@@ -452,7 +452,7 @@ int runTest()
     {
         bool loopExit = false;
 
-        readCompilerMessage(serverFd, manager, buffer, type);
+        readCompilerMessage(manager, serverFd, compilerTest.readPipe, buffer, type);
 
         switch (type)
         {

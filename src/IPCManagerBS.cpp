@@ -53,7 +53,7 @@ tl::expected<void, std::string> IPCManagerBS::writeInternal(const std::string &b
     return {};
 }
 
-IPCManagerBS::IPCManagerBS(const uint64_t readFd_, const uint64_t writeFd_) : readFd(readFd_), writeFd(writeFd_)
+IPCManagerBS::IPCManagerBS(const uint64_t writeFd_) : writeFd(writeFd_)
 {
 }
 
