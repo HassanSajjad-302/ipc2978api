@@ -41,37 +41,32 @@ struct RunCommand
 #endif
 
     RunCommand() = default;
-    uint64_t startAsyncProcess(const char *command);
+    uint64_t startAsyncProcess(const char *command, uint64_t serverFd);
 };
 
 #ifdef _WIN32
-#include <Windows.h>
-#include <chrono>
 
 // Copied partially from Ninja
-uint64_t RunCommand::startAsyncProcess(const char *command, Builder &builder, BTarget *bTarget)
+uint64_t RunCommand::startAsyncProcess(const char *command, uint64_t serverFd)
 {
     // One BTarget can launch multiple processes so we also append the clock::now().
-    const string pipe_name =
-        FORMAT("\\\\.\\pipe\\{}{}", bTarget->id, std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    const string pipe_name = R"(\\.\pipe\{}{})";
     HANDLE pipe_ = CreateNamedPipeA(pipe_name.c_str(), PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED, PIPE_TYPE_BYTE,
                                     PIPE_UNLIMITED_INSTANCES, 0, 0, INFINITE, NULL);
     if (pipe_ == INVALID_HANDLE_VALUE)
     {
-        printErrorMessage(N2978::getErrorString());
+        exitFailure(getErrorString());
     }
 
-    const uint64_t eventDataIndex = builder.registerEventData(bTarget, (uint64_t)pipe_);
-    if (!CreateIoCompletionPort(pipe_, (HANDLE)builder.serverFd, eventDataIndex, 0))
+    if (!CreateIoCompletionPort(pipe_, (HANDLE)serverFd, (ULONG_PTR)pipe_, 0))
     {
-        printErrorMessage(N2978::getErrorString());
+        exitFailure(getErrorString());
     }
 
-    if (CompletionKey &k = eventData[eventDataIndex];
-        !ConnectNamedPipe(pipe_, &reinterpret_cast<OVERLAPPED &>(k.overlappedBuffer)) &&
-        GetLastError() != ERROR_IO_PENDING)
+    OVERLAPPED overlappedIO = {};
+    if (!ConnectNamedPipe(pipe_, &reinterpret_cast<OVERLAPPED &>(overlappedIO)) && GetLastError() != ERROR_IO_PENDING)
     {
-        printErrorMessage(N2978::getErrorString());
+        exitFailure(getErrorString());
     }
 
     // Get the write end of the pipe as a handle inheritable across processes.
@@ -80,7 +75,7 @@ uint64_t RunCommand::startAsyncProcess(const char *command, Builder &builder, BT
     if (!DuplicateHandle(GetCurrentProcess(), output_write_handle, GetCurrentProcess(), &child_pipe, 0, TRUE,
                          DUPLICATE_SAME_ACCESS))
     {
-        printErrorMessage(N2978::getErrorString());
+        exitFailure(getErrorString());
     }
     CloseHandle(output_write_handle);
 
@@ -93,7 +88,7 @@ uint64_t RunCommand::startAsyncProcess(const char *command, Builder &builder, BT
                              &security_attributes, OPEN_EXISTING, 0, NULL);
     if (nul == INVALID_HANDLE_VALUE)
     {
-        printErrorMessage(N2978::getErrorString());
+        exitFailure(getErrorString());
     }
 
     STARTUPINFOA startup_info;
@@ -122,7 +117,7 @@ uint64_t RunCommand::startAsyncProcess(const char *command, Builder &builder, BT
     if (!CreateProcessA(NULL, (char *)command, NULL, NULL,
                         /* inherit handles */ TRUE, process_flags, NULL, NULL, &startup_info, &process_info))
     {
-        printErrorMessage(FORMAT("CreateProcessA failed for Command\n{}\nError\n", command, N2978::getErrorString()));
+        exitFailure(getErrorString());
     }
 
     // Close pipe channel only used by the child.
@@ -137,60 +132,7 @@ uint64_t RunCommand::startAsyncProcess(const char *command, Builder &builder, BT
     readPipe = (uint64_t)pipe_;
     pid = (uint64_t)process_info.hProcess;
 
-    return eventDataIndex;
-}
-
-bool RunCommand::wasProcessLaunchIncomplete(const uint64_t index)
-{
-    if (processState == ProcessState::LAUNCHED)
-    {
-        CompletionKey &k = eventData[index];
-        uint64_t bytesRead = 0;
-        const bool result =
-            GetOverlappedResult((HANDLE)k.handle, &(OVERLAPPED &)k.overlappedBuffer, (LPDWORD)&bytesRead, false);
-        if (result)
-        {
-            processState = ProcessState::OUTPUT_CONNECTED;
-            return true;
-        }
-        if (GetLastError() == ERROR_BROKEN_PIPE)
-        {
-            processState = ProcessState::COMPLETED;
-            return true;
-        }
-        printErrorMessage(N2978::getErrorString());
-    }
-    return false;
-}
-
-void RunCommand::reapProcess() const
-{
-    if (WaitForSingleObject((HANDLE)pid, INFINITE) == WAIT_FAILED)
-    {
-        printErrorMessage(N2978::getErrorString());
-    }
-    if (!GetExitCodeProcess((HANDLE)pid, (LPDWORD)&exitStatus))
-    {
-        printErrorMessage(N2978::getErrorString());
-    }
-
-    if (!CloseHandle((HANDLE)pid) || !CloseHandle((HANDLE)readPipe))
-    {
-        printErrorMessage(N2978::getErrorString());
-    }
-}
-
-void RunCommand::killModuleProcess(const string &processName) const
-{
-    // Exit code you want to assign to the terminated process
-    DWORD exitCode = 1;
-
-    if (!TerminateProcess((HANDLE)pid, exitCode))
-    {
-        printErrorMessage(FORMAT("Killing module process {} failed.\n", processName));
-    }
-
-    CloseHandle((HANDLE)pid); // Clean up when you’re done
+    return readPipe;
 }
 
 #else
