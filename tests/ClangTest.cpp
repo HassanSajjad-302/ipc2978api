@@ -158,77 +158,6 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
     }
 }
 
-void completeConnection(IPCManagerBS &manager, int serverFd)
-{
-#ifdef _WIN32
-    HANDLE hIOCP = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(serverFd));
-    HANDLE hPipe = reinterpret_cast<HANDLE>(manager.readFd);
-
-    if (const auto &r2 = manager.completeConnection(); !r2)
-    {
-        exitFailure(r2.error());
-    }
-    else
-    {
-        if (!*r2)
-        {
-            // Connection is pending (ERROR_IO_PENDING)
-            // Wait for IOCP to signal completion
-
-            DWORD bytesTransferred = 0;
-            ULONG_PTR completionKey = 0;
-            LPOVERLAPPED overlapped = nullptr;
-
-            if (!GetQueuedCompletionStatus(hIOCP, &bytesTransferred, &completionKey, &overlapped,
-                                           INFINITE)) // Wait indefinitely
-            {
-                exitFailure(getErrorString());
-            }
-
-            // Verify this completion is for our pipe
-            if (completionKey != (ULONG_PTR)hPipe)
-            {
-                exitFailure("Unexpected completion key");
-            }
-
-            // Connection is now complete - no need to call completeConnection again
-            // The ConnectNamedPipe operation has finished
-        }
-    }
-#else
-    if (const auto &r2 = manager.completeConnection(); !r2)
-    {
-        exitFailure(r2.error());
-    }
-    else
-    {
-        if (!*r2)
-        {
-            epoll_event ev{};
-            ev.events = EPOLLIN;
-            if (epoll_ctl(serverFd, EPOLL_CTL_ADD, manager.readFd, &ev) == -1)
-            {
-                exitFailure(getErrorString());
-            }
-
-            epoll_event ev2{};
-            if (epoll_wait(serverFd, &ev2, 1, -1) == -1)
-            {
-                exitFailure(getErrorString());
-            }
-            if (epoll_ctl(serverFd, EPOLL_CTL_DEL, manager.readFd, &ev) == -1)
-            {
-                exitFailure(getErrorString());
-            }
-            if (const auto &r3 = manager.completeConnection(); !r3)
-            {
-                exitFailure(r3.error());
-            }
-        }
-    }
-#endif
-}
-
 uint64_t createMultiplex()
 {
 #ifdef _WIN32
@@ -544,8 +473,6 @@ tl::expected<int, string> runTest()
             return tl::unexpected(r2.error());
         }
 
-        completeConnection(manager, serverFd);
-
         CTB type;
         char buffer[320];
         readCompilerMessage(serverFd, manager, buffer, type);
@@ -561,7 +488,6 @@ tl::expected<int, string> runTest()
             return tl::unexpected("wrong logical name received while compiling a-c.cpp");
         }
         printMessage(ctbLastMessage, false);
-        manager.closeConnection();
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -580,8 +506,6 @@ tl::expected<int, string> runTest()
             return tl::unexpected(r2.error());
         }
 
-        completeConnection(manager, serverFd);
-
         CTB type;
         char buffer[320];
         readCompilerMessage(serverFd, manager, buffer, type);
@@ -597,7 +521,6 @@ tl::expected<int, string> runTest()
             return tl::unexpected("wrong logical name received while compiling a-b.cpp");
         }
         printMessage(ctbLastMessage, false);
-        manager.closeConnection();
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -615,8 +538,6 @@ tl::expected<int, string> runTest()
         {
             return tl::unexpected(r2.error());
         }
-
-        completeConnection(manager, serverFd);
 
         CTB type;
         char buffer[320];
@@ -681,7 +602,6 @@ tl::expected<int, string> runTest()
 
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
-        manager.closeConnection();
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -709,8 +629,6 @@ tl::expected<int, string> runTest()
         {
             return tl::unexpected(r2.error());
         }
-
-        completeConnection(manager, serverFd);
 
         CTB type;
         char buffer[320];
@@ -744,7 +662,6 @@ tl::expected<int, string> runTest()
 
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
-        manager.closeConnection();
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -762,8 +679,6 @@ tl::expected<int, string> runTest()
         {
             return tl::unexpected(r2.error());
         }
-
-        completeConnection(manager, serverFd);
 
         CTB type;
         char buffer[320];
@@ -830,7 +745,6 @@ tl::expected<int, string> runTest()
         }
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
-        manager.closeConnection();
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -854,8 +768,6 @@ tl::expected<int, string> runTest()
         {
             return tl::unexpected(r2.error());
         }
-
-        completeConnection(manager, serverFd);
 
         CTB type;
         char buffer[320];
@@ -922,7 +834,6 @@ tl::expected<int, string> runTest()
         }
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
-        manager.closeConnection();
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -945,8 +856,6 @@ tl::expected<int, string> runTest()
         {
             return tl::unexpected(r2.error());
         }
-
-        completeConnection(manager, serverFd);
 
         CTB type;
         char buffer[320];
@@ -990,7 +899,6 @@ tl::expected<int, string> runTest()
 
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
-        manager.closeConnection();
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -1008,7 +916,6 @@ tl::expected<int, string> runTest()
         {
             return tl::unexpected(r2.error());
         }
-        completeConnection(manager, serverFd);
 
         CTB type;
         char buffer[320];
@@ -1102,7 +1009,6 @@ tl::expected<int, string> runTest()
 
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
         printMessage(ctbLastMessage, false);
-        manager.closeConnection();
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -1128,8 +1034,6 @@ tl::expected<int, string> runTest()
         {
             return tl::unexpected(r2.error());
         }
-
-        completeConnection(manager, serverFd);
 
         CTB type;
         char buffer[320];
@@ -1216,7 +1120,6 @@ tl::expected<int, string> runTest()
         }
 
         printMessage(ctbLastMessage, false);
-        manager.closeConnection();
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
