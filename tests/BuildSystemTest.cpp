@@ -42,8 +42,6 @@ struct RunCommand
 
     RunCommand() = default;
     uint64_t startAsyncProcess(const char *command);
-    static bool wasProcessLaunchIncomplete(uint64_t index);
-    void reapProcess();
 };
 
 #ifdef _WIN32
@@ -262,23 +260,6 @@ uint64_t RunCommand::startAsyncProcess(const char *command)
     close(stdoutPipesLocal[1]);
     close(stdinPipesLocal[0]);
     return readPipe;
-}
-
-bool RunCommand::wasProcessLaunchIncomplete(uint64_t index)
-{
-    return false;
-}
-
-void RunCommand::reapProcess()
-{
-    if (waitpid(pid, &exitStatus, 0) < 0)
-    {
-        exitFailure(getErrorString());
-    }
-    if (close(readPipe) == -1)
-    {
-        exitFailure(getErrorString());
-    }
 }
 
 #endif
@@ -604,8 +585,8 @@ int runTest()
 int main()
 {
     runTest();
-    print("CompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
+    print("\n\n\nCompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
     compilerTestPrunedOutput.clear();
     runTest();
-    print("CompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
+    print("\n\n\nCompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
 }

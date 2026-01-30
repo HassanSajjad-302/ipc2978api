@@ -2,11 +2,9 @@
 #include "IPCManagerCompiler.hpp"
 #include "Testing.hpp"
 #include "fmt/printf.h"
-#include <chrono>
 #include <filesystem>
 #include <random>
 #include <string>
-#include <thread>
 
 using fmt::print;
 using namespace std;
@@ -56,7 +54,7 @@ int main()
     }
 
     manager.lastMessage.errorOccurred = false;
-    string bmi1Content = getRandomString();
+    const string bmi1Content = getRandomString();
     manager.lastMessage.fileSize = bmi1Content.size();
     print("Second ");
     if (const auto &r2 =
@@ -72,7 +70,7 @@ int main()
 
     BMIFile bmi2 = BMIFile();
     bmi2.filePath = (std::filesystem::current_path() / "bmi2.txt").generic_string();
-    string bmi2Content = fileToString(bmi2.filePath);
+    const string bmi2Content = fileToString(bmi2.filePath);
     bmi2.fileSize = bmi2Content.size();
     if (const auto &r2 = CompilerTest::readSharedMemoryBMIFile(bmi2); !r2)
     {
@@ -80,7 +78,7 @@ int main()
     }
     else
     {
-        if (const auto &processMappingOfBMIFile = r2.value(); bmi2Content != processMappingOfBMIFile.file)
+        if (const auto &[file] = r2.value(); bmi2Content != file)
         {
             exitFailure(fmt::format("File Contents not similar for {}", bmi2.filePath));
         }
