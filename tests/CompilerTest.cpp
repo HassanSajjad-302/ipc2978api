@@ -34,10 +34,10 @@ struct CompilerTest
 
 int main()
 {
-    std::this_thread::sleep_for(std::chrono::milliseconds(900));
+    //std::this_thread::sleep_for(std::chrono::milliseconds(5000));
     IPCManagerCompiler manager;
     CompilerTest t(&manager);
-    std::uniform_int_distribution distribution(0, 20000);
+    std::uniform_int_distribution distribution(0, 200);
     for (uint64_t i = 0; i < distribution(generator); ++i)
     {
         CTBNonModule nonModule;

@@ -605,8 +605,8 @@ int runTest()
 int main()
 {
     runTest();
-    print("\n\n\nCompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
+    fmt::println("\n\n\nCompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
     compilerTestPrunedOutput.clear();
     runTest();
-    print("\n\n\nCompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
+    fmt::println("\n\n\nCompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
 }
