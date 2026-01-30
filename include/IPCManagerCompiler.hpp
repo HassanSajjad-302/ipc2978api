@@ -33,6 +33,10 @@ class IPCManagerCompiler : Manager
     friend struct ::CompilerTest;
     friend struct ::BuildSystemTest;
 
+
+    tl::expected<uint32_t, std::string> readInternal(char (&buffer)[BUFFERSIZE]) const override;
+    tl::expected<void, std::string> writeInternal(const std::string &buffer) const override;
+
     // This function is used to receive a particular message. Compiler knows what message it expects which will be the
     // template argument.
     template <typename T> tl::expected<T, std::string> receiveMessage() const;

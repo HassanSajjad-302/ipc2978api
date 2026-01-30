@@ -12,6 +12,13 @@ namespace N2978
 class IPCManagerBS : public Manager
 {
   public:
+    uint64_t fd = 0;
+
+    std::string_view serverReadString;
+
+    tl::expected<uint32_t, std::string> readInternal(char (&buffer)[BUFFERSIZE]) const override;
+    tl::expected<void, std::string> writeInternal(const std::string &buffer) const override;
+
     explicit IPCManagerBS(uint64_t fd_);
     tl::expected<void, std::string> receiveMessage(char (&ctbBuffer)[320], CTB &messageType) const;
     [[nodiscard]] tl::expected<void, std::string> sendMessage(const BTCModule &moduleFile) const;

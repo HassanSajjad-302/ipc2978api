@@ -19,10 +19,43 @@
 namespace N2978
 {
 
+tl::expected<uint32_t, std::string> IPCManagerBS::readInternal(char (&buffer)[4096]) const
+{
+    const uint32_t serverReadStringSize = serverReadString.size();
+    const uint32_t bytesRead = serverReadStringSize < BUFFERSIZE ? serverReadStringSize : BUFFERSIZE;
+    for (uint32_t i = 0; i < bytesRead; ++i)
+    {
+        buffer[i] = serverReadString[i];
+    }
+    const_cast<std::string_view &>(serverReadString) =
+        std::string_view{serverReadString.data() + bytesRead, serverReadString.size() - bytesRead};
+    return bytesRead;
+}
+
+tl::expected<void, std::string> IPCManagerBS::writeInternal(const std::string &buffer) const
+{
+#ifdef _WIN32
+    const bool success = WriteFile(reinterpret_cast<HANDLE>(fd), // pipe handle
+                                   buffer.data(),                // message
+                                   buffer.size(),                // message length
+                                   nullptr,                      // bytes written
+                                   nullptr);                     // not overlapped
+    if (!success)
+    {
+        return tl::unexpected(getErrorString());
+    }
+#else
+    if (const auto &r = writeAll(fd, buffer.data(), buffer.size()); !r)
+    {
+        return tl::unexpected(r.error());
+    }
+#endif
+    return {};
+}
+
 IPCManagerBS::IPCManagerBS(const uint64_t fd_)
 {
     fd = fd_;
-    isServer = true;
 }
 
 tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType) const

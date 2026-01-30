@@ -28,6 +28,58 @@ Response::Response(std::string filePath_, const ProcessMappingOfBMIFile &mapping
 {
 }
 
+tl::expected<uint32_t, std::string> IPCManagerCompiler::readInternal(char (&buffer)[4096]) const
+{
+    int32_t bytesRead;
+#ifdef _WIN32
+    const bool success = ReadFile(reinterpret_cast<HANDLE>(fd), // pipe handle
+                                  buffer,                       // buffer to receive reply
+                                  BUFFERSIZE,                   // size of buffer
+                                  LPDWORD(&bytesRead),          // number of bytes read
+                                  nullptr);                     // not overlapped
+
+    if (const uint32_t lastError = GetLastError(); !success && lastError != ERROR_MORE_DATA)
+    {
+        return tl::unexpected(getErrorString());
+    }
+
+#else
+    bytesRead = read(STDIN_FILENO, buffer, BUFFERSIZE);
+    if (bytesRead == -1)
+    {
+        return tl::unexpected(getErrorString());
+    }
+#endif
+
+    if (!bytesRead)
+    {
+        return tl::unexpected(getErrorString(ErrorCategory::READ_FILE_ZERO_BYTES_READ));
+    }
+
+    return bytesRead;
+}
+
+tl::expected<void, std::string> IPCManagerCompiler::writeInternal(const std::string &buffer) const
+{
+#ifdef _WIN32
+    const bool success = WriteFile(reinterpret_cast<HANDLE>(fd), // pipe handle
+                                   buffer.data(),                // message
+                                   buffer.size(),                // message length
+                                   nullptr,                      // bytes written
+                                   nullptr);                     // not overlapped
+    if (!success)
+    {
+        return tl::unexpected(getErrorString());
+    }
+#else
+    if (const auto &r = writeAll(STDOUT_FILENO, buffer.data(), buffer.size()); !r)
+    {
+        return tl::unexpected(r.error());
+    }
+#endif
+    return {};
+}
+
 tl::expected<void, std::string> IPCManagerCompiler::receiveBTCLastMessage() const
 {
     char buffer[BUFFERSIZE];

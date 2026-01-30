@@ -59,13 +59,11 @@ struct ProcessMappingOfBMIFile
 class Manager
 {
   public:
-    uint64_t fd = 0;
-
-    bool isServer = false;
-    std::string_view serverReadString;
-
-    tl::expected<uint32_t, std::string> readInternal(char (&buffer)[BUFFERSIZE]) const;
-    tl::expected<void, std::string> writeInternal(const std::string &buffer) const;
+    virtual tl::expected<uint32_t, std::string> readInternal(char (&buffer)[BUFFERSIZE]) const = 0;
+    virtual tl::expected<void, std::string> writeInternal(const std::string &buffer) const = 0;
+#ifndef _WIN32
+    static tl::expected<void, std::string> writeAll(const int fd, const char *buffer, const uint32_t count);
+#endif
 
     static std::string getBufferWithType(CTB type);
     static void writeUInt32(std::string &buffer, uint32_t value);
