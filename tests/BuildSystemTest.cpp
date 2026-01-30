@@ -188,7 +188,7 @@ void RunCommand::reapProcess() const
 
 #else
 
-uint64_t RunCommand::startAsyncProcess(const char *command)
+uint64_t RunCommand::startAsyncProcess(const char *command, uint64_t serverFd)
 {
     // Create pipes for stdout and stderr
     int stdoutPipesLocal[2];
@@ -255,6 +255,21 @@ uint64_t RunCommand::startAsyncProcess(const char *command)
     return readPipe;
 }
 
+void RunCommand::reapProcess() const
+{
+    if (waitpid(pid, const_cast<int *>(&exitStatus), 0) < 0)
+    {
+        exitFailure(getErrorString());
+    }
+    if (close(readPipe) == -1)
+    {
+        exitFailure(getErrorString());
+    }
+    if (close(writePipe) == -1)
+    {
+        exitFailure(getErrorString());
+    }
+}
 #endif
 
 string compilerTestPrunedOutput;
@@ -365,7 +380,11 @@ void readCompilerMessage(const uint64_t serverFd, const uint64_t readFd)
     {
         char buffer[4096];
         const int readCount = read(readFd, buffer, 4096);
-        if (readCount == 0 || readCount == -1)
+        if (readCount == 0)
+        {
+            return;
+        }
+        if (readCount == -1)
         {
             exitFailure(getErrorString());
         }
