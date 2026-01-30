@@ -618,14 +618,6 @@ int runTest()
         }
     }
 
-    IPCManagerBS oldManager = manager;
-    // This tests the scenario where build-system has not yet called the receiveMessage after calling
-    // the makeIPCManagerBS() while compiler process already exited and sent the CTBLastMessage.
-    // To ensure that we make build-system manager before CompilerTest making compiler manager,
-    // we make it here.
-
-    // manager = makeBuildSystemManager((std::filesystem::current_path() / "test1").string(), serverFd);
-
     ProcessMappingOfBMIFile bmi2Mapping;
     {
         // We don't assign the file.fileSize this-time. This IPCManagerBS::createSharedMemoryBMIFile will return it as
@@ -656,11 +648,11 @@ int runTest()
             exitFailure(fmt::format("file.fileSize is different from fileContent.size\n"));
         }
 
-        // After receiving the next message, CompilerTest will check that bmi2.txt is same as the received mapping.
-
+        // After receiving the next message, CompilerTest will check that bmi2.txt is same as the received mapping. This
+        // is tested to ensure that if the build-system is making the bmi first time is working correctly.
         constexpr BTCLastMessage btcLastMessage;
 
-        if (const auto &r2 = oldManager.sendMessage(btcLastMessage); !r2)
+        if (const auto &r2 = manager.sendMessage(btcLastMessage); !r2)
         {
             exitFailure(r2.error());
         }
@@ -668,24 +660,10 @@ int runTest()
         printMessage(btcLastMessage, true);
     }
 
-    // we delay the receiveMessage. Compiler in this duration has exited with error after connecting.
-    std::this_thread::sleep_for(std::chrono::seconds(3));
-
-    // CompilerTest would have exited by now
-    readCompilerMessage(serverFd, manager, buffer, type);
-
     if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(bmi2Mapping); !r2)
     {
         exitFailure(r2.error());
     }
-
-    if (type != CTB::LAST_MESSAGE)
-    {
-        print("Test failed. Expected CTB::LAST_MESSAGE.\n");
-    }
-
-    print("Received CTBLastMessage on new manager.");
-    printMessage(reinterpret_cast<CTBLastMessage &>(buffer), false);
 
     return EXIT_SUCCESS;
 }

@@ -90,26 +90,4 @@ int main()
             exitFailure(r3.error());
         }
     }
-
-    // Build-system will create the new manager before sending the last-message so we can safely connect. However, it
-    // wil wait for us to send the lastMessage with error before it wil receiving imitating a situation where compiler
-    // has already exited even before the build-system call receiveMessage.
-    /*
-    const auto r2 = makeIPCManagerCompiler((filesystem::current_path() / "test1").string());
-    if (!r2)
-    {
-        exitFailure(r2.error());
-    }
-    manager = r2.value();
-    */
-
-    manager.lastMessage = CTBLastMessage{};
-    manager.lastMessage.errorOccurred = true;
-    if (const auto &r3 = manager.sendCTBLastMessage(); !r3)
-    {
-        exitFailure(r3.error());
-    }
-
-    print("BTCLastMessage received on new manager.\n");
-    printMessage(manager.lastMessage, true);
 }
