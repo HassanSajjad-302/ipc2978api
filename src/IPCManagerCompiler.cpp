@@ -112,6 +112,7 @@ tl::expected<BTCModule, std::string> IPCManagerCompiler::receiveBTCModule(const 
 {
     std::string buffer = getBufferWithType(CTB::MODULE);
     writeString(buffer, moduleName.moduleName);
+    writeUInt32(buffer, buffer.size());
     buffer.append(delimiter, strlen(delimiter));
     // This call sends the CTBModule to the build-system.
     if (const auto &r = writeInternal(buffer); !r)
@@ -185,6 +186,7 @@ tl::expected<BTCNonModule, std::string> IPCManagerCompiler::receiveBTCNonModule(
     std::string buffer = getBufferWithType(CTB::NON_MODULE);
     buffer.push_back(nonModule.isHeaderUnit);
     writeString(buffer, nonModule.logicalName);
+    writeUInt32(buffer, buffer.size());
     buffer.append(delimiter, strlen(delimiter));
     // This call sends the CTBNonModule to the build-system.
     if (const auto &r = writeInternal(buffer); !r)
@@ -318,6 +320,7 @@ tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage() const
     writeString(buffer, lastMessage.errorOutput);
     writeString(buffer, lastMessage.logicalName);
     writeUInt32(buffer, lastMessage.fileSize);
+    writeUInt32(buffer, buffer.size());
     buffer.append(delimiter, strlen(delimiter));
     if (const auto &r = writeInternal(buffer); !r)
     {

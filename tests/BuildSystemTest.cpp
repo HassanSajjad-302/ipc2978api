@@ -43,7 +43,7 @@ struct RunCommand
 
     RunCommand() = default;
     uint64_t startAsyncProcess(const char *command);
-    bool wasProcessLaunchIncomplete(uint64_t index);
+    static bool wasProcessLaunchIncomplete(uint64_t index);
     void reapProcess();
 };
 
@@ -145,7 +145,6 @@ uint64_t RunCommand::startAsyncProcess(const char *command, Builder &builder, BT
 
 bool RunCommand::wasProcessLaunchIncomplete(const uint64_t index)
 {
-#ifdef _WIN32
     if (processState == ProcessState::LAUNCHED)
     {
         CompletionKey &k = eventData[index];
@@ -165,9 +164,6 @@ bool RunCommand::wasProcessLaunchIncomplete(const uint64_t index)
         printErrorMessage(N2978::getErrorString());
     }
     return false;
-#else
-    return false;
-#endif
 }
 
 void RunCommand::reapProcess() const
@@ -288,8 +284,7 @@ void RunCommand::reapProcess()
 
 #endif
 
-bool first = true;
-std::thread *thr;
+string compilerTestPrunedOutput;
 
 #ifdef _WIN32
 #define COMPILER_TEST ".\\CompilerTest.exe"
@@ -318,8 +313,6 @@ bool ends_with(const std::string &str, const std::string &suffix)
 
 void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, char (&buffer)[320], CTB &type)
 {
-    std::string str;
-
 #ifdef _WIN32
     HANDLE hIOCP = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(serverFd));
     HANDLE hPipe = reinterpret_cast<HANDLE>(manager.readFd);
@@ -395,10 +388,10 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
         }
         for (uint32_t i = 0; i < readCount; ++i)
         {
-            str.push_back(buffer[i]);
+            compilerTestPrunedOutput.push_back(buffer[i]);
         }
 
-        if (ends_with(str, delimiter))
+        if (ends_with(compilerTestPrunedOutput, delimiter))
         {
             break;
         }
@@ -408,7 +401,10 @@ void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, c
     {
         exitFailure(getErrorString());
     }
+
 #endif
+
+    // Prune the compiler output. and make a new string of the compiler-message output.
     string *str2 = new string(std::move(str));
     const_cast<string_view &>(manager.serverReadString) = string_view{str2->data(), str2->size() - strlen(delimiter)};
     if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
@@ -430,77 +426,6 @@ void closeHandle(const uint64_t fd)
     {
         exitFailure(getErrorString());
     }
-#endif
-}
-
-void completeConnection(IPCManagerBS &manager, int serverFd)
-{
-#ifdef _WIN32
-    HANDLE hIOCP = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(serverFd));
-    HANDLE hPipe = reinterpret_cast<HANDLE>(manager.readFd);
-
-    if (const auto &r2 = manager.completeConnection(); !r2)
-    {
-        exitFailure(r2.error());
-    }
-    else
-    {
-        if (!*r2)
-        {
-            // Connection is pending (ERROR_IO_PENDING)
-            // Wait for IOCP to signal completion
-
-            DWORD bytesTransferred = 0;
-            ULONG_PTR completionKey = 0;
-            LPOVERLAPPED overlapped = nullptr;
-
-            if (!GetQueuedCompletionStatus(hIOCP, &bytesTransferred, &completionKey, &overlapped,
-                                           INFINITE)) // Wait indefinitely
-            {
-                exitFailure(getErrorString());
-            }
-
-            // Verify this completion is for our pipe
-            if (completionKey != (ULONG_PTR)hPipe)
-            {
-                exitFailure("Unexpected completion key");
-            }
-
-            // Connection is now complete - no need to call completeConnection again
-            // The ConnectNamedPipe operation has finished
-        }
-    }
-#else
-    /*if (const auto &r2 = manager.completeConnection(); !r2)
-    {
-        exitFailure(r2.error());
-    }
-    else
-    {
-        if (!*r2)
-        {
-            epoll_event ev{};
-            ev.events = EPOLLIN;
-            if (epoll_ctl(serverFd, EPOLL_CTL_ADD, manager.fd, &ev) == -1)
-            {
-                exitFailure(getErrorString());
-            }
-
-            epoll_event ev2{};
-            if (epoll_wait(serverFd, &ev2, 1, -1) == -1)
-            {
-                exitFailure(getErrorString());
-            }
-            if (epoll_ctl(serverFd, EPOLL_CTL_DEL, manager.fd, &ev) == -1)
-            {
-                exitFailure(getErrorString());
-            }
-            if (const auto &r3 = manager.completeConnection(); !r3)
-            {
-                exitFailure(r3.error());
-            }
-        }
-    }*/
 #endif
 }
 
@@ -670,10 +595,6 @@ int runTest()
 
 int main()
 {
-    first = true;
     runTest();
-    thr->join();
-    first = false;
     runTest();
-    thr->join();
 }
