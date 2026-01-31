@@ -15,9 +15,6 @@
 #ifdef IS_THIS_CLANG_REPO
 #include "clang/IPC2978/IPCManagerBS.hpp"
 #include "gtest/gtest.h"
-template <typename T> void printMessage(const T &, bool)
-{
-}
 #else
 #include "IPCManagerBS.hpp"
 #include "Testing.hpp"
@@ -738,7 +735,6 @@ tl::expected<int, string> runTest()
         {
             return tl::unexpected("wrong logical name received while compiling a-b.cpp");
         }
-        printMessage(ctbModule, false);
 
         BMIFile btcModBMI;
         btcModBMI.filePath = aBPcm;
@@ -1178,7 +1174,6 @@ tl::expected<int, string> runTest()
         {
             return tl::unexpected("wrong logical name received while compiling a-b.cpp");
         }
-        printMessage(ctbModule, false);
 
         BMIFile requested;
         requested.filePath = fooPcm;
