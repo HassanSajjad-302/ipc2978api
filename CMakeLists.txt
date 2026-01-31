@@ -4,7 +4,7 @@ project(named_pipes)
 set(CMAKE_CXX_STANDARD 17)
 
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" OR "${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
-    add_link_options(-fsanitize=thread -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address -fno-omit-frame-pointer)
     add_compile_options(-fno-exceptions -fno-rtti)
 elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "MSVC")
     if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")

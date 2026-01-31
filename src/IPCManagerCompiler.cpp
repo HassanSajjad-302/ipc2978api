@@ -416,7 +416,14 @@ tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const std
         return tl::unexpected(r.error());
     }
 
+    // Build-system will send the BTCLastMessage after it has created the BMI file-mapping. Compiler process can not
+    // exit before that.
+    if (const auto &r = receiveBTCLastMessage(); !r)
+    {
+        return tl::unexpected(r.error());
+    }
     munmap(mapping, fileSize);
+
 #endif
 
     return {};
