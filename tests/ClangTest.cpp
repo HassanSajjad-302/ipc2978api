@@ -57,108 +57,6 @@ void exitFailure(const string &str)
 #endif
 }
 
-void readCompilerMessage(const uint64_t serverFd, const IPCManagerBS &manager, char (&buffer)[320], CTB &type)
-{
-    std::string str;
-
-#ifdef _WIN32
-    HANDLE hIOCP = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(serverFd));
-    HANDLE hPipe = reinterpret_cast<HANDLE>(manager.readFd);
-
-    while (true)
-    {
-        char buffer[4096];
-        DWORD bytesRead = 0;
-        OVERLAPPED overlapped = {};
-
-        // Initiate async read. Even if it is completed successfully, we will get the completion packet. We don't get
-        // the packet only if it fails immediately with error other than ERROR_IO_PENDING
-        BOOL result = ReadFile(hPipe, buffer, sizeof(buffer), &bytesRead, &overlapped);
-
-        DWORD error = GetLastError();
-        if (!result && error != ERROR_IO_PENDING)
-        {
-            exitFailure(getErrorString());
-        }
-
-        bytesRead = 0;
-
-        // Wait for the read to complete.
-        ULONG_PTR completionKey = 0;
-        LPOVERLAPPED completedOverlapped = nullptr;
-
-        if (!GetQueuedCompletionStatus(hIOCP, &bytesRead, &completionKey, &completedOverlapped, INFINITE))
-        {
-            exitFailure(getErrorString());
-        }
-
-        // Verify completion is for our pipe
-        if (completionKey != (ULONG_PTR)hPipe)
-        {
-            exitFailure("Unexpected completion key");
-        }
-
-        if (bytesRead == 0)
-        {
-            exitFailure("Pipe closed or no data read");
-        }
-
-        // Append read data to string
-        for (DWORD i = 0; i < bytesRead; ++i)
-        {
-            str.push_back(buffer[i]);
-        }
-
-        // Check for terminator
-        if (str[str.size() - 1] == ';')
-        {
-            str.pop_back();
-            break;
-        }
-    }
-#else
-
-    epoll_event ev{};
-    ev.events = EPOLLIN;
-    if (epoll_ctl(serverFd, EPOLL_CTL_ADD, manager.readFd, &ev) == -1)
-    {
-        exitFailure(getErrorString());
-    }
-
-    epoll_wait(serverFd, &ev, 1, -1);
-    while (true)
-    {
-        char buffer[4096];
-        const int readCount = read(manager.readFd, buffer, 4096);
-        if (readCount == 0 || readCount == -1)
-        {
-            exitFailure(getErrorString());
-        }
-        for (uint32_t i = 0; i < readCount; ++i)
-        {
-            str.push_back(buffer[i]);
-        }
-        if (str[str.size() - 1] != ';')
-        {
-            continue;
-        }
-        str.pop_back();
-        break;
-    }
-
-    if (epoll_ctl(serverFd, EPOLL_CTL_DEL, manager.readFd, &ev) == -1)
-    {
-        exitFailure(getErrorString());
-    }
-#endif
-
-    const_cast<string_view &>(manager.serverReadString) = *new string(str);
-    if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
-    {
-        exitFailure(r2.error());
-    }
-}
-
 uint64_t createMultiplex()
 {
 #ifdef _WIN32
@@ -420,13 +318,140 @@ CTB type;
 char buffer[320];
 RunCommand runCommand;
 
-void readFirstMessage(string_view compileCommand)
+
+void readCompilerMessage(const uint64_t serverFd, const uint64_t readFd)
+{
+#ifdef _WIN32
+    HANDLE hIOCP = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(serverFd));
+    HANDLE hPipe = reinterpret_cast<HANDLE>(readFd);
+
+    while (true)
+    {
+        char buffer[4096];
+        DWORD bytesRead = 0;
+        OVERLAPPED overlapped = {0};
+
+        // Initiate async read. Even if it is completed successfully, we will get the completion packet. We don't get
+        // the packet only if it fails immediately with error other than ERROR_IO_PENDING
+        BOOL result = ReadFile(hPipe, buffer, sizeof(buffer), &bytesRead, &overlapped);
+
+        DWORD error = GetLastError();
+        if (!result && error != ERROR_IO_PENDING)
+        {
+            if (error == ERROR_BROKEN_PIPE)
+            {
+                // read complete
+                return;
+            }
+            exitFailure(getErrorString());
+        }
+
+        bytesRead = 0;
+
+        // Wait for the read to complete.
+        ULONG_PTR completionKey = 0;
+        LPOVERLAPPED completedOverlapped = nullptr;
+
+        if (!GetQueuedCompletionStatus(hIOCP, &bytesRead, &completionKey, &completedOverlapped, INFINITE))
+        {
+            if (GetLastError() == ERROR_BROKEN_PIPE)
+            {
+                // completed
+                return;
+            }
+            exitFailure(getErrorString());
+        }
+
+        // Verify completion is for our pipe
+        if (completionKey != (ULONG_PTR)hPipe)
+        {
+            exitFailure("Unexpected completion key");
+        }
+
+        if (bytesRead == 0)
+        {
+            // completed
+            return;
+        }
+
+        // Append read data to string
+        for (DWORD i = 0; i < bytesRead; ++i)
+        {
+            compilerTestPrunedOutput.push_back(buffer[i]);
+        }
+
+        // Check for terminator
+        if (ends_with(compilerTestPrunedOutput, delimiter))
+        {
+            return;
+        }
+    }
+#else
+
+    epoll_event ev{};
+    ev.events = EPOLLIN;
+    if (epoll_ctl(serverFd, EPOLL_CTL_ADD, readFd, &ev) == -1)
+    {
+        exitFailure(getErrorString());
+    }
+
+    epoll_wait(serverFd, &ev, 1, -1);
+    while (true)
+    {
+        char buffer[4096];
+        const int readCount = read(readFd, buffer, 4096);
+        if (readCount == 0)
+        {
+            return;
+        }
+        if (readCount == -1)
+        {
+            exitFailure(getErrorString());
+        }
+        for (uint32_t i = 0; i < readCount; ++i)
+        {
+            compilerTestPrunedOutput.push_back(buffer[i]);
+        }
+
+        if (ends_with(compilerTestPrunedOutput, delimiter))
+        {
+            break;
+        }
+    }
+
+    if (epoll_ctl(serverFd, EPOLL_CTL_DEL, readFd, &ev) == -1)
+    {
+        exitFailure(getErrorString());
+    }
+#endif
+}
+
+bool endsWith(const std::string &str, const std::string &suffix)
+{
+    if (suffix.size() > str.size())
+    {
+        return false;
+    }
+    return str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+IPCManagerBS readFirstMessage(string_view compileCommand)
 {
     serverFd = createMultiplex();
     runCommand.startAsyncProcess(compileCommand.data(), serverFd);
     IPCManagerBS bs(runCommand.writePipe);
 
-    readCompilerMessage(serverFd, manager, buffer, type);
+    readCompilerMessage(serverFd, runCommand.readPipe);
+    if (!endsWith(compilerTestPrunedOutput, delimiter))
+    {
+        exitFailure("early exit by CompilerTest");
+    }
+    return bs;
+}
+
+void readMessage()
+{
+
 }
 
 // main.cpp
@@ -645,6 +670,7 @@ tl::expected<int, string> runTest()
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aCObj +
                                 "\" -noScanIPC -c -xc++-module a-c.cpp -fmodule-output=\"" + aCPcm + "\"";
 
+        IPCManagerBS manager = readFirstMessage(compileCommand);
         if (type != CTB::LAST_MESSAGE)
         {
             return tl::unexpected("received message of wrong type");
@@ -668,16 +694,7 @@ tl::expected<int, string> runTest()
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aBObj +
                                 "\" -noScanIPC -c -xc++-module a-b.cpp -fmodule-output=\"" + aBPcm + "\"";
 
-        CTB type;
-        char buffer[320];
-
-        const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager = makeBuildSystemManager(aBObj, serverFd);
-        if (const auto &r2 = Run(compileCommand); !r2)
-        {
-            return tl::unexpected(r2.error());
-        }
-        readCompilerMessage(serverFd, manager, buffer, type);
+        IPCManagerBS manager = readFirstMessage(compileCommand);
 
         if (type != CTB::LAST_MESSAGE)
         {
@@ -702,16 +719,7 @@ tl::expected<int, string> runTest()
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aObj +
                                 "\" -noScanIPC -c -xc++-module a.cpp -fmodule-output=\"" + aPcm + "\"";
 
-        CTB type;
-        char buffer[320];
-
-        const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager = makeBuildSystemManager(aObj, serverFd);
-        if (const auto &r2 = Run(compileCommand); !r2)
-        {
-            return tl::unexpected(r2.error());
-        }
-        readCompilerMessage(serverFd, manager, buffer, type);
+        IPCManagerBS manager = readFirstMessage(compileCommand);
 
         if (type != CTB::MODULE)
         {
@@ -794,16 +802,7 @@ tl::expected<int, string> runTest()
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + nPcm +
                                 "\" -noScanIPC -xc++-header n.hpp -DCOMMAND_MACRO";
 
-        CTB type;
-        char buffer[320];
-
-        const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager = makeBuildSystemManager(nPcm, serverFd);
-        if (const auto &r2 = Run(compileCommand); !r2)
-        {
-            return tl::unexpected(r2.error());
-        }
-        readCompilerMessage(serverFd, manager, buffer, type);
+        IPCManagerBS manager = readFirstMessage(compileCommand);
 
         if (type != CTB::NON_MODULE)
         {
@@ -844,16 +843,7 @@ tl::expected<int, string> runTest()
         string compileCommand =
             CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm + "\" -noScanIPC -xc++-header o.hpp";
 
-        CTB type;
-        char buffer[320];
-
-        const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager = makeBuildSystemManager(oPcm, serverFd);
-        if (const auto &r2 = Run(compileCommand); !r2)
-        {
-            return tl::unexpected(r2.error());
-        }
-        readCompilerMessage(serverFd, manager, buffer, type);
+        IPCManagerBS manager = readFirstMessage(compileCommand);
 
         if (type != CTB::NON_MODULE)
         {
@@ -934,16 +924,7 @@ tl::expected<int, string> runTest()
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm +
                                 "\" -noScanIPC -xc++-header o.hpp -DTRANSLATING";
 
-        CTB type;
-        char buffer[320];
-
-        const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager = makeBuildSystemManager(oPcm, serverFd);
-        if (const auto &r2 = Run(compileCommand); !r2)
-        {
-            return tl::unexpected(r2.error());
-        }
-        readCompilerMessage(serverFd, manager, buffer, type);
+        IPCManagerBS manager = readFirstMessage(compileCommand);
 
         if (type != CTB::NON_MODULE)
         {
@@ -1023,16 +1004,7 @@ tl::expected<int, string> runTest()
         string compileCommand =
             CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + bigPcm + "\" -noScanIPC -xc++-header big.hpp";
 
-        CTB type;
-        char buffer[320];
-
-        const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager = makeBuildSystemManager(bigPcm, serverFd);
-        if (const auto &r2 = Run(compileCommand); !r2)
-        {
-            return tl::unexpected(r2.error());
-        }
-        readCompilerMessage(serverFd, manager, buffer, type);
+        IPCManagerBS manager = readFirstMessage(compileCommand);
 
         if (type != CTB::NON_MODULE)
         {
@@ -1084,16 +1056,7 @@ tl::expected<int, string> runTest()
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + fooObj +
                                 "\" -noScanIPC -c -xc++-module foo.cpp -fmodule-output=\"" + fooPcm + "\"";
 
-        CTB type;
-        char buffer[320];
-
-        const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager = makeBuildSystemManager(fooObj, serverFd);
-        if (const auto &r2 = Run(compileCommand); !r2)
-        {
-            return tl::unexpected(r2.error());
-        }
-        readCompilerMessage(serverFd, manager, buffer, type);
+        IPCManagerBS manager = readFirstMessage(compileCommand);
 
         if (type != CTB::NON_MODULE)
         {
@@ -1202,16 +1165,7 @@ tl::expected<int, string> runTest()
     auto compileMain = [&](bool shouldFail) -> tl::expected<int, string> {
         string compileCommand = CLANG_CMD R"( -std=c++20 -o ")" + mainObj + "\" -noScanIPC -c main.cpp";
 
-        CTB type;
-        char buffer[320];
-
-        const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager = makeBuildSystemManager(mainObj, serverFd);
-        if (const auto &r2 = Run(compileCommand); !r2)
-        {
-            return tl::unexpected(r2.error());
-        }
-        readCompilerMessage(serverFd, manager, buffer, type);
+        IPCManagerBS manager = readFirstMessage(compileCommand);
 
         if (type != CTB::MODULE)
         {

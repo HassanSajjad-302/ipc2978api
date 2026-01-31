@@ -274,7 +274,7 @@ struct BuildSystemTest
     }
 };
 
-bool ends_with(const std::string &str, const std::string &suffix)
+bool endsWith(const std::string &str, const std::string &suffix)
 {
     if (suffix.size() > str.size())
     {
@@ -345,7 +345,7 @@ void readCompilerMessage(const uint64_t serverFd, const uint64_t readFd)
         }
 
         // Check for terminator
-        if (ends_with(compilerTestPrunedOutput, delimiter))
+        if (endsWith(compilerTestPrunedOutput, delimiter))
         {
             return;
         }
@@ -377,7 +377,7 @@ void readCompilerMessage(const uint64_t serverFd, const uint64_t readFd)
             compilerTestPrunedOutput.push_back(buffer[i]);
         }
 
-        if (ends_with(compilerTestPrunedOutput, delimiter))
+        if (endsWith(compilerTestPrunedOutput, delimiter))
         {
             break;
         }
@@ -460,7 +460,7 @@ int runTest()
         bool loopExit = false;
 
         readCompilerMessage(serverFd, compilerTest.readPipe);
-        if (!ends_with(compilerTestPrunedOutput, delimiter))
+        if (!endsWith(compilerTestPrunedOutput, delimiter))
         {
             exitFailure("early exit by CompilerTest");
         }
