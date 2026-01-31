@@ -318,6 +318,15 @@ CTB type;
 char buffer[320];
 RunCommand runCommand;
 
+bool endsWith(const std::string &str, const std::string &suffix)
+{
+    if (suffix.size() > str.size())
+    {
+        return false;
+    }
+    return str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
 
 void readCompilerMessage(const uint64_t serverFd, const uint64_t readFd)
 {
@@ -413,7 +422,7 @@ void readCompilerMessage(const uint64_t serverFd, const uint64_t readFd)
             compilerTestPrunedOutput.push_back(buffer[i]);
         }
 
-        if (ends_with(compilerTestPrunedOutput, delimiter))
+        if (endsWith(compilerTestPrunedOutput, delimiter))
         {
             break;
         }
@@ -424,15 +433,6 @@ void readCompilerMessage(const uint64_t serverFd, const uint64_t readFd)
         exitFailure(getErrorString());
     }
 #endif
-}
-
-bool endsWith(const std::string &str, const std::string &suffix)
-{
-    if (suffix.size() > str.size())
-    {
-        return false;
-    }
-    return str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
 IPCManagerBS readFirstMessage(string_view compileCommand)
