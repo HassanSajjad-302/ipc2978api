@@ -315,9 +315,6 @@ tl::expected<Response, std::string> IPCManagerCompiler::findResponse(std::string
 tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage() const
 {
     std::string buffer = getBufferWithType(CTB::LAST_MESSAGE);
-    buffer.push_back(lastMessage.errorOccurred);
-    writeString(buffer, lastMessage.output);
-    writeString(buffer, lastMessage.errorOutput);
     writeString(buffer, lastMessage.logicalName);
     writeUInt32(buffer, lastMessage.fileSize);
     writeUInt32(buffer, buffer.size());
@@ -415,14 +412,6 @@ tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const std
     if (const auto &r = sendCTBLastMessage(); !r)
     {
         return tl::unexpected(r.error());
-    }
-
-    if (lastMessage.errorOccurred == EXIT_SUCCESS)
-    {
-        if (const auto &r = receiveBTCLastMessage(); !r)
-        {
-            return tl::unexpected(r.error());
-        }
     }
 
     munmap(mapping, fileSize);

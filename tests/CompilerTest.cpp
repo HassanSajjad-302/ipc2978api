@@ -55,7 +55,6 @@ int main()
         }
     }
 
-    manager.lastMessage.errorOccurred = false;
     const string bmi1Content = getRandomString();
     manager.lastMessage.fileSize = bmi1Content.size();
     print("Second ");

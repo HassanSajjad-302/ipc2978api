@@ -153,14 +153,8 @@ void printMessage(const CTBLastMessage &lastMessage, const bool sent)
 {
     printSendingOrReceiving(sent);
     print("CTBLastMessage\n\n");
-    print("ExitStatus: {}\n\n", !lastMessage.errorOccurred);
-    if (!lastMessage.errorOccurred)
-    {
-        print("Output: {}\n\n", lastMessage.output);
-        print("ErrorOutput: {}\n\n", lastMessage.errorOutput);
-        print("LogicalName: {}\n\n", lastMessage.logicalName);
-        print("FileSize: {}\n\n", lastMessage.fileSize);
-    }
+    print("LogicalName: {}\n\n", lastMessage.logicalName);
+    print("FileSize: {}\n\n", lastMessage.fileSize);
 }
 
 void printMessage(const BTCModule &btcModule, const bool sent)

@@ -36,10 +36,10 @@ tl::expected<void, std::string> IPCManagerBS::writeInternal(const std::string &b
 {
 #ifdef _WIN32
     const bool success = WriteFile(reinterpret_cast<HANDLE>(writeFd), // pipe handle
-                                   buffer.data(),                    // message
-                                   buffer.size(),                    // message length
-                                   nullptr,                          // bytes written
-                                   nullptr);                         // not overlapped
+                                   buffer.data(),                     // message
+                                   buffer.size(),                     // message length
+                                   nullptr,                           // bytes written
+                                   nullptr);                          // not overlapped
     if (!success)
     {
         return tl::unexpected(getErrorString());
@@ -117,24 +117,6 @@ tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[3
 
     case CTB::LAST_MESSAGE: {
 
-        const auto &exitStatusExpected = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
-        if (!exitStatusExpected)
-        {
-            return tl::unexpected(exitStatusExpected.error());
-        }
-
-        const auto &outputExpected = readStringFromPipe(buffer, bytesRead, bytesProcessed);
-        if (!outputExpected)
-        {
-            return tl::unexpected(outputExpected.error());
-        }
-
-        const auto &errorOutputExpected = readStringFromPipe(buffer, bytesRead, bytesProcessed);
-        if (!errorOutputExpected)
-        {
-            return tl::unexpected(errorOutputExpected.error());
-        }
-
         const auto &logicalNameExpected = readStringFromPipe(buffer, bytesRead, bytesProcessed);
         if (!logicalNameExpected)
         {
@@ -149,12 +131,8 @@ tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[3
 
         messageType = CTB::LAST_MESSAGE;
 
-        auto &[exitStatus, output, errorOutput, logicalName, fileSize] =
-            getInitializedObjectFromBuffer<CTBLastMessage>(ctbBuffer);
+        auto &[logicalName, fileSize] = getInitializedObjectFromBuffer<CTBLastMessage>(ctbBuffer);
 
-        exitStatus = *exitStatusExpected;
-        output = *outputExpected;
-        errorOutput = *errorOutputExpected;
         logicalName = *logicalNameExpected;
         fileSize = *fileSizeExpected;
     }

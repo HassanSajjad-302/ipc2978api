@@ -38,17 +38,10 @@ struct CTBNonModule
     std::string logicalName;
 };
 
-// This is the last message sent by the compiler.
+// This is the last message sent by the compiler if the compiler
+// has any exported BMI.
 struct CTBLastMessage
 {
-    // Whether the compilation succeeded or failed.
-    bool errorOccurred = false;
-    // Following fields are meaningless if the compilation failed.
-    // compiler output
-    std::string output;
-    // compiler error output.
-    // Any IPC related error output should be reported on stderr.
-    std::string errorOutput;
     // exported module name if any.
     std::string logicalName;
     // This is communicated because the receiving process has no
