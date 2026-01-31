@@ -491,7 +491,11 @@ int runTest()
 
         case CTB::LAST_MESSAGE: {
             lastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
-            print("First ");
+            if (lastMessage.logicalName != "module_cat")
+            {
+                exitFailure(fmt::format("CTBLastMessage logical-name not module_cat. logical-name is {}.",
+                                        lastMessage.logicalName));
+            }
             printMessage(lastMessage, false);
             loopExit = true;
         }

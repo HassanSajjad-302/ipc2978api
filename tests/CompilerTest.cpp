@@ -56,18 +56,15 @@ int main()
     }
 
     const string bmi1Content = getRandomString();
-    manager.lastMessage.fileSize = bmi1Content.size();
-    print("Second ");
+    print("Sending first bmi-content.");
     if (const auto &r2 =
-            manager.sendCTBLastMessage(bmi1Content, (std::filesystem::current_path() / "bmi.txt").generic_string());
+            manager.sendCTBLastMessage(bmi1Content, (std::filesystem::current_path() / "bmi.txt").generic_string(), "module_cat");
         !r2)
     {
         exitFailure(r2.error());
     }
 
-    printMessage(manager.lastMessage, true);
-
-    print("BTCLastMessage has been received\n");
+    print("BTCLastMessage for first bmi-content has been received.\n");
 
     BMIFile bmi2 = BMIFile();
     bmi2.filePath = (std::filesystem::current_path() / "bmi2.txt").generic_string();

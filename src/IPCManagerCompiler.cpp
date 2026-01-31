@@ -33,10 +33,10 @@ tl::expected<uint32_t, std::string> IPCManagerCompiler::readInternal(char (&buff
     int32_t bytesRead;
 #ifdef _WIN32
     const bool success = ReadFile((HANDLE)STD_INPUT_HANDLE, // pipe handle
-                                  buffer,                       // buffer to receive reply
-                                  BUFFERSIZE,                   // size of buffer
-                                  LPDWORD(&bytesRead),          // number of bytes read
-                                  nullptr);                     // not overlapped
+                                  buffer,                   // buffer to receive reply
+                                  BUFFERSIZE,               // size of buffer
+                                  LPDWORD(&bytesRead),      // number of bytes read
+                                  nullptr);                 // not overlapped
 
     if (const uint32_t lastError = GetLastError(); !success && lastError != ERROR_MORE_DATA)
     {
@@ -63,10 +63,10 @@ tl::expected<void, std::string> IPCManagerCompiler::writeInternal(const std::str
 {
 #ifdef _WIN32
     const bool success = WriteFile(reinterpret_cast<HANDLE>(STD_OUTPUT_HANDLE), // pipe handle
-                                   buffer.data(),                // message
-                                   buffer.size(),                // message length
-                                   nullptr,                      // bytes written
-                                   nullptr);                     // not overlapped
+                                   buffer.data(),                               // message
+                                   buffer.size(),                               // message length
+                                   nullptr,                                     // bytes written
+                                   nullptr);                                    // not overlapped
     if (!success)
     {
         return tl::unexpected(getErrorString());
@@ -312,11 +312,12 @@ tl::expected<Response, std::string> IPCManagerCompiler::findResponse(std::string
     }
 }
 
-tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage() const
+tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const std::string &logicalName,
+                                                                       const uint32_t fileSize) const
 {
     std::string buffer = getBufferWithType(CTB::LAST_MESSAGE);
-    writeString(buffer, lastMessage.logicalName);
-    writeUInt32(buffer, lastMessage.fileSize);
+    writeString(buffer, logicalName);
+    writeUInt32(buffer, fileSize);
     writeUInt32(buffer, buffer.size());
     buffer.append(delimiter, strlen(delimiter));
     if (const auto &r = writeInternal(buffer); !r)
@@ -327,7 +328,8 @@ tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage() const
 }
 
 tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const std::string &bmiFile,
-                                                                       const std::string &filePath) const
+                                                                       const std::string &filePath,
+                                                                       const std::string &logicalName) const
 {
 #ifdef _WIN32
     const HANDLE hFile = CreateFileA(filePath.c_str(), GENERIC_READ | GENERIC_WRITE,
@@ -364,7 +366,7 @@ tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const std
     UnmapViewOfFile(pView);
     CloseHandle(hFile);
 
-    if (const auto &r = sendCTBLastMessage(); !r)
+    if (const auto &r = sendCTBLastMessage(logicalName, fileSize); !r)
     {
         return tl::unexpected(r.error());
     }
@@ -409,7 +411,7 @@ tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const std
         return tl::unexpected(getErrorString());
     }
 
-    if (const auto &r = sendCTBLastMessage(); !r)
+    if (const auto &r = sendCTBLastMessage(logicalName, fileSize); !r)
     {
         return tl::unexpected(r.error());
     }
