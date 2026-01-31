@@ -42,8 +42,6 @@ struct CTBNonModule
 // has any exported BMI.
 struct CTBLastMessage
 {
-    // exported module name if any.
-    std::string logicalName;
     // This is communicated because the receiving process has no
     // way to learn the shared memory file size on both Windows
     // and Linux without a filesystem call.

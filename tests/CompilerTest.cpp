@@ -58,7 +58,7 @@ int main()
     const string bmi1Content = getRandomString();
     print("Sending first bmi-content.");
     if (const auto &r2 =
-            manager.sendCTBLastMessage(bmi1Content, (std::filesystem::current_path() / "bmi.txt").generic_string(), "module_cat");
+            manager.sendCTBLastMessage(bmi1Content, (std::filesystem::current_path() / "bmi.txt").generic_string());
         !r2)
     {
         exitFailure(r2.error());

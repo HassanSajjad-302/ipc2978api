@@ -312,11 +312,9 @@ tl::expected<Response, std::string> IPCManagerCompiler::findResponse(std::string
     }
 }
 
-tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const std::string &logicalName,
-                                                                       const uint32_t fileSize) const
+tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const uint32_t fileSize) const
 {
     std::string buffer = getBufferWithType(CTB::LAST_MESSAGE);
-    writeString(buffer, logicalName);
     writeUInt32(buffer, fileSize);
     writeUInt32(buffer, buffer.size());
     buffer.append(delimiter, strlen(delimiter));
@@ -328,8 +326,7 @@ tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const std
 }
 
 tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const std::string &bmiFile,
-                                                                       const std::string &filePath,
-                                                                       const std::string &logicalName) const
+                                                                       const std::string &filePath) const
 {
 #ifdef _WIN32
     const HANDLE hFile = CreateFileA(filePath.c_str(), GENERIC_READ | GENERIC_WRITE,
@@ -411,7 +408,7 @@ tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const std
         return tl::unexpected(getErrorString());
     }
 
-    if (const auto &r = sendCTBLastMessage(logicalName, fileSize); !r)
+    if (const auto &r = sendCTBLastMessage(fileSize); !r)
     {
         return tl::unexpected(r.error());
     }

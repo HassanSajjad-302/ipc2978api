@@ -117,12 +117,6 @@ tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[3
 
     case CTB::LAST_MESSAGE: {
 
-        const auto &logicalNameExpected = readStringFromPipe(buffer, bytesRead, bytesProcessed);
-        if (!logicalNameExpected)
-        {
-            return tl::unexpected(logicalNameExpected.error());
-        }
-
         const auto &fileSizeExpected = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
         if (!fileSizeExpected)
         {
@@ -131,9 +125,8 @@ tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[3
 
         messageType = CTB::LAST_MESSAGE;
 
-        auto &[logicalName, fileSize] = getInitializedObjectFromBuffer<CTBLastMessage>(ctbBuffer);
+        auto &[fileSize] = getInitializedObjectFromBuffer<CTBLastMessage>(ctbBuffer);
 
-        logicalName = *logicalNameExpected;
         fileSize = *fileSizeExpected;
     }
     break;

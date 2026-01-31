@@ -153,7 +153,6 @@ void printMessage(const CTBLastMessage &lastMessage, const bool sent)
 {
     printSendingOrReceiving(sent);
     print("CTBLastMessage\n\n");
-    print("LogicalName: {}\n\n", lastMessage.logicalName);
     print("FileSize: {}\n\n", lastMessage.fileSize);
 }
 

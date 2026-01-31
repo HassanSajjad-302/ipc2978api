@@ -53,8 +53,7 @@ class IPCManagerCompiler : Manager
     //  Compiler can use this function to read the BMI file. BMI should be read using this function to conserve memory.
     static tl::expected<ProcessMappingOfBMIFile, std::string> readSharedMemoryBMIFile(const BMIFile &file);
 
-    [[nodiscard]] tl::expected<void, std::string> sendCTBLastMessage(const std::string &logicalName,
-                                                                     uint32_t fileSize) const;
+    [[nodiscard]] tl::expected<void, std::string> sendCTBLastMessage(uint32_t fileSize) const;
 
   public:
     // Compiler process can use this function to close the BMI file-mapping to reduce references to shared memory file.
@@ -72,8 +71,7 @@ class IPCManagerCompiler : Manager
     // if the compilation failed. Hence, it will not create the file-mapping and nor will it send BTCLastMessage, so the
     // compiler process will indefinitely hang.
     [[nodiscard]] tl::expected<void, std::string> sendCTBLastMessage(const std::string &bmiFile,
-                                                                     const std::string &filePath,
-                                                                     const std::string &logicalName) const;
+                                                                     const std::string &filePath) const;
 };
 
 inline IPCManagerCompiler *managerCompiler;
