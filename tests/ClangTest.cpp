@@ -10,6 +10,7 @@
 
 // #define IS_THIS_CLANG_REPO
 
+#include <iostream>
 #include <wordexp.h>
 #ifdef IS_THIS_CLANG_REPO
 #include "clang/IPC2978/IPCManagerBS.hpp"
@@ -20,7 +21,6 @@ template <typename T> void printMessage(const T &, bool)
 #else
 #include "IPCManagerBS.hpp"
 #include "Testing.hpp"
-#include "fmt/printf.h"
 #endif
 
 #include <filesystem>
@@ -327,7 +327,6 @@ bool endsWith(const std::string &str, const std::string &suffix)
     return str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
-
 void readCompilerMessage(const uint64_t serverFd, const uint64_t readFd)
 {
 #ifdef _WIN32
@@ -451,7 +450,22 @@ IPCManagerBS readFirstMessage(string_view compileCommand)
 
 void readMessage()
 {
+    readCompilerMessage(serverFd, runCommand.readPipe);
+    if (!endsWith(compilerTestPrunedOutput, delimiter))
+    {
+        exitFailure("early exit by CompilerTest");
+    }
+}
 
+void endCompilerTest()
+{
+    readCompilerMessage(serverFd, runCommand.readPipe);
+    runCommand.reapProcess();
+    std::cout << compilerTestPrunedOutput << std::endl;
+    if (runCommand.exitStatus != EXIT_SUCCESS)
+    {
+        std::cout << "CompilerTest did not exit successfully. ExitCode is" <<  runCommand.exitStatus << std::endl;
+    }
 }
 
 // main.cpp
@@ -682,11 +696,7 @@ tl::expected<int, string> runTest()
         {
             return tl::unexpected("wrong logical name received while compiling a-c.cpp");
         }
-        printMessage(ctbLastMessage, false);
-        if (const auto &r2 = CloseProcess(); !r2)
-        {
-            return tl::unexpected("closing process failed");
-        }
+        endCompilerTest();
     }
 
     // compiling a-b.cpp
@@ -707,11 +717,7 @@ tl::expected<int, string> runTest()
         {
             return tl::unexpected("wrong logical name received while compiling a-b.cpp");
         }
-        printMessage(ctbLastMessage, false);
-        if (const auto &r2 = CloseProcess(); !r2)
-        {
-            return tl::unexpected("closing process failed");
-        }
+        endCompilerTest();
     }
 
     // compiling a.cpp
@@ -767,7 +773,7 @@ tl::expected<int, string> runTest()
         modDep.isHeaderUnit = false;
         btcMod.modDeps.emplace_back(std::move(modDep));
 
-        if (const auto &r2 = manager.sendMessage(std::move(btcMod)); !r2)
+        if (const auto &r2 = manager.sendMessage(btcMod); !r2)
         {
             string str = r2.error();
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
@@ -780,7 +786,6 @@ tl::expected<int, string> runTest()
         }
 
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
-        printMessage(ctbLastMessage, false);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -818,7 +823,7 @@ tl::expected<int, string> runTest()
         BTCNonModule nonModMPcm;
         nonModMPcm.isHeaderUnit = false;
         nonModMPcm.filePath = mHpp;
-        if (const auto &r2 = manager.sendMessage(std::move(nonModMPcm)); !r2)
+        if (const auto &r2 = manager.sendMessage(nonModMPcm); !r2)
         {
             string str = r2.error();
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
@@ -831,7 +836,6 @@ tl::expected<int, string> runTest()
         }
 
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
-        printMessage(ctbLastMessage, false);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -906,7 +910,6 @@ tl::expected<int, string> runTest()
             return tl::unexpected("received message of wrong type");
         }
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
-        printMessage(ctbLastMessage, false);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -987,7 +990,6 @@ tl::expected<int, string> runTest()
             return tl::unexpected("received message of wrong type");
         }
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
-        printMessage(ctbLastMessage, false);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -1044,7 +1046,6 @@ tl::expected<int, string> runTest()
         }
 
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
-        printMessage(ctbLastMessage, false);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -1145,7 +1146,6 @@ tl::expected<int, string> runTest()
         }
 
         const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
-        printMessage(ctbLastMessage, false);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
@@ -1248,7 +1248,6 @@ tl::expected<int, string> runTest()
             return tl::unexpected("wrong last message received");
         }
 
-        printMessage(ctbLastMessage, false);
         if (const auto &r2 = CloseProcess(); !r2)
         {
             return tl::unexpected("closing process failed");
