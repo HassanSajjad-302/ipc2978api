@@ -13,7 +13,6 @@ class IPCManagerBS : public Manager
 {
   public:
     uint64_t writeFd = 0;
-
     std::string_view serverReadString;
 
     tl::expected<uint32_t, std::string> readInternal(char (&buffer)[BUFFERSIZE]) const override;

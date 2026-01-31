@@ -17,16 +17,6 @@
 
 using fmt::print, std::string_view;
 
-enum class ProcessState
-{
-    LAUNCHED,
-    OUTPUT_CONNECTED,
-    COMPLETED,
-    CONNECTED,
-    IPCFD_CLOSED,
-    OUTPUTFD_CLOSED,
-};
-
 struct RunCommand
 {
     string output;
@@ -34,12 +24,6 @@ struct RunCommand
     uint64_t readPipe;
     uint64_t writePipe;
     int exitStatus;
-#ifdef _WIN32
-    ProcessState processState = ProcessState::LAUNCHED;
-#else
-    ProcessState processState = ProcessState::OUTPUT_CONNECTED;
-#endif
-
     RunCommand() = default;
     uint64_t startAsyncProcess(const char *command, uint64_t serverFd);
     void reapProcess() const;

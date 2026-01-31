@@ -10,6 +10,7 @@
 
 // #define IS_THIS_CLANG_REPO
 
+#include <wordexp.h>
 #ifdef IS_THIS_CLANG_REPO
 #include "clang/IPC2978/IPCManagerBS.hpp"
 #include "gtest/gtest.h"
@@ -176,79 +177,256 @@ uint64_t createMultiplex()
 #endif
 }
 
-IPCManagerBS makeBuildSystemManager(const string &filePath, uint64_t serverFd)
+struct RunCommand
 {
-    auto r = makeIPCManagerBS(filePath);
-    if (!r)
-    {
-        exitFailure(r.error());
-    }
-
-    if (const auto &r2 = r->registerManager(serverFd, r->fd); !r2)
-    {
-        exitFailure(r2.error());
-    }
-
-    return *r;
-}
+    uint64_t pid;
+    uint64_t readPipe;
+    uint64_t writePipe;
+    int exitStatus;
+    uint64_t startAsyncProcess(const char *command, uint64_t serverFd);
+    void reapProcess() const;
+};
 
 #ifdef _WIN32
-PROCESS_INFORMATION pi;
-tl::expected<void, string> Run(const string &command)
+
+// Copied partially from Ninja
+uint64_t RunCommand::startAsyncProcess(const char *command, uint64_t serverFd)
 {
-    STARTUPINFOA si{};
-    si.cb = sizeof(si);
-    if (!CreateProcessA(nullptr,                             // lpApplicationName
-                        const_cast<char *>(command.c_str()), // lpCommandLine
-                        nullptr,                             // lpProcessAttributes
-                        nullptr,                             // lpThreadAttributes
-                        FALSE,                               // bInheritHandles
-                        0,                                   // dwCreationFlags
-                        nullptr,                             // lpEnvironment
-                        nullptr,                             // lpCurrentDirectory
-                        &si,                                 // lpStartupInfo
-                        &pi                                  // lpProcessInformation
-                        ))
+    // One BTarget can launch multiple processes so we also append the clock::now().
+    const string read_pipe_name = R"(\\.\pipe\read{}{})";
+    const string write_pipe_name = R"(\\.\pipe\write{}{})";
+
+    // ===== CREATE READ PIPE (for reading child's stdout/stderr - ASYNC) =====
+    HANDLE readPipe_ = CreateNamedPipeA(read_pipe_name.c_str(), PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED,
+                                        PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES, 0, 0, INFINITE, NULL);
+    if (readPipe_ == INVALID_HANDLE_VALUE)
     {
-        return tl::unexpected("CreateProcess" + getErrorString());
+        exitFailure(getErrorString());
     }
-    return {};
+
+    // Register read pipe with IOCP for async operations
+    if (!CreateIoCompletionPort(readPipe_, (HANDLE)serverFd, (ULONG_PTR)readPipe_, 0))
+    {
+        exitFailure(getErrorString());
+    }
+
+    OVERLAPPED readOverlappedIO = {};
+    if (!ConnectNamedPipe(readPipe_, &readOverlappedIO) && GetLastError() != ERROR_IO_PENDING)
+    {
+        exitFailure(getErrorString());
+    }
+
+    // Get the write end for child's stdout/stderr
+    HANDLE outputWriteHandle = CreateFileA(read_pipe_name.c_str(), GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+    if (outputWriteHandle == INVALID_HANDLE_VALUE)
+    {
+        exitFailure(getErrorString());
+    }
+
+    {
+        char buffer[4096];
+        DWORD bytesRead = 0;
+        OVERLAPPED overlapped = {0};
+
+        // Wait for the read to complete.
+        ULONG_PTR completionKey = 0;
+        LPOVERLAPPED completedOverlapped = nullptr;
+        if (!GetQueuedCompletionStatus((HANDLE)serverFd, &bytesRead, &completionKey, &completedOverlapped, INFINITE))
+        {
+            exitFailure(getErrorString());
+        }
+    }
+
+    HANDLE childStdoutPipe;
+    if (!DuplicateHandle(GetCurrentProcess(), outputWriteHandle, GetCurrentProcess(), &childStdoutPipe, 0, TRUE,
+                         DUPLICATE_SAME_ACCESS))
+    {
+        exitFailure(getErrorString());
+    }
+    CloseHandle(outputWriteHandle);
+
+    // ===== CREATE WRITE PIPE (for writing to child's stdin - SYNC) =====
+    // Note: No FILE_FLAG_OVERLAPPED - this makes it synchronous
+    HANDLE writePipe_ = CreateNamedPipeA(write_pipe_name.c_str(),
+                                         PIPE_ACCESS_OUTBOUND, // No FILE_FLAG_OVERLAPPED
+                                         PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES, 0, 0, INFINITE, NULL);
+    if (writePipe_ == INVALID_HANDLE_VALUE)
+    {
+        exitFailure(getErrorString());
+    }
+
+    // Get the read end for child's stdin
+    HANDLE inputReadHandle = CreateFileA(write_pipe_name.c_str(), GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+    if (inputReadHandle == INVALID_HANDLE_VALUE)
+    {
+        exitFailure(getErrorString());
+    }
+
+    HANDLE childStdinPipe;
+    if (!DuplicateHandle(GetCurrentProcess(), inputReadHandle, GetCurrentProcess(), &childStdinPipe, 0, TRUE,
+                         DUPLICATE_SAME_ACCESS))
+    {
+        exitFailure(getErrorString());
+    }
+    CloseHandle(inputReadHandle);
+
+    STARTUPINFOA startup_info;
+    memset(&startup_info, 0, sizeof(startup_info));
+    startup_info.cb = sizeof(STARTUPINFO);
+
+    bool use_console_ = false;
+    if (!use_console_)
+    {
+        startup_info.dwFlags = STARTF_USESTDHANDLES;
+        startup_info.hStdInput = childStdinPipe;   // Child reads from this
+        startup_info.hStdOutput = childStdoutPipe; // Child writes to this
+        startup_info.hStdError = childStdoutPipe;  // Child writes to this
+    }
+
+    PROCESS_INFORMATION process_info;
+    memset(&process_info, 0, sizeof(process_info));
+
+    // Ninja handles ctrl-c, except for subprocesses in console pools.
+    DWORD process_flags = use_console_ ? 0 : CREATE_NEW_PROCESS_GROUP;
+
+    // Do not prepend 'cmd /c' on Windows, this breaks command
+    // lines greater than 8,191 chars.
+    if (!CreateProcessA(NULL, (char *)command, NULL, NULL,
+                        /* inherit handles */ TRUE, process_flags, NULL, NULL, &startup_info, &process_info))
+    {
+        exitFailure(getErrorString());
+    }
+
+    // Close pipe channels only used by the child.
+    CloseHandle(childStdoutPipe);
+    CloseHandle(childStdinPipe);
+
+    CloseHandle(process_info.hThread);
+
+    readPipe = (uint64_t)readPipe_;   // Parent reads child's output from this (ASYNC)
+    writePipe = (uint64_t)writePipe_; // Parent writes to child's input via this (SYNC)
+    pid = (uint64_t)process_info.hProcess;
+
+    return readPipe;
 }
+
+void RunCommand::reapProcess() const
+{
+    if (WaitForSingleObject((HANDLE)pid, INFINITE) == WAIT_FAILED)
+    {
+        exitFailure(getErrorString());
+    }
+
+    if (!GetExitCodeProcess((HANDLE)pid, (LPDWORD)&exitStatus))
+    {
+        exitFailure(getErrorString());
+    }
+
+    if (!CloseHandle((HANDLE)pid) || !CloseHandle((HANDLE)readPipe) || !CloseHandle((HANDLE)writePipe))
+    {
+        exitFailure(getErrorString());
+    }
+}
+
 #else
 
-int procStatus;
-int procId;
-/// Start a process and gather its raw output.  Returns its exit code.
-/// Crashes (calls Fatal()) on error.
-tl::expected<void, string> Run(const string &command)
+uint64_t RunCommand::startAsyncProcess(const char *command, uint64_t serverFd)
 {
-    if (procId = fork(); procId == -1)
+    // Create pipes for stdout and stderr
+    int stdoutPipesLocal[2];
+    if (pipe(stdoutPipesLocal) == -1)
     {
-        return tl::unexpected("fork" + getErrorString());
+        exitFailure(getErrorString());
     }
-    if (procId == 0)
+
+    // Create pipe for stdin
+    int stdinPipesLocal[2];
+    if (pipe(stdinPipesLocal) == -1)
+    {
+        exitFailure(getErrorString());
+    }
+
+    readPipe = stdoutPipesLocal[0];
+    writePipe = stdinPipesLocal[1];
+
+    pid = fork();
+    if (pid == -1)
+    {
+        exitFailure(getErrorString());
+    }
+    if (pid == 0)
     {
         // Child process
-        exit(WEXITSTATUS(system(command.c_str())));
+
+        // Redirect stdin from the pipe
+        dup2(stdinPipesLocal[0], STDIN_FILENO);
+
+        // Redirect stdout and stderr to the pipes
+        dup2(stdoutPipesLocal[1], STDOUT_FILENO); // Redirect stdout to stdout_pipe
+        dup2(stdoutPipesLocal[1], STDERR_FILENO); // Redirect stderr to stderr_pipe
+
+        // Close unused pipe ends
+        close(stdoutPipesLocal[0]);
+        close(stdoutPipesLocal[1]);
+        close(stdinPipesLocal[0]);
+        close(stdinPipesLocal[1]);
+
+        wordexp_t p;
+        if (wordexp(command, &p, 0) != 0)
+        {
+            perror("wordexp");
+            _exit(127);
+        }
+
+        // p.we_wordv is a NULL-terminated argv suitable for exec*
+        char **argv = p.we_wordv;
+
+        // Use execvp so PATH is searched and environment is inherited
+        execvp(argv[0], argv);
+
+        // If execvp returns, it failed:
+        perror("execvp");
+        wordfree(&p);
+        _exit(127);
     }
-    return {};
+
+    // Parent process
+    // Close unused pipe ends
+    close(stdoutPipesLocal[1]);
+    close(stdinPipesLocal[0]);
+    return readPipe;
+}
+
+void RunCommand::reapProcess() const
+{
+    if (waitpid(pid, const_cast<int *>(&exitStatus), 0) < 0)
+    {
+        exitFailure(getErrorString());
+    }
+    if (close(readPipe) == -1)
+    {
+        exitFailure(getErrorString());
+    }
+    if (close(writePipe) == -1)
+    {
+        exitFailure(getErrorString());
+    }
 }
 #endif
 
-tl::expected<void, std::string> CloseProcess()
+string compilerTestPrunedOutput;
+uint64_t serverFd;
+CTB type;
+char buffer[320];
+RunCommand runCommand;
+
+void readFirstMessage(string_view compileCommand)
 {
-#ifdef _WIN32
-    if (WaitForSingleObject(pi.hProcess, INFINITE) == WAIT_FAILED)
-    {
-        return tl::unexpected("WaitForSingleObject" + getErrorString());
-    }
-#else
-    if (waitpid(procId, &procStatus, 0) == -1)
-    {
-        return tl::unexpected("waitpid" + getErrorString());
-    }
-#endif
-    return {};
+    serverFd = createMultiplex();
+    runCommand.startAsyncProcess(compileCommand.data(), serverFd);
+    IPCManagerBS bs(runCommand.writePipe);
+
+    readCompilerMessage(serverFd, manager, buffer, type);
 }
 
 // main.cpp
@@ -466,17 +644,6 @@ tl::expected<int, string> runTest()
     {
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aCObj +
                                 "\" -noScanIPC -c -xc++-module a-c.cpp -fmodule-output=\"" + aCPcm + "\"";
-
-        CTB type;
-        char buffer[320];
-
-        const uint64_t serverFd = createMultiplex();
-        IPCManagerBS manager = makeBuildSystemManager(aCObj, serverFd);
-        if (const auto &r2 = Run(compileCommand); !r2)
-        {
-            return tl::unexpected(r2.error());
-        }
-        readCompilerMessage(serverFd, manager, buffer, type);
 
         if (type != CTB::LAST_MESSAGE)
         {
