@@ -511,8 +511,7 @@ int main()
     Hello();
     World();
     Foo();
-// has no closing brace to test for error.
-
+}
 )";
 
 // Creates all the input files (source files + pcm files) that are needed for the test.
@@ -725,565 +724,471 @@ tl::expected<int, string> runTest()
         IPCManagerBS manager = readFirstCompilerStdout(compileCommand, false);
         endCompilerTest();
     }
-    /*
-        // compiling a.cpp
+    // compiling a.cpp
+    {
+        string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aObj +
+                                "\" -noScanIPC -c -xc++-module a.cpp -fmodule-output=\"" + aPcm + "\"";
+
+        IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
+
+        if (type != CTB::MODULE)
         {
-            string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aObj +
-                                    "\" -noScanIPC -c -xc++-module a.cpp -fmodule-output=\"" + aPcm + "\"";
-
-            IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
-
-            if (type != CTB::MODULE)
-            {
-                return tl::unexpected("received message of wrong type");
-            }
-
-            const auto &ctbModule = reinterpret_cast<CTBModule &>(buffer);
-
-            if (ctbModule.moduleName != "A:B")
-            {
-                return tl::unexpected("wrong logical name received while compiling a-b.cpp");
-            }
-
-            BMIFile btcModBMI;
-            btcModBMI.filePath = aBPcm;
-            ProcessMappingOfBMIFile btcModBmiProcMap;
-            if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(btcModBMI); r2)
-            {
-                btcModBmiProcMap = *r2;
-            }
-            else
-            {
-                return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
-            }
-
-            BTCModule btcMod;
-            btcMod.requested = std::move(btcModBMI);
-
-            BMIFile modDepBMI;
-            modDepBMI.filePath = aCPcm;
-            ProcessMappingOfBMIFile modDepBmiProcMap;
-            if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(modDepBMI); r2)
-            {
-                modDepBmiProcMap = *r2;
-            }
-            else
-            {
-                return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
-            }
-
-            ModuleDep modDep;
-            modDep.file = std::move(modDepBMI);
-            modDep.logicalNames.emplace_back("A:C");
-            modDep.isHeaderUnit = false;
-            btcMod.modDeps.emplace_back(std::move(modDep));
-
-            if (const auto &r2 = manager.sendMessage(btcMod); !r2)
-            {
-                string str = r2.error();
-                return tl::unexpected("manager send message failed" + r2.error() + "\n");
-            }
-
-            readCompilerMessage(serverFd, runCommand.readPipe);
-            if (type != CTB::LAST_MESSAGE)
-            {
-                return tl::unexpected("received message of wrong type");
-            }
-
-            const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
-            if (ctbLastMessage.logicalName != "A")
-            {
-                return tl::unexpected("wrong logical name received while compiling a-b.cpp");
-            }
-
-            endCompilerTest();
-
-            if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(btcModBmiProcMap); !r2)
-            {
-                return tl::unexpected("closing bmi-mapping failed");
-            }
-
-            if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(modDepBmiProcMap); !r2)
-            {
-                return tl::unexpected("closing bmi-mapping failed");
-            }
+            return tl::unexpected("received message of wrong type");
         }
-        /*
-            // compiling n.hpp
-            {
-                string compileCommand = CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + nPcm +
-                                        "\" -noScanIPC -xc++-header n.hpp -DCOMMAND_MACRO";
-
-                IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
-
-                if (type != CTB::NON_MODULE)
-                {
-                    return tl::unexpected("received message of wrong type");
-                }
-                const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
-
-                if (ctbNonModMHpp.logicalName != "m.hpp" || ctbNonModMHpp.isHeaderUnit == true)
-                {
-                    return tl::unexpected("wrong message received");
-                }
-
-                BTCNonModule nonModMPcm;
-                nonModMPcm.isHeaderUnit = false;
-                nonModMPcm.filePath = mHpp;
-                if (const auto &r2 = manager.sendMessage(nonModMPcm); !r2)
-                {
-                    string str = r2.error();
-                    return tl::unexpected("manager send message failed" + r2.error() + "\n");
-                }
-
-                readCompilerMessage(serverFd, manager, buffer, type);
-                if (type != CTB::LAST_MESSAGE)
-                {
-                    return tl::unexpected("received message of wrong type");
-                }
-
-                const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
-                if (const auto &r2 = CloseProcess(); !r2)
-                {
-                    return tl::unexpected("closing process failed");
-                }
-            }
-
-            // compiling o.hpp
-            {
-                string compileCommand =
-                    CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm + "\" -noScanIPC -xc++-header o.hpp";
-
-                IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
-
-                if (type != CTB::NON_MODULE)
-                {
-                    return tl::unexpected("received message of wrong type");
-                }
-                const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
-                if (ctbNonModMHpp.logicalName != "m.hpp" || ctbNonModMHpp.isHeaderUnit == true)
-                {
-                    return tl::unexpected("wrong message received");
-                }
-
-                BTCNonModule nonModMPcm;
-                nonModMPcm.isHeaderUnit = false;
-                nonModMPcm.filePath = mHpp;
-                if (const auto &r2 = manager.sendMessage(std::move(nonModMPcm)); !r2)
-                {
-                    string str = r2.error();
-                    return tl::unexpected("manager send message failed" + r2.error() + "\n");
-                }
-
-                readCompilerMessage(serverFd, manager, buffer, type);
-                if (type != CTB::NON_MODULE)
-                {
-                    return tl::unexpected("received message of wrong type");
-                }
-                const auto &ctbNonModNHpp = reinterpret_cast<CTBNonModule &>(buffer);
-                if (ctbNonModNHpp.logicalName != "n.hpp" || ctbNonModNHpp.isHeaderUnit == false)
-                {
-                    return tl::unexpected("wrong message received");
-                }
-
-                BTCNonModule nonModNPcm;
-                nonModNPcm.isHeaderUnit = true;
-
-                BMIFile nonModNPcmBmi;
-                nonModNPcmBmi.filePath = nPcm;
-
-                ProcessMappingOfBMIFile nonModNPcmBmiProcMap;
-                if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(nonModNPcmBmi); r2)
-                {
-                    nonModNPcmBmiProcMap = *r2;
-                }
-                else
-                {
-                    return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
-                }
-
-                nonModNPcm.filePath = std::move(nonModNPcmBmi.filePath);
-                nonModNPcm.fileSize = nonModNPcmBmi.fileSize;
-
-                if (const auto &r2 = manager.sendMessage(std::move(nonModNPcm)); !r2)
-                {
-                    string str = r2.error();
-                    return tl::unexpected("manager send message failed" + r2.error() + "\n");
-                }
-
-                readCompilerMessage(serverFd, manager, buffer, type);
-                if (type != CTB::LAST_MESSAGE)
-                {
-                    return tl::unexpected("received message of wrong type");
-                }
-                const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
-                if (const auto &r2 = CloseProcess(); !r2)
-                {
-                    return tl::unexpected("closing process failed");
-                }
-
-                if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(nonModNPcmBmiProcMap); !r2)
-                {
-                    return tl::unexpected("closing bmi-mapping failed");
-                }
-            }
-
-            // compiling o.hpp with include-translation. BTCNonModule for n.hpp will be received with
-            // isHeaderUnit = true.
-            {
-                string compileCommand = CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm +
-                                        "\" -noScanIPC -xc++-header o.hpp -DTRANSLATING";
-
-                IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
-
-                if (type != CTB::NON_MODULE)
-                {
-                    return tl::unexpected("received message of wrong type");
-                }
-                const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
-                if (ctbNonModMHpp.logicalName != "m.hpp" || ctbNonModMHpp.isHeaderUnit == true)
-                {
-                    return tl::unexpected("wrong message received");
-                }
-
-                BTCNonModule nonModMPcm;
-                nonModMPcm.isHeaderUnit = false;
-                nonModMPcm.filePath = mHpp;
-                if (const auto &r2 = manager.sendMessage(std::move(nonModMPcm)); !r2)
-                {
-                    string str = r2.error();
-                    return tl::unexpected("manager send message failed" + r2.error() + "\n");
-                }
-
-                readCompilerMessage(serverFd, manager, buffer, type);
-                if (type != CTB::NON_MODULE)
-                {
-                    return tl::unexpected("received message of wrong type");
-                }
-                const auto &ctbNonModNHpp = reinterpret_cast<CTBNonModule &>(buffer);
-                if (ctbNonModNHpp.logicalName != "n.hpp" || ctbNonModNHpp.isHeaderUnit == true)
-                {
-                    return tl::unexpected("wrong message received");
-                }
-
-                BTCNonModule nonModNPcm;
-
-                BMIFile nonModNPcmBmi;
-                nonModNPcmBmi.filePath = nPcm;
-
-                ProcessMappingOfBMIFile nonModNPcmBmiProcMap;
-                if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(nonModNPcmBmi); r2)
-                {
-                    nonModNPcmBmiProcMap = *r2;
-                }
-                else
-                {
-                    return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
-                }
-
-                nonModNPcm.isHeaderUnit = true;
-                nonModNPcm.filePath = nPcm;
-                nonModNPcm.fileSize = nonModNPcmBmi.fileSize;
-
-                if (const auto &r2 = manager.sendMessage(std::move(nonModNPcm)); !r2)
-                {
-                    string str = r2.error();
-                    return tl::unexpected("manager send message failed" + r2.error() + "\n");
-                }
-
-                readCompilerMessage(serverFd, manager, buffer, type);
-                if (type != CTB::LAST_MESSAGE)
-                {
-                    return tl::unexpected("received message of wrong type");
-                }
-                const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
-                if (const auto &r2 = CloseProcess(); !r2)
-                {
-                    return tl::unexpected("closing process failed");
-                }
-
-                if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(nonModNPcmBmiProcMap); !r2)
-                {
-                    return tl::unexpected("closing bmi-mapping failed");
-                }
-            }
-
-            // compiling big.hpp
-            {
-                string compileCommand =
-                    CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + bigPcm + "\" -noScanIPC -xc++-header
-       big.hpp";
-
-                IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
-
-                if (type != CTB::NON_MODULE)
-                {
-                    return tl::unexpected("received message of wrong type");
-                }
-                const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
-
-                if (ctbNonModMHpp.logicalName != "x.hpp" || ctbNonModMHpp.isHeaderUnit == true)
-                {
-                    return tl::unexpected("wrong message received");
-                }
-
-                BTCNonModule headerFile;
-                headerFile.isHeaderUnit = false;
-                headerFile.filePath = xHpp;
-                HeaderFile yHeaderFile;
-                yHeaderFile.logicalName = "y.hpp";
-                yHeaderFile.filePath = yHpp;
-                yHeaderFile.isSystem = true;
-                headerFile.headerFiles.emplace_back(std::move(yHeaderFile));
-                HeaderFile zHeaderFile;
-                zHeaderFile.logicalName = "z.hpp";
-                zHeaderFile.filePath = zHpp;
-                zHeaderFile.isSystem = true;
-                headerFile.headerFiles.emplace_back(std::move(zHeaderFile));
-
-                if (const auto &r2 = manager.sendMessage(std::move(headerFile)); !r2)
-                {
-                    string str = r2.error();
-                    return tl::unexpected("manager send message failed" + r2.error() + "\n");
-                }
-
-                readCompilerMessage(serverFd, manager, buffer, type);
-                if (type != CTB::LAST_MESSAGE)
-                {
-                    return tl::unexpected("received message of wrong type");
-                }
-
-                const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
-                if (const auto &r2 = CloseProcess(); !r2)
-                {
-                    return tl::unexpected("closing process failed");
-                }
-            }
-
-            // compiling foo.cpp
-            {
-                string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + fooObj +
-                                        "\" -noScanIPC -c -xc++-module foo.cpp -fmodule-output=\"" + fooPcm + "\"";
-
-                IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
-
-                if (type != CTB::NON_MODULE)
-                {
-                    return tl::unexpected("received message of wrong type");
-                }
-                const auto &xHeader = reinterpret_cast<CTBNonModule &>(buffer);
-
-                if (xHeader.logicalName != "x.hpp" || xHeader.isHeaderUnit == true)
-                {
-                    return tl::unexpected("wrong message received");
-                }
-
-                BTCNonModule bigHu;
-                bigHu.isHeaderUnit = true;
-                bigHu.logicalNames.emplace_back("big.hpp");
-                bigHu.logicalNames.emplace_back("y.hpp");
-                bigHu.logicalNames.emplace_back("z.hpp");
-
-                BMIFile bigHuBmi;
-                bigHuBmi.filePath = bigPcm;
-
-                ProcessMappingOfBMIFile bigHuBmiProcMap;
-                if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(bigHuBmi); r2)
-                {
-                    bigHuBmiProcMap = *r2;
-                }
-                else
-                {
-                    return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
-                }
-                bigHu.filePath = bigHuBmi.filePath;
-                bigHu.fileSize = bigHuBmi.fileSize;
-
-                if (const auto &r2 = manager.sendMessage(bigHu); !r2)
-                {
-                    string str = r2.error();
-                    return tl::unexpected("manager send message failed" + r2.error() + "\n");
-                }
-
-                readCompilerMessage(serverFd, manager, buffer, type);
-                if (type != CTB::MODULE)
-                {
-                    return tl::unexpected("received message of wrong type");
-                }
-                const auto &aModule = reinterpret_cast<CTBModule &>(buffer);
-
-                if (aModule.moduleName != "A")
-                {
-                    return tl::unexpected("wrong message received");
-                }
-
-                BMIFile requested;
-                requested.filePath = aPcm;
-                ProcessMappingOfBMIFile aPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(requested);
-
-                BMIFile abModDepBmi;
-                abModDepBmi.filePath = aBPcm;
-                ProcessMappingOfBMIFile aCPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(abModDepBmi);
-
-                BMIFile acModDepBmi;
-                acModDepBmi.filePath = aCPcm;
-                ProcessMappingOfBMIFile aBPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(acModDepBmi);
-
-                BTCModule amod;
-                amod.requested = requested;
-                ModuleDep abModDep;
-                abModDep.isHeaderUnit = false;
-                abModDep.file = abModDepBmi;
-                abModDep.logicalNames.emplace_back("A:B");
-                amod.modDeps.emplace_back(std::move(abModDep));
-                ModuleDep acModDep;
-                acModDep.file = acModDepBmi;
-                acModDep.logicalNames.emplace_back("A:C");
-                amod.modDeps.emplace_back(std::move(acModDep));
-
-                if (const auto &r2 = manager.sendMessage(amod); !r2)
-                {
-                    string str = r2.error();
-                    return tl::unexpected("manager send message failed" + r2.error() + "\n");
-                }
-
-                readCompilerMessage(serverFd, manager, buffer, type);
-                if (type != CTB::LAST_MESSAGE)
-                {
-                    return tl::unexpected("received message of wrong type");
-                }
-
-                const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
-                if (const auto &r2 = CloseProcess(); !r2)
-                {
-                    return tl::unexpected("closing process failed");
-                }
-
-                if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(bigHuBmiProcMap); !r2)
-                {
-                    return tl::unexpected("closing bmi-mapping failed");
-                }
-
-                IPCManagerBS::closeBMIFileMapping(aPcmProcMap);
-                IPCManagerBS::closeBMIFileMapping(aBPcmProcMap);
-                IPCManagerBS::closeBMIFileMapping(aCPcmProcMap);
-            }
-
-            // compiling main.cpp
-            auto compileMain = [&](bool shouldFail) -> tl::expected<int, string> {
-                string compileCommand = CLANG_CMD R"( -std=c++20 -o ")" + mainObj + "\" -noScanIPC -c main.cpp";
-
-                IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
-
-                if (type != CTB::MODULE)
-                {
-                    return tl::unexpected("received message of wrong type");
-                }
-
-                const auto &ctbModule = reinterpret_cast<CTBModule &>(buffer);
-
-                if (ctbModule.moduleName != "Foo")
-                {
-                    return tl::unexpected("wrong logical name received while compiling a-b.cpp");
-                }
-
-                BMIFile requested;
-                requested.filePath = fooPcm;
-                ProcessMappingOfBMIFile requestedProcMap = *IPCManagerBS::createSharedMemoryBMIFile(requested);
-
-                BMIFile bigHuModDepBmi;
-                bigHuModDepBmi.filePath = bigPcm;
-                ProcessMappingOfBMIFile bigHuModDepBmiProcMap =
-       *IPCManagerBS::createSharedMemoryBMIFile(bigHuModDepBmi);
-
-                BMIFile aModDepBmi;
-                aModDepBmi.filePath = aPcm;
-                ProcessMappingOfBMIFile aPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(aModDepBmi);
-
-                BMIFile abModDepBmi;
-                abModDepBmi.filePath = aBPcm;
-                ProcessMappingOfBMIFile aCPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(abModDepBmi);
-
-                BMIFile acModDepBmi;
-                acModDepBmi.filePath = aCPcm;
-                ProcessMappingOfBMIFile aBPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(acModDepBmi);
-
-                BTCModule foo;
-                foo.requested = requested;
-
-                ModuleDep bigModDep;
-                bigModDep.isHeaderUnit = true;
-                bigModDep.file = bigHuModDepBmi;
-                bigModDep.logicalNames.emplace_back("big.hpp");
-                bigModDep.logicalNames.emplace_back("x.hpp");
-                bigModDep.logicalNames.emplace_back("y.hpp");
-                bigModDep.logicalNames.emplace_back("z.hpp");
-                foo.modDeps.emplace_back(std::move(bigModDep));
-
-                ModuleDep aModDep;
-                aModDep.isHeaderUnit = false;
-                aModDep.file = aModDepBmi;
-                aModDep.logicalNames.emplace_back("A");
-                foo.modDeps.emplace_back(std::move(aModDep));
-
-                ModuleDep bModDep;
-                bModDep.isHeaderUnit = false;
-                bModDep.file = abModDepBmi;
-                bModDep.logicalNames.emplace_back("A:B");
-                foo.modDeps.emplace_back(std::move(bModDep));
-
-                ModuleDep cModDep;
-                cModDep.isHeaderUnit = false;
-                cModDep.file = acModDepBmi;
-                cModDep.logicalNames.emplace_back("A:C");
-                foo.modDeps.emplace_back(std::move(cModDep));
-
-                if (const auto &r2 = manager.sendMessage(std::move(foo)); !r2)
-                {
-                    string str = r2.error();
-                    return tl::unexpected("manager send message failed" + r2.error() + "\n");
-                }
-
-                readCompilerMessage(serverFd, manager, buffer, type);
-                if (type != CTB::LAST_MESSAGE)
-                {
-                    return tl::unexpected("received message of wrong type");
-                }
-
-                const auto &ctbLastMessage = reinterpret_cast<CTBLastMessage &>(buffer);
-                if (ctbLastMessage.errorOccurred != shouldFail)
-                {
-                    return tl::unexpected("wrong last message received");
-                }
-
-                if (const auto &r2 = CloseProcess(); !r2)
-                {
-                    return tl::unexpected("closing process failed");
-                }
-
-                IPCManagerBS::closeBMIFileMapping(requestedProcMap);
-                IPCManagerBS::closeBMIFileMapping(bigHuModDepBmiProcMap);
-                IPCManagerBS::closeBMIFileMapping(aPcmProcMap);
-                IPCManagerBS::closeBMIFileMapping(aBPcmProcMap);
-                IPCManagerBS::closeBMIFileMapping(aCPcmProcMap);
-                return {};
-            };
-
-            if (const auto &r = compileMain(true); !r)
-            {
-                string str = r.error();
-                return tl::unexpected("compiling main failed" + r.error() + "\n");
-            }
-            // main.cpp
-            ofstream("main.cpp") << mainDotCpp + '}';
-
-            if (const auto &r = compileMain(false); !r)
-            {
-                string str = r.error();
-                return tl::unexpected("compiling main failed" + r.error() + "\n");
-            }
-
-            fflush(stdout);*/
+
+        const auto &ctbModule = reinterpret_cast<CTBModule &>(buffer);
+
+        if (ctbModule.moduleName != "A:B")
+        {
+            return tl::unexpected("wrong logical name received while compiling a-b.cpp");
+        }
+
+        BMIFile btcModBMI;
+        btcModBMI.filePath = aBPcm;
+        ProcessMappingOfBMIFile btcModBmiProcMap;
+        if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(btcModBMI); r2)
+        {
+            btcModBmiProcMap = *r2;
+        }
+        else
+        {
+            return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
+        }
+
+        BTCModule btcMod;
+        btcMod.requested = std::move(btcModBMI);
+
+        BMIFile modDepBMI;
+        modDepBMI.filePath = aCPcm;
+        ProcessMappingOfBMIFile modDepBmiProcMap;
+        if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(modDepBMI); r2)
+        {
+            modDepBmiProcMap = *r2;
+        }
+        else
+        {
+            return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
+        }
+
+        ModuleDep modDep;
+        modDep.file = std::move(modDepBMI);
+        modDep.logicalNames.emplace_back("A:C");
+        modDep.isHeaderUnit = false;
+        btcMod.modDeps.emplace_back(std::move(modDep));
+
+        if (const auto &r2 = manager.sendMessage(btcMod); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
+        }
+
+        endCompilerTest();
+
+        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(btcModBmiProcMap); !r2)
+        {
+            return tl::unexpected("closing bmi-mapping failed");
+        }
+
+        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(modDepBmiProcMap); !r2)
+        {
+            return tl::unexpected("closing bmi-mapping failed");
+        }
+    }
+    // compiling n.hpp
+    {
+        string compileCommand = CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + nPcm +
+                                "\" -noScanIPC -xc++-header n.hpp -DCOMMAND_MACRO";
+
+        IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
+
+        if (type != CTB::NON_MODULE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+        const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
+
+        if (ctbNonModMHpp.logicalName != "m.hpp" || ctbNonModMHpp.isHeaderUnit == true)
+        {
+            return tl::unexpected("wrong message received");
+        }
+
+        BTCNonModule nonModMPcm;
+        nonModMPcm.isHeaderUnit = false;
+        nonModMPcm.filePath = mHpp;
+        if (const auto &r2 = manager.sendMessage(nonModMPcm); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
+        }
+
+        endCompilerTest();
+    }
+
+    // compiling o.hpp
+    {
+        string compileCommand =
+            CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm + "\" -noScanIPC -xc++-header o.hpp";
+
+        IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
+
+        if (type != CTB::NON_MODULE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+        const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
+        if (ctbNonModMHpp.logicalName != "m.hpp" || ctbNonModMHpp.isHeaderUnit == true)
+        {
+            return tl::unexpected("wrong message received");
+        }
+
+        BTCNonModule nonModMPcm;
+        nonModMPcm.isHeaderUnit = false;
+        nonModMPcm.filePath = mHpp;
+        if (const auto &r2 = manager.sendMessage(std::move(nonModMPcm)); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
+        }
+
+        readCompilerStdout(manager, true);
+        if (type != CTB::NON_MODULE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+        const auto &ctbNonModNHpp = reinterpret_cast<CTBNonModule &>(buffer);
+        if (ctbNonModNHpp.logicalName != "n.hpp" || ctbNonModNHpp.isHeaderUnit == false)
+        {
+            return tl::unexpected("wrong message received");
+        }
+
+        BTCNonModule nonModNPcm;
+        nonModNPcm.isHeaderUnit = true;
+
+        BMIFile nonModNPcmBmi;
+        nonModNPcmBmi.filePath = nPcm;
+
+        ProcessMappingOfBMIFile nonModNPcmBmiProcMap;
+        if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(nonModNPcmBmi); r2)
+        {
+            nonModNPcmBmiProcMap = *r2;
+        }
+        else
+        {
+            return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
+        }
+
+        nonModNPcm.filePath = std::move(nonModNPcmBmi.filePath);
+        nonModNPcm.fileSize = nonModNPcmBmi.fileSize;
+
+        if (const auto &r2 = manager.sendMessage(std::move(nonModNPcm)); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
+        }
+
+        endCompilerTest();
+
+        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(nonModNPcmBmiProcMap); !r2)
+        {
+            return tl::unexpected("closing bmi-mapping failed");
+        }
+    }
+
+    // compiling o.hpp with include-translation. BTCNonModule for n.hpp will be received with
+    // isHeaderUnit = true.
+    {
+        string compileCommand = CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm +
+                                "\" -noScanIPC -xc++-header o.hpp -DTRANSLATING";
+
+        IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
+
+        if (type != CTB::NON_MODULE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+        const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
+        if (ctbNonModMHpp.logicalName != "m.hpp" || ctbNonModMHpp.isHeaderUnit == true)
+        {
+            return tl::unexpected("wrong message received");
+        }
+
+        BTCNonModule nonModMPcm;
+        nonModMPcm.isHeaderUnit = false;
+        nonModMPcm.filePath = mHpp;
+        if (const auto &r2 = manager.sendMessage(std::move(nonModMPcm)); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
+        }
+
+        readCompilerStdout(manager, true);
+        if (type != CTB::NON_MODULE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+        const auto &ctbNonModNHpp = reinterpret_cast<CTBNonModule &>(buffer);
+        if (ctbNonModNHpp.logicalName != "n.hpp" || ctbNonModNHpp.isHeaderUnit == true)
+        {
+            return tl::unexpected("wrong message received");
+        }
+
+        BTCNonModule nonModNPcm;
+
+        BMIFile nonModNPcmBmi;
+        nonModNPcmBmi.filePath = nPcm;
+
+        ProcessMappingOfBMIFile nonModNPcmBmiProcMap;
+        if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(nonModNPcmBmi); r2)
+        {
+            nonModNPcmBmiProcMap = *r2;
+        }
+        else
+        {
+            return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
+        }
+
+        nonModNPcm.isHeaderUnit = true;
+        nonModNPcm.filePath = nPcm;
+        nonModNPcm.fileSize = nonModNPcmBmi.fileSize;
+
+        if (const auto &r2 = manager.sendMessage(std::move(nonModNPcm)); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
+        }
+
+        endCompilerTest();
+
+        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(nonModNPcmBmiProcMap); !r2)
+        {
+            return tl::unexpected("closing bmi-mapping failed");
+        }
+    }
+
+    // compiling big.hpp
+    {
+        string compileCommand =
+            CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + bigPcm + "\" -noScanIPC -xc++-header big.hpp";
+
+        IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
+
+        if (type != CTB::NON_MODULE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+        const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
+
+        if (ctbNonModMHpp.logicalName != "x.hpp" || ctbNonModMHpp.isHeaderUnit == true)
+        {
+            return tl::unexpected("wrong message received");
+        }
+
+        BTCNonModule headerFile;
+        headerFile.isHeaderUnit = false;
+        headerFile.filePath = xHpp;
+        HeaderFile yHeaderFile;
+        yHeaderFile.logicalName = "y.hpp";
+        yHeaderFile.filePath = yHpp;
+        yHeaderFile.isSystem = true;
+        headerFile.headerFiles.emplace_back(std::move(yHeaderFile));
+        HeaderFile zHeaderFile;
+        zHeaderFile.logicalName = "z.hpp";
+        zHeaderFile.filePath = zHpp;
+        zHeaderFile.isSystem = true;
+        headerFile.headerFiles.emplace_back(std::move(zHeaderFile));
+
+        if (const auto &r2 = manager.sendMessage(std::move(headerFile)); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
+        }
+
+        endCompilerTest();
+    }
+
+    // compiling foo.cpp
+    {
+        string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + fooObj +
+                                "\" -noScanIPC -c -xc++-module foo.cpp -fmodule-output=\"" + fooPcm + "\"";
+
+        IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
+
+        if (type != CTB::NON_MODULE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+        const auto &xHeader = reinterpret_cast<CTBNonModule &>(buffer);
+
+        if (xHeader.logicalName != "x.hpp" || xHeader.isHeaderUnit == true)
+        {
+            return tl::unexpected("wrong message received");
+        }
+
+        BTCNonModule bigHu;
+        bigHu.isHeaderUnit = true;
+        bigHu.logicalNames.emplace_back("big.hpp");
+        bigHu.logicalNames.emplace_back("y.hpp");
+        bigHu.logicalNames.emplace_back("z.hpp");
+
+        BMIFile bigHuBmi;
+        bigHuBmi.filePath = bigPcm;
+
+        ProcessMappingOfBMIFile bigHuBmiProcMap;
+        if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(bigHuBmi); r2)
+        {
+            bigHuBmiProcMap = *r2;
+        }
+        else
+        {
+            return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
+        }
+        bigHu.filePath = bigHuBmi.filePath;
+        bigHu.fileSize = bigHuBmi.fileSize;
+
+        if (const auto &r2 = manager.sendMessage(bigHu); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
+        }
+
+        readCompilerStdout(manager, true);
+        if (type != CTB::MODULE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+        const auto &aModule = reinterpret_cast<CTBModule &>(buffer);
+
+        if (aModule.moduleName != "A")
+        {
+            return tl::unexpected("wrong message received");
+        }
+
+        BMIFile requested;
+        requested.filePath = aPcm;
+        ProcessMappingOfBMIFile aPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(requested);
+
+        BMIFile abModDepBmi;
+        abModDepBmi.filePath = aBPcm;
+        ProcessMappingOfBMIFile aCPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(abModDepBmi);
+
+        BMIFile acModDepBmi;
+        acModDepBmi.filePath = aCPcm;
+        ProcessMappingOfBMIFile aBPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(acModDepBmi);
+
+        BTCModule amod;
+        amod.requested = requested;
+        ModuleDep abModDep;
+        abModDep.isHeaderUnit = false;
+        abModDep.file = abModDepBmi;
+        abModDep.logicalNames.emplace_back("A:B");
+        amod.modDeps.emplace_back(std::move(abModDep));
+        ModuleDep acModDep;
+        acModDep.file = acModDepBmi;
+        acModDep.logicalNames.emplace_back("A:C");
+        amod.modDeps.emplace_back(std::move(acModDep));
+
+        if (const auto &r2 = manager.sendMessage(amod); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
+        }
+
+        endCompilerTest();
+
+        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(bigHuBmiProcMap); !r2)
+        {
+            return tl::unexpected("closing bmi-mapping failed");
+        }
+
+        IPCManagerBS::closeBMIFileMapping(aPcmProcMap);
+        IPCManagerBS::closeBMIFileMapping(aBPcmProcMap);
+        IPCManagerBS::closeBMIFileMapping(aCPcmProcMap);
+    }
+
+    // compiling main.cpp
+    {
+        string compileCommand = CLANG_CMD R"( -std=c++20 -o ")" + mainObj + "\" -noScanIPC -c main.cpp";
+
+        IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
+
+        if (type != CTB::MODULE)
+        {
+            return tl::unexpected("received message of wrong type");
+        }
+
+        const auto &ctbModule = reinterpret_cast<CTBModule &>(buffer);
+
+        if (ctbModule.moduleName != "Foo")
+        {
+            return tl::unexpected("wrong logical name received while compiling a-b.cpp");
+        }
+
+        BMIFile requested;
+        requested.filePath = fooPcm;
+        ProcessMappingOfBMIFile requestedProcMap = *IPCManagerBS::createSharedMemoryBMIFile(requested);
+
+        BMIFile bigHuModDepBmi;
+        bigHuModDepBmi.filePath = bigPcm;
+        ProcessMappingOfBMIFile bigHuModDepBmiProcMap = *IPCManagerBS::createSharedMemoryBMIFile(bigHuModDepBmi);
+
+        BMIFile aModDepBmi;
+        aModDepBmi.filePath = aPcm;
+        ProcessMappingOfBMIFile aPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(aModDepBmi);
+
+        BMIFile abModDepBmi;
+        abModDepBmi.filePath = aBPcm;
+        ProcessMappingOfBMIFile aCPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(abModDepBmi);
+
+        BMIFile acModDepBmi;
+        acModDepBmi.filePath = aCPcm;
+        ProcessMappingOfBMIFile aBPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(acModDepBmi);
+
+        BTCModule foo;
+        foo.requested = requested;
+
+        ModuleDep bigModDep;
+        bigModDep.isHeaderUnit = true;
+        bigModDep.file = bigHuModDepBmi;
+        bigModDep.logicalNames.emplace_back("big.hpp");
+        bigModDep.logicalNames.emplace_back("x.hpp");
+        bigModDep.logicalNames.emplace_back("y.hpp");
+        bigModDep.logicalNames.emplace_back("z.hpp");
+        foo.modDeps.emplace_back(std::move(bigModDep));
+
+        ModuleDep aModDep;
+        aModDep.isHeaderUnit = false;
+        aModDep.file = aModDepBmi;
+        aModDep.logicalNames.emplace_back("A");
+        foo.modDeps.emplace_back(std::move(aModDep));
+
+        ModuleDep bModDep;
+        bModDep.isHeaderUnit = false;
+        bModDep.file = abModDepBmi;
+        bModDep.logicalNames.emplace_back("A:B");
+        foo.modDeps.emplace_back(std::move(bModDep));
+
+        ModuleDep cModDep;
+        cModDep.isHeaderUnit = false;
+        cModDep.file = acModDepBmi;
+        cModDep.logicalNames.emplace_back("A:C");
+        foo.modDeps.emplace_back(std::move(cModDep));
+
+        if (const auto &r2 = manager.sendMessage(foo); !r2)
+        {
+            string str = r2.error();
+            return tl::unexpected("manager send message failed" + r2.error() + "\n");
+        }
+
+        endCompilerTest();
+
+        IPCManagerBS::closeBMIFileMapping(requestedProcMap);
+        IPCManagerBS::closeBMIFileMapping(bigHuModDepBmiProcMap);
+        IPCManagerBS::closeBMIFileMapping(aPcmProcMap);
+        IPCManagerBS::closeBMIFileMapping(aBPcmProcMap);
+        IPCManagerBS::closeBMIFileMapping(aCPcmProcMap);
+    }
+
+    fflush(stdout);
     return {};
 }
 } // namespace
