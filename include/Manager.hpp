@@ -60,7 +60,7 @@ class Manager
 {
   public:
     virtual tl::expected<uint32_t, std::string> readInternal(char (&buffer)[BUFFERSIZE]) const = 0;
-    virtual tl::expected<void, std::string> writeInternal(const std::string &buffer) const = 0;
+    virtual tl::expected<void, std::string> writeInternal(std::string_view buffer) const = 0;
     virtual ~Manager() = default;
 #ifndef _WIN32
     static tl::expected<void, std::string> writeAll(const int fd, const char *buffer, const uint32_t count);

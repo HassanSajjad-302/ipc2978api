@@ -16,7 +16,7 @@ class IPCManagerBS : public Manager
     std::string_view serverReadString;
 
     tl::expected<uint32_t, std::string> readInternal(char (&buffer)[BUFFERSIZE]) const override;
-    tl::expected<void, std::string> writeInternal(const std::string &buffer) const override;
+    tl::expected<void, std::string> writeInternal(std::string_view buffer) const override;
 
     explicit IPCManagerBS(uint64_t writeFd_);
     tl::expected<void, std::string> receiveMessage(char (&ctbBuffer)[320], CTB &messageType) const;

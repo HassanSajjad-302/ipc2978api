@@ -112,6 +112,7 @@ struct BTCNonModule
     bool isSystem = true;
     std::string filePath;
     // if isHeaderUnit == false, the following are meaning-less.
+    // Except headerFiles can be sent on the first request.
     // if isHeaderUnit == true, fileSize of the requested file.
     uint32_t fileSize;
     // A header-unit can be composed of

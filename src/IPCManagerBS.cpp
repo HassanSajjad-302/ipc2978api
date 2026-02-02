@@ -32,7 +32,7 @@ tl::expected<uint32_t, std::string> IPCManagerBS::readInternal(char (&buffer)[40
     return bytesRead;
 }
 
-tl::expected<void, std::string> IPCManagerBS::writeInternal(const std::string &buffer) const
+tl::expected<void, std::string> IPCManagerBS::writeInternal(const std::string_view buffer) const
 {
 #ifdef _WIN32
     const bool success = WriteFile(reinterpret_cast<HANDLE>(writeFd), // pipe handle
