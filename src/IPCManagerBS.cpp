@@ -59,9 +59,6 @@ IPCManagerBS::IPCManagerBS(const uint64_t writeFd_) : writeFd(writeFd_)
 
 tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType) const
 {
-    //    raise(SIGTRAP); // At the location of the BP.
-
-    // Read from the pipe.
     char buffer[BUFFERSIZE];
     uint32_t bytesRead;
     if (const auto &r = readInternal(buffer); !r)
