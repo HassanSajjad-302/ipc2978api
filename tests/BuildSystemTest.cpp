@@ -268,7 +268,7 @@ struct BuildSystemTest
 {
 
     //  Compiler can use this function to read the BMI file. BMI should be read using this function to conserve memory.
-    static tl::expected<ProcessMappingOfBMIFile, std::string> readSharedMemoryBMIFile(const BMIFile &file)
+    static tl::expected<Mapping, std::string> readSharedMemoryBMIFile(const BMIFile &file)
     {
         return IPCManagerCompiler::readSharedMemoryBMIFile(file);
     }
@@ -543,7 +543,7 @@ int runTest()
         }
     }
 
-    ProcessMappingOfBMIFile bmi2Mapping;
+    Mapping bmi2Mapping;
     {
         // We don't assign the file.fileSize this-time. This IPCManagerBS::createSharedMemoryBMIFile will return it as
         // an out variable. This is used when build-system has to make a mapping for a prebuilt file. This case of

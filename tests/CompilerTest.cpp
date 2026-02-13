@@ -26,7 +26,7 @@ struct CompilerTest
         return compilerManager->receiveBTCNonModule(nonModule);
     }
 
-    static tl::expected<ProcessMappingOfBMIFile, std::string> readSharedMemoryBMIFile(const BMIFile &file)
+    static tl::expected<Mapping, std::string> readSharedMemoryBMIFile(const BMIFile &file)
     {
         return IPCManagerCompiler::readSharedMemoryBMIFile(file);
     }

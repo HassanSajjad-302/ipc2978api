@@ -19,12 +19,12 @@ enum class FileType : uint8_t
 
 struct Response
 {
-    std::string filePath;
+    std::string_view filePath;
     // if type == HEADER_FILE, then fileSize has no meaning
-    ProcessMappingOfBMIFile mapping;
+    Mapping mapping;
     FileType type;
     bool isSystem;
-    Response(std::string filePath_, const ProcessMappingOfBMIFile &mapping_, FileType type_, bool isSystem_);
+    Response(std::string_view filePath_, const Mapping &mapping_, FileType type_, bool isSystem_);
 };
 
 // IPC Manager Compiler
@@ -33,8 +33,21 @@ class IPCManagerCompiler : Manager
     friend struct ::CompilerTest;
     friend struct ::BuildSystemTest;
 
-    tl::expected<uint32_t, std::string> readInternal(char (&buffer)[BUFFERSIZE]) const override;
+    tl::expected<std::string_view, std::string> readInternal(char (&buffer)[BUFFERSIZE]) const;
     tl::expected<void, std::string> writeInternal(std::string_view buffer) const override;
+
+    struct BMIFileMapping
+    {
+        BMIFile file;
+        Mapping mapping;
+    };
+
+    tl::expected<BMIFileMapping, std::string> readProcessMappingOfBMIFile(std::string_view message,
+                                                                                  uint32_t &bytesRead);
+    static tl::expected<ModuleDep, std::string> readModuleDep(std::string_view message, uint32_t &bytesRead);
+    static tl::expected<HuDep, std::string> readHuDep(std::string_view message, uint32_t &bytesRead);
+    static tl::expected<HeaderFile, std::string> readHeaderFile(std::string_view message,
+                                                                        uint32_t &bytesRead);
 
     // This function is used to receive a particular message. Compiler knows what message it expects which will be the
     // template argument.
@@ -42,27 +55,27 @@ class IPCManagerCompiler : Manager
     // Called by sendCTBLastMessage. Build-system will send this after it has created the BMI file-mapping.
     [[nodiscard]] tl::expected<void, std::string> receiveBTCLastMessage() const;
     // This function is called by findResponse if it did not find the module in the IPCManagerCompiler::responses cache.
-    [[nodiscard]] tl::expected<BTCModule, std::string> receiveBTCModule(const CTBModule &moduleName);
+    [[nodiscard]] tl::expected<void, std::string> receiveBTCModule(const CTBModule &moduleName);
     // This function is called by findResponse if it did not find the header-unit or header-file in the
     // IPCManagerCompiler::responses cache.
     [[nodiscard]] tl::expected<BTCNonModule, std::string> receiveBTCNonModule(const CTBNonModule &nonModule);
 
     // Internal cache for the possible future requests.
-    std::unordered_map<std::string, Response> responses;
+    std::unordered_map<std::string_view, Response> responses;
 
     //  Compiler can use this function to read the BMI file. BMI should be read using this function to conserve memory.
-    static tl::expected<ProcessMappingOfBMIFile, std::string> readSharedMemoryBMIFile(const BMIFile &file);
+    static tl::expected<Mapping, std::string> readSharedMemoryBMIFile(const BMIFile &file);
 
     [[nodiscard]] tl::expected<void, std::string> sendCTBLastMessage(uint32_t fileSize) const;
 
   public:
     // Compiler process can use this function to close the BMI file-mapping to reduce references to shared memory file.
     // Not needed as it will be cleared at process exit.
-    static tl::expected<void, std::string> closeBMIFileMapping(const ProcessMappingOfBMIFile &processMappingOfBMIFile);
+    static tl::expected<void, std::string> closeBMIFileMapping(const Mapping &processMappingOfBMIFile);
 
     // Cache mapping between the file-path and bmi-file-mapping. Only to be queried by the compiler. Passed path must be
     // lexically normal and lower-case on Windows.
-    std::unordered_map<std::string, ProcessMappingOfBMIFile> filePathProcessMapping;
+    std::unordered_map<std::string, Mapping> filePathProcessMapping;
 
     // For FileType::HEADER_FILE, it can return FileType::HEADER_UNIT, otherwise it will return the request
     // response. Either it will return from the cache or it will fetch it from the build-system
@@ -94,33 +107,6 @@ template <typename T> tl::expected<T, std::string> IPCManagerCompiler::receiveMe
 
     if constexpr (std::is_same_v<T, BTCModule>)
     {
-        const auto &r = readProcessMappingOfBMIFileFromPipe(buffer, bytesRead, bytesProcessed);
-        if (!r)
-        {
-            return tl::unexpected(r.error());
-        }
-
-        const auto &r2 = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
-        if (!r2)
-        {
-            return tl::unexpected(r2.error());
-        }
-
-        const auto &r3 = readVectorOfModuleDepFromPipe(buffer, bytesRead, bytesProcessed);
-        if (!r3)
-        {
-            return tl::unexpected(r3.error());
-        }
-
-        BTCModule moduleFile;
-        moduleFile.requested = *r;
-        moduleFile.isSystem = *r2;
-        moduleFile.modDeps = *r3;
-
-        if (bytesRead == bytesProcessed)
-        {
-            return moduleFile;
-        }
     }
     else if constexpr (std::is_same_v<T, BTCNonModule>)
     {

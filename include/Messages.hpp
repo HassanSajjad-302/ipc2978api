@@ -3,7 +3,7 @@
 
 #include <cstdint>
 #include <signal.h>
-#include <string>
+#include <string_view>
 #include <vector>
 
 namespace N2978
@@ -11,7 +11,7 @@ namespace N2978
 // CTB --> Compiler to Build-System
 // BTC --> Build-System to Compiler
 
-// string is 4 bytes that hold the size of the char array, followed by the array.
+// string_view is 4 bytes that hold the size of the char array, followed by the array.
 // vector is 4 bytes that hold the size of the array, followed by the array.
 // All fields are sent in declaration order, even if meaningless.
 
@@ -27,7 +27,7 @@ enum class CTB : uint8_t
 // This is sent when the compiler needs a module.
 struct CTBModule
 {
-    std::string moduleName;
+    std::string_view moduleName;
 };
 
 // This is sent when the compiler needs something else than a module.
@@ -35,7 +35,7 @@ struct CTBModule
 struct CTBNonModule
 {
     bool isHeaderUnit = false;
-    std::string logicalName;
+    std::string_view logicalName;
 };
 
 // This is the last message sent by the compiler if the compiler
@@ -61,7 +61,7 @@ enum class BTC : uint8_t
 
 struct BMIFile
 {
-    std::string filePath;
+    std::string_view filePath;
     uint32_t fileSize = UINT32_MAX;
 };
 
@@ -74,7 +74,7 @@ struct ModuleDep
     // composed of multiple header-files. And if later,
     // any of the following logicalNames is included or
     // imported, this header-unit can be used instead.
-    std::vector<std::string> logicalNames;
+    std::vector<std::string_view> logicalNames;
     bool isSystem = true;
 };
 
@@ -93,15 +93,15 @@ struct HuDep
     // multiple header-files. And if later,
     // any of the following logicalNames is included or
     // imported, this header-unit can be used instead.
-    std::vector<std::string> logicalNames;
+    std::vector<std::string_view> logicalNames;
     // whether header-unit / header-file belongs to user or system directory.
     bool isSystem = true;
 };
 
 struct HeaderFile
 {
-    std::string logicalName;
-    std::string filePath;
+    std::string_view logicalName;
+    std::string_view filePath;
     bool isSystem = true;
 };
 
@@ -110,7 +110,7 @@ struct BTCNonModule
 {
     bool isHeaderUnit = false;
     bool isSystem = true;
-    std::string filePath;
+    std::string_view filePath;
     // if isHeaderUnit == false, the following are meaning-less.
     // Except headerFiles can be sent on the first request.
     // if isHeaderUnit == true, fileSize of the requested file.
@@ -119,7 +119,7 @@ struct BTCNonModule
     // multiple header-files. And if later,
     // any of the following logicalNames is included or
     // imported, this header-unit can be used instead.
-    std::vector<std::string> logicalNames;
+    std::vector<std::string_view> logicalNames;
     // build-system might send the following on first request, if it knows that a
     // header-unit is being compiled that compose multiple header-files to reduce
     // the number of subsequent requests.

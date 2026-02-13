@@ -19,19 +19,6 @@
 namespace N2978
 {
 
-tl::expected<uint32_t, std::string> IPCManagerBS::readInternal(char (&buffer)[4096]) const
-{
-    const uint32_t serverReadStringSize = serverReadString.size();
-    const uint32_t bytesRead = serverReadStringSize < BUFFERSIZE ? serverReadStringSize : BUFFERSIZE;
-    for (uint32_t i = 0; i < bytesRead; ++i)
-    {
-        buffer[i] = serverReadString[i];
-    }
-    const_cast<std::string_view &>(serverReadString) =
-        std::string_view{serverReadString.data() + bytesRead, serverReadString.size() - bytesRead};
-    return bytesRead;
-}
-
 tl::expected<void, std::string> IPCManagerBS::writeInternal(const std::string_view buffer) const
 {
 #ifdef _WIN32
@@ -57,28 +44,23 @@ IPCManagerBS::IPCManagerBS(const uint64_t writeFd_) : writeFd(writeFd_)
 {
 }
 
-tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType) const
+tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType,
+                                                             const std::string_view serverReadString)
 {
-    char buffer[BUFFERSIZE];
-    uint32_t bytesRead;
-    if (const auto &r = readInternal(buffer); !r)
+    if (serverReadString.empty())
     {
-        return tl::unexpected(r.error());
-    }
-    else
-    {
-        bytesRead = *r;
+        return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
     }
 
-    uint32_t bytesProcessed = 1;
+    uint32_t bytesRead = 1;
 
     // read call fails if zero byte is read, so safe to process 1 byte
-    switch (static_cast<CTB>(buffer[0]))
+    switch (static_cast<CTB>(serverReadString[0]))
     {
 
     case CTB::MODULE: {
 
-        const auto &r = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        const auto &r = readStringFromPipe(serverReadString, bytesRead);
         if (!r)
         {
             return tl::unexpected(r.error());
@@ -92,13 +74,13 @@ tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[3
 
     case CTB::NON_MODULE: {
 
-        const auto &r = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
+        const auto &r = readBoolFromPipe(serverReadString, bytesRead);
         if (!r)
         {
             return tl::unexpected(r.error());
         }
 
-        const auto &r2 = readStringFromPipe(buffer, bytesRead, bytesProcessed);
+        const auto &r2 = readStringFromPipe(serverReadString, bytesRead);
         if (!r2)
         {
             return tl::unexpected(r.error());
@@ -114,7 +96,7 @@ tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[3
 
     case CTB::LAST_MESSAGE: {
 
-        const auto &fileSizeExpected = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
+        const auto &fileSizeExpected = readUInt32FromPipe(serverReadString, bytesRead);
         if (!fileSizeExpected)
         {
             return tl::unexpected(fileSizeExpected.error());
@@ -129,9 +111,9 @@ tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[3
     break;
     }
 
-    if (bytesRead != bytesProcessed)
+    if (serverReadString.size() != bytesRead)
     {
-        return tl::unexpected(getErrorString(bytesRead, bytesProcessed));
+        return tl::unexpected(getErrorString(serverReadString.size(), bytesRead));
     }
 
     return {};
@@ -178,9 +160,9 @@ tl::expected<void, std::string> IPCManagerBS::sendMessage(const BTCLastMessage &
     return {};
 }
 
-tl::expected<ProcessMappingOfBMIFile, std::string> IPCManagerBS::createSharedMemoryBMIFile(BMIFile &bmiFile)
+tl::expected<Mapping, std::string> IPCManagerBS::createSharedMemoryBMIFile(BMIFile &bmiFile)
 {
-    ProcessMappingOfBMIFile sharedFile{};
+    Mapping sharedFile{};
 #ifdef _WIN32
 
     std::string mappingName = bmiFile.filePath;
@@ -265,7 +247,7 @@ tl::expected<ProcessMappingOfBMIFile, std::string> IPCManagerBS::createSharedMem
 }
 
 tl::expected<void, std::string> IPCManagerBS::closeBMIFileMapping(
-    const ProcessMappingOfBMIFile &processMappingOfBMIFile)
+    const Mapping &processMappingOfBMIFile)
 {
 #ifdef _WIN32
     CloseHandle(processMappingOfBMIFile.mapping);

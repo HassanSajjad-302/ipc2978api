@@ -745,7 +745,7 @@ tl::expected<int, string> runTest()
 
         BMIFile btcModBMI;
         btcModBMI.filePath = aBPcm;
-        ProcessMappingOfBMIFile btcModBmiProcMap;
+        Mapping btcModBmiProcMap;
         if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(btcModBMI); r2)
         {
             btcModBmiProcMap = *r2;
@@ -760,7 +760,7 @@ tl::expected<int, string> runTest()
 
         BMIFile modDepBMI;
         modDepBMI.filePath = aCPcm;
-        ProcessMappingOfBMIFile modDepBmiProcMap;
+        Mapping modDepBmiProcMap;
         if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(modDepBMI); r2)
         {
             modDepBmiProcMap = *r2;
@@ -867,7 +867,7 @@ tl::expected<int, string> runTest()
         BMIFile nonModNPcmBmi;
         nonModNPcmBmi.filePath = nPcm;
 
-        ProcessMappingOfBMIFile nonModNPcmBmiProcMap;
+        Mapping nonModNPcmBmiProcMap;
         if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(nonModNPcmBmi); r2)
         {
             nonModNPcmBmiProcMap = *r2;
@@ -937,7 +937,7 @@ tl::expected<int, string> runTest()
         BMIFile nonModNPcmBmi;
         nonModNPcmBmi.filePath = nPcm;
 
-        ProcessMappingOfBMIFile nonModNPcmBmiProcMap;
+        Mapping nonModNPcmBmiProcMap;
         if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(nonModNPcmBmi); r2)
         {
             nonModNPcmBmiProcMap = *r2;
@@ -1033,7 +1033,7 @@ tl::expected<int, string> runTest()
         BMIFile bigHuBmi;
         bigHuBmi.filePath = bigPcm;
 
-        ProcessMappingOfBMIFile bigHuBmiProcMap;
+        Mapping bigHuBmiProcMap;
         if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(bigHuBmi); r2)
         {
             bigHuBmiProcMap = *r2;
@@ -1065,15 +1065,15 @@ tl::expected<int, string> runTest()
 
         BMIFile requested;
         requested.filePath = aPcm;
-        ProcessMappingOfBMIFile aPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(requested);
+        Mapping aPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(requested);
 
         BMIFile abModDepBmi;
         abModDepBmi.filePath = aBPcm;
-        ProcessMappingOfBMIFile aCPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(abModDepBmi);
+        Mapping aCPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(abModDepBmi);
 
         BMIFile acModDepBmi;
         acModDepBmi.filePath = aCPcm;
-        ProcessMappingOfBMIFile aBPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(acModDepBmi);
+        Mapping aBPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(acModDepBmi);
 
         BTCModule amod;
         amod.requested = requested;
@@ -1125,23 +1125,23 @@ tl::expected<int, string> runTest()
 
         BMIFile requested;
         requested.filePath = fooPcm;
-        ProcessMappingOfBMIFile requestedProcMap = *IPCManagerBS::createSharedMemoryBMIFile(requested);
+        Mapping requestedProcMap = *IPCManagerBS::createSharedMemoryBMIFile(requested);
 
         BMIFile bigHuModDepBmi;
         bigHuModDepBmi.filePath = bigPcm;
-        ProcessMappingOfBMIFile bigHuModDepBmiProcMap = *IPCManagerBS::createSharedMemoryBMIFile(bigHuModDepBmi);
+        Mapping bigHuModDepBmiProcMap = *IPCManagerBS::createSharedMemoryBMIFile(bigHuModDepBmi);
 
         BMIFile aModDepBmi;
         aModDepBmi.filePath = aPcm;
-        ProcessMappingOfBMIFile aPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(aModDepBmi);
+        Mapping aPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(aModDepBmi);
 
         BMIFile abModDepBmi;
         abModDepBmi.filePath = aBPcm;
-        ProcessMappingOfBMIFile aCPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(abModDepBmi);
+        Mapping aCPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(abModDepBmi);
 
         BMIFile acModDepBmi;
         acModDepBmi.filePath = aCPcm;
-        ProcessMappingOfBMIFile aBPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(acModDepBmi);
+        Mapping aBPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(acModDepBmi);
 
         BTCModule foo;
         foo.requested = requested;
