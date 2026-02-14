@@ -228,7 +228,7 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCModule(const CTBMo
     {
         return tl::unexpected(received.error());
     }
-    std::string_view message = *received;
+    const std::string_view message = *received;
 
     uint32_t bytesRead = 0;
 

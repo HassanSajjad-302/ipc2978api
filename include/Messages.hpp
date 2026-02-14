@@ -116,7 +116,7 @@ struct BTCNonModule
     // the number of subsequent requests.
     std::vector<HeaderFile> headerFiles;
     std::string_view filePath;
-    // if isHeaderUnit == false, the following are meaning-less.
+    // if isHeaderUnit == false, the following are meaning-less and are not sent.
     // if isHeaderUnit == true, fileSize of the requested file.
     uint32_t fileSize;
     // A header-unit can be composed of

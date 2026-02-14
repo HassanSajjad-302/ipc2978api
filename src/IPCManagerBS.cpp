@@ -125,6 +125,7 @@ tl::expected<void, std::string> IPCManagerBS::sendMessage(const BTCModule &modul
     writeBMIFile(buffer, moduleFile.requested);
     buffer.push_back(moduleFile.isSystem);
     writeVectorOfModuleDep(buffer, moduleFile.modDeps);
+    buffer.append(delimiter, strlen(delimiter));
     if (const auto &r = writeInternal(buffer); !r)
     {
         return tl::unexpected(r.error());
@@ -137,11 +138,15 @@ tl::expected<void, std::string> IPCManagerBS::sendMessage(const BTCNonModule &no
     std::string buffer;
     buffer.push_back(nonModule.isHeaderUnit);
     buffer.push_back(nonModule.isSystem);
-    writeString(buffer, nonModule.filePath);
-    writeUInt32(buffer, nonModule.fileSize);
-    writeVectorOfStrings(buffer, nonModule.logicalNames);
     writeVectorOfHeaderFiles(buffer, nonModule.headerFiles);
-    writeVectorOfHuDeps(buffer, nonModule.huDeps);
+    writeString(buffer, nonModule.filePath);
+    if (nonModule.isHeaderUnit)
+    {
+        writeUInt32(buffer, nonModule.fileSize);
+        writeVectorOfStrings(buffer, nonModule.logicalNames);
+        writeVectorOfHuDeps(buffer, nonModule.huDeps);
+        buffer.append(delimiter, strlen(delimiter));
+    }
     if (const auto &r = writeInternal(buffer); !r)
     {
         return tl::unexpected(r.error());
@@ -246,8 +251,7 @@ tl::expected<Mapping, std::string> IPCManagerBS::createSharedMemoryBMIFile(BMIFi
 #endif
 }
 
-tl::expected<void, std::string> IPCManagerBS::closeBMIFileMapping(
-    const Mapping &processMappingOfBMIFile)
+tl::expected<void, std::string> IPCManagerBS::closeBMIFileMapping(const Mapping &processMappingOfBMIFile)
 {
 #ifdef _WIN32
     CloseHandle(processMappingOfBMIFile.mapping);
