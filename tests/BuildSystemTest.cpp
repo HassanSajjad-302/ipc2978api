@@ -581,7 +581,7 @@ int runTest()
             exitFailure(r2.error());
         }
         print("Reply to Second CTBLastMessage ");
-        printMessage(btcLastMessage, true);
+        printMessage(true);
     }
 
     // As CompilerTest will output some print statements.

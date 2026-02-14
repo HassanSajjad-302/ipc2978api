@@ -56,7 +56,7 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(cha
 #ifdef _WIN32
     const bool success = ReadFile((HANDLE)STD_INPUT_HANDLE, // pipe handle
                                   buffer,                   // buffer to receive reply
-                                  4096,               // size of buffer
+                                  4096,                     // size of buffer
                                   LPDWORD(&bytesRead),      // number of bytes read
                                   nullptr);                 // not overlapped
 
@@ -293,10 +293,10 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCNonModule(const CT
         responses.emplace(logicalName, Response{filePath, {}, FileType::HEADER_FILE, isSystemHeaderFile});
     }
 
+    std::string *str = new std::string(nonModule.logicalName);
     if (!isHeaderUnit)
     {
         TRY_READ_VAL(filePath, readString, readCompilerMessage, bytesRead);
-        std::string *str = new std::string(nonModule.logicalName);
         responses.emplace(*str, Response{filePath, {}, FileType::HEADER_FILE, isSystem});
         if (readCompilerMessage.size() != bytesRead)
         {
@@ -306,6 +306,8 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCNonModule(const CT
     }
 
     TRY_READ_VAL(file, readProcessMappingOfBMIFile, readCompilerMessage, bytesRead);
+    responses.emplace(*str, Response{file.mapping.file, file.mapping, FileType::HEADER_UNIT, isSystem});
+
     TRY_READ(logicalNames, readLogicalNames, readCompilerMessage, bytesRead, file, FileType::HEADER_UNIT, isSystem);
 
     TRY_READ_VAL(huDepsSize, readUInt32, readCompilerMessage, bytesRead);

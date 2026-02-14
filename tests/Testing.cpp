@@ -1,11 +1,16 @@
 
 #include "Testing.hpp"
+
+#include "IPCManagerBS.hpp"
+
+#include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <utility>
 
 #include "fmt/printf.h"
 
-using fmt::print;
+using fmt::print, std::filesystem::current_path;
 
 void exitFailure(const string &str)
 {
@@ -101,22 +106,104 @@ BTCModule getBTCModule()
     return b;
 }
 
-BTCNonModule getBTCNonModule()
+auto createTempTestFilesEntry(bool makeMapping, bool makeFile, const string_view key, const FileType fileType,
+                              const bool isSystem) -> auto
+{
+    if (makeMapping && !makeFile)
+    {
+        exitFailure("makeMapping is true and makeFile is false\n");
+    }
+
+    string str = getRandomString(10);
+    for (char &c : str)
+    {
+        c = tolower(c);
+    }
+
+    const string filePath = (current_path() / str).string();
+    const string fileContents = getRandomString();
+    std::ofstream(filePath) << fileContents;
+    const auto &it = tempTestFiles.emplace(key, TestResponse{filePath, fileContents, fileType, isSystem});
+
+    if (makeMapping)
+    {
+        BMIFile file;
+        file.filePath = filePath;
+        if (const auto &mapping = IPCManagerBS::createSharedMemoryBMIFile(file); !mapping)
+        {
+            exitFailure("Failed to create shared memory bmifile");
+        }
+    }
+
+    return it;
+}
+
+BTCNonModule getBTCNonModule(CTBNonModule &ctbNonModule)
 {
     BTCNonModule nonModule;
-    nonModule.isHeaderUnit = false;
+    nonModule.isHeaderUnit = getRandomBool();
     nonModule.isSystem = getRandomBool();
-    nonModule.filePath = getRandomString();
-    nonModule.fileSize = 0;
 
     const uint32_t headerFilesSize = getRandomNumber(10);
+
     for (uint32_t i = 0; i < headerFilesSize; ++i)
     {
+        auto it = createTempTestFilesEntry(false, true, getRandomString(), FileType::HEADER_FILE, getRandomBool());
         HeaderFile h;
-        h.logicalName = getRandomString();
-        h.isSystem = getRandomBool();
-        h.filePath = getRandomString();
-        nonModule.headerFiles.emplace_back(std::move(h));
+        h.logicalName = it.first->first;
+        h.isSystem = it.first->second.isSystem;
+        h.filePath = it.first->second.filePath;
+        nonModule.headerFiles.emplace_back(h);
+    }
+
+    if (!nonModule.isHeaderUnit)
+    {
+        auto it =
+            createTempTestFilesEntry(false, true, ctbNonModule.logicalName, FileType::HEADER_FILE, nonModule.isSystem);
+        nonModule.filePath = it.first->second.filePath;
+        return nonModule;
+    }
+
+    auto it = createTempTestFilesEntry(true, true, ctbNonModule.logicalName, FileType::HEADER_UNIT, nonModule.isSystem);
+    nonModule.filePath = it.first->second.filePath;
+    nonModule.fileSize = it.first->second.fileContent.size();
+
+    uint32_t logicalNameSize = getRandomNumber(2);
+    for (uint32_t i = 0; i < logicalNameSize; ++i)
+    {
+        const auto &it2 = tempTestFiles.emplace(getRandomString(),
+                                                TestResponse{it.first->second.filePath, it.first->second.fileContent,
+                                                             FileType::HEADER_UNIT, nonModule.isSystem});
+        nonModule.logicalNames.emplace_back(it2.first->first);
+    }
+
+    uint32_t huDepSize = getRandomNumber(10);
+
+    for (uint32_t i = 1; i < huDepSize; ++i)
+    {
+        auto itHuDepMain =
+            createTempTestFilesEntry(true, true, getRandomString(), FileType::HEADER_UNIT, getRandomBool());
+        HuDep huDep;
+        huDep.isSystem = itHuDepMain.first->second.isSystem;
+        huDep.file.filePath = itHuDepMain.first->second.filePath;
+        huDep.file.fileSize = itHuDepMain.first->second.fileContent.size();
+        nonModule.huDeps.emplace_back(std::move(huDep));
+
+        logicalNameSize = getRandomNumber(10);
+        if (logicalNameSize == 0)
+        {
+            logicalNameSize = 1;
+        }
+
+        for (uint32_t j = 0; j < logicalNameSize; ++j)
+        {
+            const auto &it2 =
+                tempTestFiles.emplace(getRandomString(), TestResponse{itHuDepMain.first->second.filePath,
+                                                                      itHuDepMain.first->second.fileContent,
+                                                                      FileType::HEADER_UNIT, huDep.isSystem});
+            huDep.logicalNames.emplace_back(getRandomString());
+        }
+        nonModule.huDeps.emplace_back(std::move(huDep));
     }
 
     return nonModule;
@@ -217,3 +304,10 @@ void printMessage(const BTCLastMessage &lastMessage, const bool sent)
     printSendingOrReceiving(sent);
     print("BTCLastMessage\n\n");
 }
+
+/*
+TestResponse::TestResponse(string filePath_, string fileContent_, FileType fileType_, bool isSystem_)
+    : filePath(std::move(filePath_)), fileContent(std::move(fileContent_)), fileType(fileType_), isSystem(isSystem_)
+{
+}
+*/
