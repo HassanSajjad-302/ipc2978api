@@ -48,6 +48,9 @@ class IPCManagerCompiler : Manager
     static tl::expected<HuDep, std::string> readHuDep(std::string_view message, uint32_t &bytesRead);
     static tl::expected<HeaderFile, std::string> readHeaderFile(std::string_view message,
                                                                         uint32_t &bytesRead);
+    tl::expected<void, std::string> readLogicalNames(std::string_view message,
+                                                                        uint32_t &bytesRead,
+                                                           const BMIFileMapping &mapping, FileType type, bool isSystem);
 
     // This function is used to receive a particular message. Compiler knows what message it expects which will be the
     // template argument.
@@ -58,7 +61,7 @@ class IPCManagerCompiler : Manager
     [[nodiscard]] tl::expected<void, std::string> receiveBTCModule(const CTBModule &moduleName);
     // This function is called by findResponse if it did not find the header-unit or header-file in the
     // IPCManagerCompiler::responses cache.
-    [[nodiscard]] tl::expected<BTCNonModule, std::string> receiveBTCNonModule(const CTBNonModule &nonModule);
+    [[nodiscard]] tl::expected<void, std::string> receiveBTCNonModule(const CTBNonModule &nonModule);
 
     // Internal cache for the possible future requests.
     std::unordered_map<std::string_view, Response> responses;
@@ -110,61 +113,7 @@ template <typename T> tl::expected<T, std::string> IPCManagerCompiler::receiveMe
     }
     else if constexpr (std::is_same_v<T, BTCNonModule>)
     {
-        const auto &r = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
-        if (!r)
-        {
-            return tl::unexpected(r.error());
-        }
 
-        const auto &r2 = readBoolFromPipe(buffer, bytesRead, bytesProcessed);
-        if (!r2)
-        {
-            return tl::unexpected(r2.error());
-        }
-
-        const auto &r3 = readStringFromPipe(buffer, bytesRead, bytesProcessed);
-        if (!r3)
-        {
-            return tl::unexpected(r3.error());
-        }
-
-        const auto &r4 = readUInt32FromPipe(buffer, bytesRead, bytesProcessed);
-        if (!r4)
-        {
-            return tl::unexpected(r4.error());
-        }
-
-        const auto &r5 = readVectorOfStringFromPipe(buffer, bytesRead, bytesProcessed);
-        if (!r5)
-        {
-            return tl::unexpected(r5.error());
-        }
-
-        const auto &r6 = readVectorOfHeaderFileFromPipe(buffer, bytesRead, bytesProcessed);
-        if (!r6)
-        {
-            return tl::unexpected(r6.error());
-        }
-
-        const auto &r7 = readVectorOfHuDepFromPipe(buffer, bytesRead, bytesProcessed);
-        if (!r7)
-        {
-            return tl::unexpected(r7.error());
-        }
-
-        BTCNonModule nonModule;
-        nonModule.isHeaderUnit = *r;
-        nonModule.isSystem = *r2;
-        nonModule.filePath = *r3;
-        nonModule.fileSize = *r4;
-        nonModule.logicalNames = *r5;
-        nonModule.headerFiles = *r6;
-        nonModule.huDeps = *r7;
-
-        if (bytesRead == bytesProcessed)
-        {
-            return nonModule;
-        }
     }
     else
     {

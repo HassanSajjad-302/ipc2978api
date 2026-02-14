@@ -122,7 +122,7 @@ tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[3
 tl::expected<void, std::string> IPCManagerBS::sendMessage(const BTCModule &moduleFile) const
 {
     std::string buffer;
-    writeProcessMappingOfBMIFile(buffer, moduleFile.requested);
+    writeBMIFile(buffer, moduleFile.requested);
     buffer.push_back(moduleFile.isSystem);
     writeVectorOfModuleDep(buffer, moduleFile.modDeps);
     if (const auto &r = writeInternal(buffer); !r)

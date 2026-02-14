@@ -121,7 +121,7 @@ void Manager::writeString(std::string &buffer, const std::string_view &str)
     buffer.append(str.begin(), str.end()); // Insert all characters
 }
 
-void Manager::writeProcessMappingOfBMIFile(std::string &buffer, const BMIFile &file)
+void Manager::writeBMIFile(std::string &buffer, const BMIFile &file)
 {
     writeString(buffer, file.filePath);
     writeUInt32(buffer, file.fileSize);
@@ -130,14 +130,14 @@ void Manager::writeProcessMappingOfBMIFile(std::string &buffer, const BMIFile &f
 void Manager::writeModuleDep(std::string &buffer, const ModuleDep &dep)
 {
     buffer.push_back(dep.isHeaderUnit);
-    writeProcessMappingOfBMIFile(buffer, dep.file);
-    writeVectorOfStrings(buffer, dep.logicalNames);
+    writeBMIFile(buffer, dep.file);
     buffer.push_back(dep.isSystem);
+    writeVectorOfStrings(buffer, dep.logicalNames);
 }
 
 void Manager::writeHuDep(std::string &buffer, const HuDep &dep)
 {
-    writeProcessMappingOfBMIFile(buffer, dep.file);
+    writeBMIFile(buffer, dep.file);
     writeVectorOfStrings(buffer, dep.logicalNames);
     buffer.push_back(dep.isSystem);
 }
@@ -163,7 +163,7 @@ void Manager::writeVectorOfProcessMappingOfBMIFiles(std::string &buffer, const s
     writeUInt32(buffer, files.size());
     for (const BMIFile &file : files)
     {
-        writeProcessMappingOfBMIFile(buffer, file);
+        writeBMIFile(buffer, file);
     }
 }
 

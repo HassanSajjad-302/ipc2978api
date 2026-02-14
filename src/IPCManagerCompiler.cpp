@@ -19,6 +19,21 @@
 #include <unistd.h>
 #endif
 
+#define TRY_READ(var, func, ...)                                                                                       \
+    const auto &var = func(__VA_ARGS__);                                                                               \
+    if (!var)                                                                                                          \
+    {                                                                                                                  \
+        return tl::unexpected(var.error());                                                                            \
+    }
+
+#define TRY_READ_VAL(var, func, ...)                                                                                   \
+    const auto &var##_result = func(__VA_ARGS__);                                                                      \
+    if (!var##_result)                                                                                                 \
+    {                                                                                                                  \
+        return tl::unexpected(var##_result.error());                                                                   \
+    }                                                                                                                  \
+    auto &var = *var##_result;
+
 namespace N2978
 {
 
@@ -112,97 +127,23 @@ tl::expected<IPCManagerCompiler::BMIFileMapping, std::string> IPCManagerCompiler
     }
 }
 
-tl::expected<ModuleDep, std::string> IPCManagerCompiler::readModuleDep(const std::string_view message,
-                                                                       uint32_t &bytesRead)
+tl::expected<void, std::string> IPCManagerCompiler::readLogicalNames(const std::string_view message,
+                                                                     uint32_t &bytesRead, const BMIFileMapping &mapping,
+                                                                     const FileType type, const bool isSystem)
 {
-    const auto &r = readBool(message, bytesRead);
-    if (!r)
+    const auto &logicalNamesSize = readUInt32(message, bytesRead);
+    if (!logicalNamesSize)
     {
-        return tl::unexpected(r.error());
+        return tl::unexpected(logicalNamesSize.error());
     }
 
-    const auto &r2 = readProcessMappingOfBMIFile(message, bytesRead);
-    if (!r2)
+    for (uint32_t i = 0; i < *logicalNamesSize; ++i)
     {
-        return tl::unexpected(r2.error());
+        TRY_READ_VAL(logicalName, readString, message, bytesRead);
+        responses.emplace(logicalName, Response(mapping.file.filePath, mapping.mapping, type, isSystem));
     }
 
-    const auto &r3 = readVectorOfString(message, bytesRead);
-    if (!r3)
-    {
-        return tl::unexpected(r3.error());
-    }
-
-    const auto &r4 = readBool(message, bytesRead);
-    if (!r4)
-    {
-        return tl::unexpected(r4.error());
-    }
-
-    ModuleDep modDep;
-
-    modDep.isHeaderUnit = *r;
-    modDep.file = *r2;
-    modDep.logicalNames = *r3;
-    modDep.isSystem = *r4;
-
-    return modDep;
-}
-
-tl::expected<HuDep, std::string> IPCManagerCompiler::readHuDep(const std::string_view message, uint32_t &bytesRead)
-{
-    const auto &r = readProcessMappingOfBMIFile(message, bytesRead);
-    if (!r)
-    {
-        return tl::unexpected(r.error());
-    }
-
-    const auto &r2 = readVectorOfString(message, bytesRead);
-    if (!r2)
-    {
-        return tl::unexpected(r2.error());
-    }
-
-    const auto &r3 = readBool(message, bytesRead);
-    if (!r3)
-    {
-        return tl::unexpected(r3.error());
-    }
-
-    HuDep huDep;
-    huDep.file = *r;
-    huDep.logicalNames = *r2;
-    huDep.isSystem = *r3;
-    return huDep;
-}
-
-tl::expected<HeaderFile, std::string> IPCManagerCompiler::readHeaderFile(const std::string_view message,
-                                                                         uint32_t &bytesRead)
-{
-
-    const auto &r = readString(message, bytesRead);
-    if (!r)
-    {
-        return tl::unexpected(r.error());
-    }
-
-    const auto &r2 = readString(message, bytesRead);
-    if (!r2)
-    {
-        return tl::unexpected(r2.error());
-    }
-
-    const auto &r3 = readBool(message, bytesRead);
-    if (!r3)
-    {
-        return tl::unexpected(r3.error());
-    }
-
-    HeaderFile hf;
-    hf.logicalName = *r;
-    hf.filePath = *r2;
-    hf.isSystem = *r3;
-    return hf;
+    return {};
 }
 
 tl::expected<void, std::string> IPCManagerCompiler::receiveBTCLastMessage() const
@@ -256,101 +197,32 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCModule(const CTBMo
     std::string_view readCompilerMessage = *received;
     uint32_t bytesRead = 0;
 
-    const auto &requested = readProcessMappingOfBMIFile(readCompilerMessage, bytesRead);
-    if (!requested)
-    {
-        return tl::unexpected(requested.error());
-    }
-
-    const auto &isSystem = readBool(readCompilerMessage, bytesRead);
-    if (!isSystem)
-    {
-        return tl::unexpected(isSystem.error());
-    }
+    TRY_READ_VAL(requested, readProcessMappingOfBMIFile, readCompilerMessage, bytesRead);
+    TRY_READ_VAL(isSystem, readBool, readCompilerMessage, bytesRead);
 
     responses.emplace(moduleName.moduleName,
-                      Response(requested->file.filePath, requested->mapping, FileType::MODULE, *isSystem));
+                      Response(requested.file.filePath, requested.mapping, FileType::MODULE, isSystem));
 
-    const auto &modDepsSize = readUInt32(readCompilerMessage, bytesRead);
-    if (!modDepsSize)
+    TRY_READ_VAL(modDepsSize, readUInt32, readCompilerMessage, bytesRead);
+
+    for (uint32_t i = 0; i < modDepsSize; ++i)
     {
-        return tl::unexpected(modDepsSize.error());
+        TRY_READ_VAL(isHeaderUnit, readBool, readCompilerMessage, bytesRead);
+        TRY_READ_VAL(modDepFile, readProcessMappingOfBMIFile, readCompilerMessage, bytesRead);
+        TRY_READ_VAL(modDepIsSytem, readBool, readCompilerMessage, bytesRead);
+     TRY_READ(logicalNames, readLogicalNames, readCompilerMessage, bytesRead, modDepFile,
+                 isHeaderUnit ? FileType::HEADER_UNIT : FileType::HEADER_FILE, modDepIsSytem);
     }
 
-    for (uint32_t i = 0; i < *modDepsSize; ++i)
+    if (readCompilerMessage.size() != bytesRead)
     {
-        const auto &isHeaderUnit = readBool(readCompilerMessage, bytesRead);
-        if (!isHeaderUnit)
-        {
-            return tl::unexpected(isHeaderUnit.error());
-        }
-
-        const auto &modDepFile = readProcessMappingOfBMIFile(readCompilerMessage, bytesRead);
-        if (!modDepFile)
-        {
-            return tl::unexpected(modDepFile.error());
-        }
-
-        const auto &logicalNamesSize = readUInt32(readCompilerMessage, bytesRead);
-        if (!logicalNamesSize)
-        {
-            return tl::unexpected(logicalNamesSize.error());
-        }
-
-        for (uint32_t i = 0; i < *logicalNamesSize; ++i)
-        {
-
-        }
-
-
-        const auto &modDepIsSytem = readBool(readCompilerMessage, bytesRead);
-        if (!modDepIsSytem)
-        {
-            return tl::unexpected(modDepIsSytem.error());
-        }
-
-
-        if (isHeaderUnit)
-        {
-            // logicalNames include all the include-names of the composing-headers of the big header-unit dependency.
-            // These are mapped to the dependency big-hu in IPCManagerCompiler::responses cache. e.g. if the module
-            // "Cat" depends on the "string" which is compiled as big-hu "stl", then build-system will send all the
-            // composing include-names like "vector" etc. So if we any of these is requested later, response cache will
-            // have them mapped to the big-hu BMI "stl".
-            if (const auto &r = readSharedMemoryBMIFile(file); r)
-            {
-                filePathProcessMapping.emplace(file.filePath, r.value());
-                for (std::string s : logicalNames)
-                {
-                    responses.emplace(std::move(s),
-                                      Response(file.filePath, r.value(), FileType::HEADER_UNIT, isSystem2));
-                }
-            }
-            else
-            {
-                return tl::unexpected(r.error());
-            }
-        }
-        else
-        {
-            if (const auto &r = readSharedMemoryBMIFile(file); r)
-            {
-                filePathProcessMapping.emplace(file.filePath, r.value());
-                // logicalNames[0] is the module logicalName of the dependency module.
-                responses.emplace(logicalNames[0],
-                                  Response(std::move(file.filePath), r.value(), FileType::MODULE, isSystem2));
-            }
-            else
-            {
-                return tl::unexpected(r.error());
-            }
-        }
-
+        return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
     }
 }
 
-tl::expected<BTCNonModule, std::string> IPCManagerCompiler::receiveBTCNonModule(const CTBNonModule &nonModule)
+tl::expected<void, std::string> IPCManagerCompiler::receiveBTCNonModule(const CTBNonModule &nonModule)
 {
+
     std::string buffer = getBufferWithType(CTB::NON_MODULE);
     buffer.push_back(nonModule.isHeaderUnit);
     writeString(buffer, nonModule.logicalName);
@@ -362,73 +234,59 @@ tl::expected<BTCNonModule, std::string> IPCManagerCompiler::receiveBTCNonModule(
         return tl::unexpected(r.error());
     }
 
-    auto received = receiveMessage<BTCNonModule>();
+    char stackBuffer[BUFFERSIZE];
+    auto received = readInternal(stackBuffer);
 
     if (!received)
     {
         return tl::unexpected(received.error());
     }
 
-    auto &[isHeaderUnit, isSystem, filePath, fileSize, logicalNames, headerFiles, huDeps] = received.value();
+    std::string_view readCompilerMessage = *received;
+    uint32_t bytesRead = 0;
 
-    // the requested header-file or header-unit
-    BMIFile f;
-    f.filePath = std::move(filePath);
-    f.fileSize = fileSize;
-
-    if (isHeaderUnit)
     {
-        if (const auto &r = readSharedMemoryBMIFile(f); r)
+        TRY_READ_VAL(isHeaderUnit, readBool, readCompilerMessage, bytesRead);
+        TRY_READ_VAL(isSystem, readBool, readCompilerMessage, bytesRead);
+        TRY_READ_VAL(headerFilesSize, readUInt32, readCompilerMessage, bytesRead);
+
+        for (uint32_t i = 0; i < headerFilesSize; ++i)
         {
-            filePathProcessMapping.emplace(f.filePath, r.value());
-            for (std::string &h : logicalNames)
+            TRY_READ_VAL(logicalName, readString, readCompilerMessage, bytesRead);
+            TRY_READ_VAL(filePath, readString, readCompilerMessage, bytesRead);
+            TRY_READ_VAL(isSystemHeaderFile, readBool, readCompilerMessage, bytesRead);
+
+            responses.emplace(logicalName, Response{filePath, {}, FileType::HEADER_FILE, isSystemHeaderFile});
+        }
+
+        if (!isHeaderUnit)
+        {
+            TRY_READ_VAL(filePath, readString, readCompilerMessage, bytesRead);
+            responses.emplace(nonModule.logicalName, Response{filePath, {}, FileType::HEADER_FILE, isSystem});
+            if (readCompilerMessage.size() != bytesRead)
             {
-                // if our request was compiled as big-hu, then the logicalNames include all the composing include-names
-                // of the big-hu. e.g. if we requested "string" which was compiled as big-hu "stl", this array will
-                // include "vector", "algorithm" etc. These will be mapped to the same BMIFile. This reduces no. of
-                // messages.
-                responses.emplace(std::move(h), Response(f.filePath, r.value(), FileType::HEADER_UNIT, isSystem));
+                return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
             }
+            return {};
         }
-        else
+
+        TRY_READ_VAL(file, readProcessMappingOfBMIFile, readCompilerMessage, bytesRead);
+        TRY_READ(logicalNames, readLogicalNames, readCompilerMessage, bytesRead, file, FileType::HEADER_UNIT, isSystem);
+
+        TRY_READ_VAL(huDepsSize, readUInt32, readCompilerMessage, bytesRead);
+        for (uint32_t i = 0; i < huDepsSize; ++i)
         {
-            return tl::unexpected(r.error());
+            TRY_READ_VAL(huDepFile, readProcessMappingOfBMIFile, readCompilerMessage, bytesRead);
+            TRY_READ_VAL(huDepIsSystem, readBool, readCompilerMessage, bytesRead);
+            TRY_READ(huDeplogicalNames, readLogicalNames, readCompilerMessage, bytesRead, huDepFile,
+                     FileType::HEADER_UNIT, huDepIsSystem);
         }
     }
-
-    // All the hu-deps of this header-unit.
-    for (auto &[file, logicalHUDep, isSystem2] : huDeps)
+    if (readCompilerMessage.size() != bytesRead)
     {
-        if (const auto &r = readSharedMemoryBMIFile(file); r)
-        {
-            filePathProcessMapping.emplace(file.filePath, r.value());
-            // All the composing include-names of the dependency if any. These will be mapped to the dependency big hu.
-            for (std::string &l : logicalHUDep)
-            {
-                responses.emplace(std::move(l), Response(file.filePath, r.value(), FileType::HEADER_UNIT, isSystem2));
-            }
-        }
-        else
-        {
-            return tl::unexpected(r.error());
-        }
+        return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
     }
-
-    // if we are compiling a big hu, only then the following is received. It is only received in first request. It is
-    // the list of all the composing header-files.
-    for (auto &[logicalName, headerFilePath, isSystem2] : headerFiles)
-    {
-        BMIFile headerBMI;
-        headerBMI.filePath = std::move(headerFilePath);
-        responses.emplace(std::move(logicalName),
-                          Response(std::move(headerBMI.filePath), {}, FileType::HEADER_FILE, isSystem2));
-    }
-
-    responses.emplace(
-        nonModule.logicalName,
-        Response(std::move(f.filePath), {}, isHeaderUnit ? FileType::HEADER_UNIT : FileType::HEADER_FILE, isSystem));
-
-    return received;
+    return {};
 }
 
 tl::expected<Response, std::string> IPCManagerCompiler::findResponse(std::string logicalName, const FileType type)

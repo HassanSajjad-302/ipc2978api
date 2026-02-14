@@ -69,13 +69,14 @@ struct ModuleDep
 {
     bool isHeaderUnit;
     BMIFile file;
+    // whether header-unit / module belongs to system (ignore warnings).
+    bool isSystem = true;
     // if isHeaderUnit == true, then the following might
     // contain more than one values, as header-unit can be
     // composed of multiple header-files. And if later,
     // any of the following logicalNames is included or
     // imported, this header-unit can be used instead.
     std::vector<std::string_view> logicalNames;
-    bool isSystem = true;
 };
 
 // Reply for CTBModule
@@ -89,13 +90,13 @@ struct BTCModule
 struct HuDep
 {
     BMIFile file;
+    // whether header-unit / header-file belongs to system (ignore warnings).
+    bool isSystem = true;
     // A header-unit can be composed of
     // multiple header-files. And if later,
     // any of the following logicalNames is included or
     // imported, this header-unit can be used instead.
     std::vector<std::string_view> logicalNames;
-    // whether header-unit / header-file belongs to user or system directory.
-    bool isSystem = true;
 };
 
 struct HeaderFile
@@ -110,9 +111,12 @@ struct BTCNonModule
 {
     bool isHeaderUnit = false;
     bool isSystem = true;
+    // build-system might send the following on first request, if it knows that a
+    // header-unit is being compiled that compose multiple header-files to reduce
+    // the number of subsequent requests.
+    std::vector<HeaderFile> headerFiles;
     std::string_view filePath;
     // if isHeaderUnit == false, the following are meaning-less.
-    // Except headerFiles can be sent on the first request.
     // if isHeaderUnit == true, fileSize of the requested file.
     uint32_t fileSize;
     // A header-unit can be composed of
@@ -120,10 +124,6 @@ struct BTCNonModule
     // any of the following logicalNames is included or
     // imported, this header-unit can be used instead.
     std::vector<std::string_view> logicalNames;
-    // build-system might send the following on first request, if it knows that a
-    // header-unit is being compiled that compose multiple header-files to reduce
-    // the number of subsequent requests.
-    std::vector<HeaderFile> headerFiles;
     std::vector<HuDep> huDeps;
 };
 
