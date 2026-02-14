@@ -66,7 +66,7 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(cha
     }
 
 #else
-    std::string *output;
+    std::string *output = nullptr;
     while (true)
     {
         const uint32_t bytesRead = read(STDIN_FILENO, buffer, 4096);
