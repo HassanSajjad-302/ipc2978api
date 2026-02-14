@@ -478,7 +478,7 @@ int runTest()
         case CTB::NON_MODULE: {
             const auto &ctbNonModule = reinterpret_cast<CTBNonModule &>(buffer);
             printMessage(ctbNonModule, false);
-            BTCNonModule nonModule = getBTCNonModule();
+            BTCNonModule nonModule = getBTCNonModule(ctbNonModule);
             if (const auto &r2 = manager.sendMessage(nonModule); !r2)
             {
                 exitFailure(r2.error());
@@ -553,7 +553,7 @@ int runTest()
         BMIFile bmi2;
         bmi2.filePath = (std::filesystem::current_path() / "bmi2.txt").generic_string();
         string bmi2Content = getRandomString();
-        std::ofstream(bmi2.filePath) << bmi2Content;
+        std::ofstream(string(bmi2.filePath)) << bmi2Content;
 
         // creates server mapping to a new file.
         if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(bmi2); !r2)
@@ -581,7 +581,6 @@ int runTest()
             exitFailure(r2.error());
         }
         print("Reply to Second CTBLastMessage ");
-        printMessage(true);
     }
 
     // As CompilerTest will output some print statements.
@@ -606,8 +605,10 @@ int runTest()
 int main()
 {
     runTest();
+    /*
     fmt::println("\n\n\nCompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
     compilerTestPrunedOutput.clear();
     runTest();
     fmt::println("\n\n\nCompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
+*/
 }

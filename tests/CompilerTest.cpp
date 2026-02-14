@@ -17,11 +17,11 @@ struct CompilerTest
     explicit CompilerTest(IPCManagerCompiler *c) : compilerManager(c)
     {
     }
-    [[nodiscard]] tl::expected<BTCModule, std::string> receiveBTCModule(const CTBModule &moduleName)
+    [[nodiscard]] tl::expected<void, std::string> receiveBTCModule(const CTBModule &moduleName)
     {
         return compilerManager->receiveBTCModule(moduleName);
     }
-    [[nodiscard]] tl::expected<BTCNonModule, std::string> receiveBTCNonModule(const CTBNonModule &nonModule)
+    [[nodiscard]] tl::expected<void, std::string> receiveBTCNonModule(const CTBNonModule &nonModule)
     {
         return compilerManager->receiveBTCNonModule(nonModule);
     }
@@ -34,7 +34,7 @@ struct CompilerTest
 
 int main()
 {
-    // std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(5000));
     IPCManagerCompiler manager;
     CompilerTest t(&manager);
     std::uniform_int_distribution distribution(0, 200);
@@ -42,7 +42,8 @@ int main()
     {
         CTBNonModule nonModule;
         nonModule.isHeaderUnit = false;
-        nonModule.logicalName = getRandomString();
+        string str = getRandomString();
+        nonModule.logicalName = str;
 
         if (const auto &r2 = t.receiveBTCNonModule(nonModule); !r2)
         {
@@ -51,7 +52,6 @@ int main()
         else
         {
             printMessage(nonModule, true);
-            printMessage(*r2, false);
         }
     }
 

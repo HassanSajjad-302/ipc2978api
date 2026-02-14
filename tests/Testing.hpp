@@ -20,7 +20,7 @@ string getRandomString(uint32_t length = 0);
 bool getRandomBool();
 uint32_t getRandomNumber(uint32_t max);
 BTCModule getBTCModule();
-BTCNonModule getBTCNonModule(CTBNonModule &nonModule);
+BTCNonModule getBTCNonModule(const CTBNonModule &nonModule);
 void printSendingOrReceiving(bool sent);
 void printMessage(const CTBModule &ctbModule, bool sent);
 void printMessage(const CTBNonModule &nonModule, bool sent);

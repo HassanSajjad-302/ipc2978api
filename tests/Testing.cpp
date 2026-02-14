@@ -138,7 +138,7 @@ auto createTempTestFilesEntry(bool makeMapping, bool makeFile, const string_view
     return it;
 }
 
-BTCNonModule getBTCNonModule(CTBNonModule &ctbNonModule)
+BTCNonModule getBTCNonModule(const CTBNonModule &ctbNonModule)
 {
     BTCNonModule nonModule;
     nonModule.isHeaderUnit = getRandomBool();
@@ -201,7 +201,7 @@ BTCNonModule getBTCNonModule(CTBNonModule &ctbNonModule)
                 tempTestFiles.emplace(getRandomString(), TestResponse{itHuDepMain.first->second.filePath,
                                                                       itHuDepMain.first->second.fileContent,
                                                                       FileType::HEADER_UNIT, huDep.isSystem});
-            huDep.logicalNames.emplace_back(getRandomString());
+            huDep.logicalNames.emplace_back(it2.first->first);
         }
         nonModule.huDeps.emplace_back(std::move(huDep));
     }
@@ -305,9 +305,7 @@ void printMessage(const BTCLastMessage &lastMessage, const bool sent)
     print("BTCLastMessage\n\n");
 }
 
-/*
 TestResponse::TestResponse(string filePath_, string fileContent_, FileType fileType_, bool isSystem_)
     : filePath(std::move(filePath_)), fileContent(std::move(fileContent_)), fileType(fileType_), isSystem(isSystem_)
 {
 }
-*/

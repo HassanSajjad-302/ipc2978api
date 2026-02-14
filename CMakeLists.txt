@@ -30,7 +30,7 @@ target_include_directories(fmt PUBLIC tests/fmt/include)
 
 add_library(Testing tests/Testing.cpp)
 target_include_directories(Testing PUBLIC include)
-target_link_libraries(Testing PUBLIC fmt)
+target_link_libraries(Testing PUBLIC fmt Compiler BuildSystem)
 
 add_executable(CompilerTest tests/CompilerTest.cpp)
 add_executable(BuildSystemTest tests/BuildSystemTest.cpp)

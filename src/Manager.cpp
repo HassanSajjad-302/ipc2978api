@@ -196,7 +196,7 @@ void Manager::writeVectorOfHeaderFiles(std::string &buffer, const std::vector<He
 
 tl::expected<bool, std::string> Manager::readBool(const std::string_view message, uint32_t &bytesRead)
 {
-    if (bytesRead + 1 < message.size())
+    if (bytesRead + 1 > message.size())
     {
         return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
     }
@@ -207,7 +207,7 @@ tl::expected<bool, std::string> Manager::readBool(const std::string_view message
 
 tl::expected<uint32_t, std::string> Manager::readUInt32(const std::string_view message, uint32_t &bytesRead)
 {
-    if (bytesRead + 4 < message.size())
+    if (bytesRead + 4 > message.size())
     {
         return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
     }
@@ -225,7 +225,7 @@ tl::expected<std::string_view, std::string> Manager::readString(const std::strin
         return tl::unexpected(r.error());
     }
     const uint32_t stringSize = *r;
-    if (bytesRead + stringSize < message.size())
+    if (bytesRead + stringSize > message.size())
     {
         return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
     }
