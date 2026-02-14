@@ -16,6 +16,21 @@
 #include <unistd.h>
 #endif
 
+#define TRY_READ(var, func, ...)                                                                                       \
+    const auto &var = func(__VA_ARGS__);                                                                               \
+    if (!var)                                                                                                          \
+    {                                                                                                                  \
+        return tl::unexpected(var.error());                                                                            \
+    }
+
+#define TRY_READ_VAL(var, func, ...)                                                                                   \
+    const auto &var##_result = func(__VA_ARGS__);                                                                      \
+    if (!var##_result)                                                                                                 \
+    {                                                                                                                  \
+        return tl::unexpected(var##_result.error());                                                                   \
+    }                                                                                                                  \
+    auto &var = *var##_result;
+
 namespace N2978
 {
 
@@ -59,54 +74,29 @@ tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[3
     {
 
     case CTB::MODULE: {
-
-        const auto &r = readString(serverReadString, bytesRead);
-        if (!r)
-        {
-            return tl::unexpected(r.error());
-        }
+        TRY_READ_VAL(r, readString, serverReadString, bytesRead);
 
         messageType = CTB::MODULE;
-        getInitializedObjectFromBuffer<CTBModule>(ctbBuffer).moduleName = *r;
+        getInitializedObjectFromBuffer<CTBModule>(ctbBuffer).moduleName = r;
     }
-
     break;
 
     case CTB::NON_MODULE: {
-
-        const auto &r = readBool(serverReadString, bytesRead);
-        if (!r)
-        {
-            return tl::unexpected(r.error());
-        }
-
-        const auto &r2 = readString(serverReadString, bytesRead);
-        if (!r2)
-        {
-            return tl::unexpected(r.error());
-        }
-
+        TRY_READ_VAL(r, readBool, serverReadString, bytesRead);
+        TRY_READ_VAL(r2, readString, serverReadString, bytesRead);
         messageType = CTB::NON_MODULE;
         auto &[isHeaderUnit, str] = getInitializedObjectFromBuffer<CTBNonModule>(ctbBuffer);
-        isHeaderUnit = *r;
-        str = *r2;
+        isHeaderUnit = r;
+        str = r2;
     }
-
     break;
 
     case CTB::LAST_MESSAGE: {
-
-        const auto &fileSizeExpected = readUInt32(serverReadString, bytesRead);
-        if (!fileSizeExpected)
-        {
-            return tl::unexpected(fileSizeExpected.error());
-        }
+        TRY_READ_VAL(fileSizeExpected, readUInt32, serverReadString, bytesRead);
 
         messageType = CTB::LAST_MESSAGE;
-
         auto &[fileSize] = getInitializedObjectFromBuffer<CTBLastMessage>(ctbBuffer);
-
-        fileSize = *fileSizeExpected;
+        fileSize = fileSizeExpected;
     }
     break;
     }

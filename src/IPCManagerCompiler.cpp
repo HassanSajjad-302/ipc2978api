@@ -56,7 +56,7 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(cha
 #ifdef _WIN32
     const bool success = ReadFile((HANDLE)STD_INPUT_HANDLE, // pipe handle
                                   buffer,                   // buffer to receive reply
-                                  BUFFERSIZE,               // size of buffer
+                                  4096,               // size of buffer
                                   LPDWORD(&bytesRead),      // number of bytes read
                                   nullptr);                 // not overlapped
 
@@ -69,7 +69,7 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(cha
     std::string *output;
     while (true)
     {
-        const uint32_t bytesRead = read(STDIN_FILENO, buffer, BUFFERSIZE);
+        const uint32_t bytesRead = read(STDIN_FILENO, buffer, 4096);
         if (bytesRead == -1)
         {
             return tl::unexpected(getErrorString());
@@ -183,7 +183,7 @@ tl::expected<void, std::string> IPCManagerCompiler::readLogicalNames(const std::
 
 tl::expected<void, std::string> IPCManagerCompiler::receiveBTCLastMessage() const
 {
-    char buffer[BUFFERSIZE];
+    char buffer[4096];
     uint32_t bytesRead;
     if (const auto &r = readInternal(buffer); !r)
     {
@@ -221,7 +221,7 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCModule(const CTBMo
         return tl::unexpected(r.error());
     }
 
-    char stackBuffer[BUFFERSIZE];
+    char stackBuffer[4096];
     auto received = readInternal(stackBuffer);
 
     if (!received)
@@ -258,7 +258,6 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCModule(const CTBMo
 
 tl::expected<void, std::string> IPCManagerCompiler::receiveBTCNonModule(const CTBNonModule &nonModule)
 {
-
     std::string buffer = getBufferWithType(CTB::NON_MODULE);
     buffer.push_back(nonModule.isHeaderUnit);
     writeString(buffer, nonModule.logicalName);
@@ -270,7 +269,7 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCNonModule(const CT
         return tl::unexpected(r.error());
     }
 
-    char stackBuffer[BUFFERSIZE];
+    char stackBuffer[4096];
     auto received = readInternal(stackBuffer);
 
     if (!received)

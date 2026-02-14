@@ -33,7 +33,7 @@ class IPCManagerCompiler : Manager
     friend struct ::CompilerTest;
     friend struct ::BuildSystemTest;
 
-    tl::expected<std::string_view, std::string> readInternal(char (&buffer)[BUFFERSIZE]) const;
+    tl::expected<std::string_view, std::string> readInternal(char (&buffer)[4096]) const;
     tl::expected<void, std::string> writeInternal(std::string_view buffer) const override;
 
     struct BMIFileMapping

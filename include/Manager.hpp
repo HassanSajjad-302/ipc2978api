@@ -8,13 +8,6 @@
 #include <string>
 #include <vector>
 
-#define BUFFERSIZE 4096
-
-#ifdef _WIN32
-// The following variable is used in CreateNamedFunction.
-#define PIPE_TIMEOUT 5000
-#endif
-
 namespace tl
 {
 template <typename T, typename U> class expected;

@@ -14,9 +14,9 @@ void exitFailure(const string &str)
     exit(EXIT_FAILURE);
 }
 
-string fileToString(const string &file_name)
+string fileToString(const string_view file_name)
 {
-    std::ifstream file_stream{file_name};
+    std::ifstream file_stream{string(file_name)};
 
     if (file_stream.fail())
     {

@@ -6,14 +6,14 @@
 #include <random>
 #include <string>
 
-using std::string;
+using std::string, std::string_view;
 using namespace N2978;
 
 inline std::random_device rd;
 inline std::mt19937 generator(rd());
 
 void exitFailure(const string &str);
-string fileToString(const string &file_name);
+string fileToString(string_view file_name);
 string getRandomString(uint32_t length = 0);
 bool getRandomBool();
 uint32_t getRandomNumber(uint32_t max);
