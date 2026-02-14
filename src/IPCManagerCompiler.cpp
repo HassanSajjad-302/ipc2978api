@@ -42,9 +42,17 @@ Response::Response(std::string_view filePath_, const Mapping &mapping_, const Fi
 {
 }
 
+static bool endsWith(const std::string_view str, const std::string &suffix)
+{
+    if (suffix.size() > str.size())
+    {
+        return false;
+    }
+    return str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
 tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(char (&buffer)[4096]) const
 {
-    int32_t bytesRead;
 #ifdef _WIN32
     const bool success = ReadFile((HANDLE)STD_INPUT_HANDLE, // pipe handle
                                   buffer,                   // buffer to receive reply
@@ -58,20 +66,47 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(cha
     }
 
 #else
-    bytesRead = read(STDIN_FILENO, buffer, BUFFERSIZE);
-    if (bytesRead == -1)
+    std::string *output;
+    while (true)
     {
-        return tl::unexpected(getErrorString());
+        const uint32_t bytesRead = read(STDIN_FILENO, buffer, BUFFERSIZE);
+        if (bytesRead == -1)
+        {
+            return tl::unexpected(getErrorString());
+        }
+        if (!bytesRead)
+        {
+            return tl::unexpected(getErrorString(ErrorCategory::READ_FILE_ZERO_BYTES_READ));
+        }
+
+        // We will return once we receive the delimiter. If string is in 4kb then we don't make an allocation.
+        if (endsWith(std::string_view{buffer, bytesRead}, delimiter))
+        {
+            if (output)
+            {
+                output->append(buffer, bytesRead);
+                if (output->size() < 4 + strlen(delimiter))
+                {
+                    return tl::unexpected(
+                        "N2978 Error: Received string only has delimiter but not the size of payload\n");
+                }
+                return std::string_view{output->data(), output->size() - 4 - strlen(delimiter)};
+            }
+
+            if (bytesRead < 4 + strlen(delimiter))
+            {
+                return tl::unexpected("N2978 Error: Received string only has delimiter but not the size of payload\n");
+            }
+            return std::string_view{buffer, bytesRead - strlen(delimiter)};
+        }
+
+        if (!output)
+        {
+            output = new std::string{};
+        }
+        output->append(buffer, bytesRead);
     }
 #endif
-
-    if (!bytesRead)
-    {
-        return tl::unexpected(getErrorString(ErrorCategory::READ_FILE_ZERO_BYTES_READ));
-    }
-
-    return {};
-    // return bytesRead;
 }
 
 tl::expected<void, std::string> IPCManagerCompiler::writeInternal(const std::string_view buffer) const
@@ -193,31 +228,32 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCModule(const CTBMo
     {
         return tl::unexpected(received.error());
     }
+    std::string_view message = *received;
 
-    std::string_view readCompilerMessage = *received;
     uint32_t bytesRead = 0;
 
-    TRY_READ_VAL(requested, readProcessMappingOfBMIFile, readCompilerMessage, bytesRead);
-    TRY_READ_VAL(isSystem, readBool, readCompilerMessage, bytesRead);
+    TRY_READ_VAL(requested, readProcessMappingOfBMIFile, message, bytesRead);
+    TRY_READ_VAL(isSystem, readBool, message, bytesRead);
 
-    responses.emplace(moduleName.moduleName,
-                      Response(requested.file.filePath, requested.mapping, FileType::MODULE, isSystem));
+    std::string *str = new std::string(moduleName.moduleName);
+    responses.emplace(*str, Response(requested.file.filePath, requested.mapping, FileType::MODULE, isSystem));
 
-    TRY_READ_VAL(modDepsSize, readUInt32, readCompilerMessage, bytesRead);
+    TRY_READ_VAL(modDepsSize, readUInt32, message, bytesRead);
 
     for (uint32_t i = 0; i < modDepsSize; ++i)
     {
-        TRY_READ_VAL(isHeaderUnit, readBool, readCompilerMessage, bytesRead);
-        TRY_READ_VAL(modDepFile, readProcessMappingOfBMIFile, readCompilerMessage, bytesRead);
-        TRY_READ_VAL(modDepIsSytem, readBool, readCompilerMessage, bytesRead);
-     TRY_READ(logicalNames, readLogicalNames, readCompilerMessage, bytesRead, modDepFile,
+        TRY_READ_VAL(isHeaderUnit, readBool, message, bytesRead);
+        TRY_READ_VAL(modDepFile, readProcessMappingOfBMIFile, message, bytesRead);
+        TRY_READ_VAL(modDepIsSytem, readBool, message, bytesRead);
+        TRY_READ(logicalNames, readLogicalNames, message, bytesRead, modDepFile,
                  isHeaderUnit ? FileType::HEADER_UNIT : FileType::HEADER_FILE, modDepIsSytem);
     }
 
-    if (readCompilerMessage.size() != bytesRead)
+    if (message.size() != bytesRead)
     {
         return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
     }
+    return {};
 }
 
 tl::expected<void, std::string> IPCManagerCompiler::receiveBTCNonModule(const CTBNonModule &nonModule)
@@ -245,43 +281,43 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCNonModule(const CT
     std::string_view readCompilerMessage = *received;
     uint32_t bytesRead = 0;
 
+    TRY_READ_VAL(isHeaderUnit, readBool, readCompilerMessage, bytesRead);
+    TRY_READ_VAL(isSystem, readBool, readCompilerMessage, bytesRead);
+    TRY_READ_VAL(headerFilesSize, readUInt32, readCompilerMessage, bytesRead);
+
+    for (uint32_t i = 0; i < headerFilesSize; ++i)
     {
-        TRY_READ_VAL(isHeaderUnit, readBool, readCompilerMessage, bytesRead);
-        TRY_READ_VAL(isSystem, readBool, readCompilerMessage, bytesRead);
-        TRY_READ_VAL(headerFilesSize, readUInt32, readCompilerMessage, bytesRead);
+        TRY_READ_VAL(logicalName, readString, readCompilerMessage, bytesRead);
+        TRY_READ_VAL(filePath, readString, readCompilerMessage, bytesRead);
+        TRY_READ_VAL(isSystemHeaderFile, readBool, readCompilerMessage, bytesRead);
 
-        for (uint32_t i = 0; i < headerFilesSize; ++i)
-        {
-            TRY_READ_VAL(logicalName, readString, readCompilerMessage, bytesRead);
-            TRY_READ_VAL(filePath, readString, readCompilerMessage, bytesRead);
-            TRY_READ_VAL(isSystemHeaderFile, readBool, readCompilerMessage, bytesRead);
-
-            responses.emplace(logicalName, Response{filePath, {}, FileType::HEADER_FILE, isSystemHeaderFile});
-        }
-
-        if (!isHeaderUnit)
-        {
-            TRY_READ_VAL(filePath, readString, readCompilerMessage, bytesRead);
-            responses.emplace(nonModule.logicalName, Response{filePath, {}, FileType::HEADER_FILE, isSystem});
-            if (readCompilerMessage.size() != bytesRead)
-            {
-                return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
-            }
-            return {};
-        }
-
-        TRY_READ_VAL(file, readProcessMappingOfBMIFile, readCompilerMessage, bytesRead);
-        TRY_READ(logicalNames, readLogicalNames, readCompilerMessage, bytesRead, file, FileType::HEADER_UNIT, isSystem);
-
-        TRY_READ_VAL(huDepsSize, readUInt32, readCompilerMessage, bytesRead);
-        for (uint32_t i = 0; i < huDepsSize; ++i)
-        {
-            TRY_READ_VAL(huDepFile, readProcessMappingOfBMIFile, readCompilerMessage, bytesRead);
-            TRY_READ_VAL(huDepIsSystem, readBool, readCompilerMessage, bytesRead);
-            TRY_READ(huDeplogicalNames, readLogicalNames, readCompilerMessage, bytesRead, huDepFile,
-                     FileType::HEADER_UNIT, huDepIsSystem);
-        }
+        responses.emplace(logicalName, Response{filePath, {}, FileType::HEADER_FILE, isSystemHeaderFile});
     }
+
+    if (!isHeaderUnit)
+    {
+        TRY_READ_VAL(filePath, readString, readCompilerMessage, bytesRead);
+        std::string *str = new std::string(nonModule.logicalName);
+        responses.emplace(*str, Response{filePath, {}, FileType::HEADER_FILE, isSystem});
+        if (readCompilerMessage.size() != bytesRead)
+        {
+            return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
+        }
+        return {};
+    }
+
+    TRY_READ_VAL(file, readProcessMappingOfBMIFile, readCompilerMessage, bytesRead);
+    TRY_READ(logicalNames, readLogicalNames, readCompilerMessage, bytesRead, file, FileType::HEADER_UNIT, isSystem);
+
+    TRY_READ_VAL(huDepsSize, readUInt32, readCompilerMessage, bytesRead);
+    for (uint32_t i = 0; i < huDepsSize; ++i)
+    {
+        TRY_READ_VAL(huDepFile, readProcessMappingOfBMIFile, readCompilerMessage, bytesRead);
+        TRY_READ_VAL(huDepIsSystem, readBool, readCompilerMessage, bytesRead);
+        TRY_READ(huDeplogicalNames, readLogicalNames, readCompilerMessage, bytesRead, huDepFile, FileType::HEADER_UNIT,
+                 huDepIsSystem);
+    }
+
     if (readCompilerMessage.size() != bytesRead)
     {
         return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
@@ -289,7 +325,7 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCNonModule(const CT
     return {};
 }
 
-tl::expected<Response, std::string> IPCManagerCompiler::findResponse(std::string logicalName, const FileType type)
+tl::expected<Response, std::string> IPCManagerCompiler::findResponse(std::string_view logicalName, const FileType type)
 {
 #ifdef _WIN32
     if (type != FileType::MODULE)

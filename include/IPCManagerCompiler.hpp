@@ -43,18 +43,13 @@ class IPCManagerCompiler : Manager
     };
 
     tl::expected<BMIFileMapping, std::string> readProcessMappingOfBMIFile(std::string_view message,
-                                                                                  uint32_t &bytesRead);
+                                                                          uint32_t &bytesRead);
     static tl::expected<ModuleDep, std::string> readModuleDep(std::string_view message, uint32_t &bytesRead);
     static tl::expected<HuDep, std::string> readHuDep(std::string_view message, uint32_t &bytesRead);
-    static tl::expected<HeaderFile, std::string> readHeaderFile(std::string_view message,
-                                                                        uint32_t &bytesRead);
-    tl::expected<void, std::string> readLogicalNames(std::string_view message,
-                                                                        uint32_t &bytesRead,
-                                                           const BMIFileMapping &mapping, FileType type, bool isSystem);
+    static tl::expected<HeaderFile, std::string> readHeaderFile(std::string_view message, uint32_t &bytesRead);
+    tl::expected<void, std::string> readLogicalNames(std::string_view message, uint32_t &bytesRead,
+                                                     const BMIFileMapping &mapping, FileType type, bool isSystem);
 
-    // This function is used to receive a particular message. Compiler knows what message it expects which will be the
-    // template argument.
-    template <typename T> tl::expected<T, std::string> receiveMessage() const;
     // Called by sendCTBLastMessage. Build-system will send this after it has created the BMI file-mapping.
     [[nodiscard]] tl::expected<void, std::string> receiveBTCLastMessage() const;
     // This function is called by findResponse if it did not find the module in the IPCManagerCompiler::responses cache.
@@ -82,7 +77,7 @@ class IPCManagerCompiler : Manager
 
     // For FileType::HEADER_FILE, it can return FileType::HEADER_UNIT, otherwise it will return the request
     // response. Either it will return from the cache or it will fetch it from the build-system
-    [[nodiscard]] tl::expected<Response, std::string> findResponse(std::string logicalName, FileType type);
+    [[nodiscard]] tl::expected<Response, std::string> findResponse(std::string_view logicalName, FileType type);
     // This function should not be called if the compilation failed as the build-system does not expect to receive BMI
     // if the compilation failed. Hence, it will not create the file-mapping and nor will it send BTCLastMessage, so the
     // compiler process will indefinitely hang.
@@ -91,43 +86,5 @@ class IPCManagerCompiler : Manager
 };
 
 inline IPCManagerCompiler *managerCompiler;
-
-template <typename T> tl::expected<T, std::string> IPCManagerCompiler::receiveMessage() const
-{
-    // Read from the pipe.
-    char buffer[BUFFERSIZE];
-    uint32_t bytesRead;
-    if (const auto &r = readInternal(buffer); !r)
-    {
-        return tl::unexpected(r.error());
-    }
-    else
-    {
-        bytesRead = *r;
-    }
-
-    uint32_t bytesProcessed = 0;
-
-    if constexpr (std::is_same_v<T, BTCModule>)
-    {
-    }
-    else if constexpr (std::is_same_v<T, BTCNonModule>)
-    {
-
-    }
-    else
-    {
-        static_assert(false && "Unknown type\n");
-    }
-
-    if (bytesRead != bytesProcessed)
-    {
-        return tl::unexpected(getErrorString(bytesRead, bytesProcessed));
-    }
-    std::string str = __FILE__;
-    str += ':';
-    str += std::to_string(__LINE__);
-    return tl::unexpected(getErrorString("N2978 IPC API internal error" + str));
-}
 } // namespace N2978
 #endif // IPC_MANAGER_COMPILER_HPP

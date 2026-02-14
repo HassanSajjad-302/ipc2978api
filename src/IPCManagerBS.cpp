@@ -60,7 +60,7 @@ tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[3
 
     case CTB::MODULE: {
 
-        const auto &r = readStringFromPipe(serverReadString, bytesRead);
+        const auto &r = readString(serverReadString, bytesRead);
         if (!r)
         {
             return tl::unexpected(r.error());
@@ -74,13 +74,13 @@ tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[3
 
     case CTB::NON_MODULE: {
 
-        const auto &r = readBoolFromPipe(serverReadString, bytesRead);
+        const auto &r = readBool(serverReadString, bytesRead);
         if (!r)
         {
             return tl::unexpected(r.error());
         }
 
-        const auto &r2 = readStringFromPipe(serverReadString, bytesRead);
+        const auto &r2 = readString(serverReadString, bytesRead);
         if (!r2)
         {
             return tl::unexpected(r.error());
@@ -96,7 +96,7 @@ tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[3
 
     case CTB::LAST_MESSAGE: {
 
-        const auto &fileSizeExpected = readUInt32FromPipe(serverReadString, bytesRead);
+        const auto &fileSizeExpected = readUInt32(serverReadString, bytesRead);
         if (!fileSizeExpected)
         {
             return tl::unexpected(fileSizeExpected.error());
