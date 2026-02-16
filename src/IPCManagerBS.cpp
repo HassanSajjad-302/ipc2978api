@@ -129,14 +129,14 @@ tl::expected<void, std::string> IPCManagerBS::sendMessage(const BTCNonModule &no
     buffer.push_back(nonModule.isHeaderUnit);
     buffer.push_back(nonModule.isSystem);
     writeVectorOfHeaderFiles(buffer, nonModule.headerFiles);
-    writeString(buffer, nonModule.filePath);
+    writePath(buffer, nonModule.filePath);
     if (nonModule.isHeaderUnit)
     {
         writeUInt32(buffer, nonModule.fileSize);
         writeVectorOfStrings(buffer, nonModule.logicalNames);
         writeVectorOfHuDeps(buffer, nonModule.huDeps);
-        buffer.append(delimiter, strlen(delimiter));
     }
+    buffer.append(delimiter, strlen(delimiter));
     if (const auto &r = writeInternal(buffer); !r)
     {
         return tl::unexpected(r.error());

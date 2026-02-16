@@ -62,6 +62,8 @@ class Manager
     static std::string getBufferWithType(CTB type);
     static void writeUInt32(std::string &buffer, uint32_t value);
     static void writeString(std::string &buffer, const std::string_view &str);
+    // path is used in system calls. so it is followed by null character while the normal string is not.
+    static void writePath(std::string &buffer, const std::string_view &str);
     static void writeBMIFile(std::string &buffer, const BMIFile &file);
     static void writeModuleDep(std::string &buffer, const ModuleDep &dep);
     static void writeHuDep(std::string &buffer, const HuDep &dep);
@@ -74,8 +76,10 @@ class Manager
 
     static tl::expected<bool, std::string> readBool(std::string_view message, uint32_t &bytesRead);
     static tl::expected<uint32_t, std::string> readUInt32(std::string_view message, uint32_t &bytesRead);
-    static tl::expected<std::string_view, std::string> readString(std::string_view message,
-                                                                          uint32_t &bytesRead);
+    static tl::expected<std::string_view, std::string> readString(std::string_view message, uint32_t &bytesRead);
+
+    // path is used in system calls. so it is followed by null character while the normal string is not.
+    static tl::expected<std::string_view, std::string> readPath(std::string_view message, uint32_t &bytesRead);
 };
 
 template <typename T, typename... Args> constexpr T *construct_at(T *p, Args &&...args)

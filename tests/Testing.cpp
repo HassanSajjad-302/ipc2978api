@@ -16,6 +16,7 @@ void exitFailure(const string &str)
 {
     print(stderr, "{}\n", str);
     print("Test Failed\n");
+    string str2 = str;
     exit(EXIT_FAILURE);
 }
 
@@ -187,7 +188,6 @@ BTCNonModule getBTCNonModule(const CTBNonModule &ctbNonModule)
         huDep.isSystem = itHuDepMain.first->second.isSystem;
         huDep.file.filePath = itHuDepMain.first->second.filePath;
         huDep.file.fileSize = itHuDepMain.first->second.fileContent.size();
-        nonModule.huDeps.emplace_back(std::move(huDep));
 
         logicalNameSize = getRandomNumber(10);
         if (logicalNameSize == 0)

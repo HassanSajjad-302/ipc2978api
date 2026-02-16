@@ -121,9 +121,16 @@ void Manager::writeString(std::string &buffer, const std::string_view &str)
     buffer.append(str.begin(), str.end()); // Insert all characters
 }
 
+void Manager::writePath(std::string &buffer, const std::string_view &str)
+{
+    writeUInt32(buffer, str.size());
+    buffer.append(str.begin(), str.end()); // Insert all characters
+    buffer.push_back('\0');
+}
+
 void Manager::writeBMIFile(std::string &buffer, const BMIFile &file)
 {
-    writeString(buffer, file.filePath);
+    writePath(buffer, file.filePath);
     writeUInt32(buffer, file.fileSize);
 }
 
@@ -138,14 +145,14 @@ void Manager::writeModuleDep(std::string &buffer, const ModuleDep &dep)
 void Manager::writeHuDep(std::string &buffer, const HuDep &dep)
 {
     writeBMIFile(buffer, dep.file);
-    writeVectorOfStrings(buffer, dep.logicalNames);
     buffer.push_back(dep.isSystem);
+    writeVectorOfStrings(buffer, dep.logicalNames);
 }
 
 void Manager::writeHeaderFile(std::string &buffer, const HeaderFile &dep)
 {
     writeString(buffer, dep.logicalName);
-    writeString(buffer, dep.filePath);
+    writePath(buffer, dep.filePath);
     buffer.push_back(dep.isSystem);
 }
 
@@ -216,8 +223,7 @@ tl::expected<uint32_t, std::string> Manager::readUInt32(const std::string_view m
     return result;
 }
 
-tl::expected<std::string_view, std::string> Manager::readString(const std::string_view message,
-                                                                        uint32_t &bytesRead)
+tl::expected<std::string_view, std::string> Manager::readString(const std::string_view message, uint32_t &bytesRead)
 {
     auto r = readUInt32(message, bytesRead);
     if (!r)
@@ -231,6 +237,25 @@ tl::expected<std::string_view, std::string> Manager::readString(const std::strin
     }
     std::string_view result = {message.data() + bytesRead, stringSize};
     bytesRead += stringSize;
+    return result;
+}
+
+tl::expected<std::string_view, std::string> Manager::readPath(const std::string_view message, uint32_t &bytesRead)
+{
+    auto r = readUInt32(message, bytesRead);
+    if (!r)
+    {
+        return tl::unexpected(r.error());
+    }
+    const uint32_t stringSize = *r;
+    if (bytesRead + stringSize > message.size())
+    {
+        return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
+    }
+    std::string_view result = {message.data() + bytesRead, stringSize};
+    bytesRead += stringSize;
+    // This string is followed by \0
+    bytesRead += 1;
     return result;
 }
 

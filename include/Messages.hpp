@@ -12,6 +12,7 @@ namespace N2978
 // BTC --> Build-System to Compiler
 
 // string_view is 4 bytes that hold the size of the char array, followed by the array.
+// string_view representing the filePath is followed by null terminator.
 // vector is 4 bytes that hold the size of the array, followed by the array.
 // All fields are sent in declaration order, even if meaningless.
 
