@@ -79,20 +79,24 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(cha
             return tl::unexpected(getErrorString(ErrorCategory::READ_FILE_ZERO_BYTES_READ));
         }
 
-        // We will return once we receive the delimiter. If string is in 4kb then we don't make an allocation.
+        // We will return once we receive the delimiter.
         if (endsWith(std::string_view{buffer, bytesRead}, delimiter))
         {
             if (output)
             {
-                output->append(buffer, bytesRead);
-                return std::string_view{output->data(), output->size() - strlen(delimiter)};
+                output->append(buffer, bytesRead - strlen(delimiter));
             }
-
-            if (bytesRead < strlen(delimiter))
+            else
             {
-                return tl::unexpected("N2978 Error: Received string only has delimiter but not the size of payload\n");
+                if (bytesRead < strlen(delimiter))
+                {
+                    return tl::unexpected(
+                        "N2978 Error: Received string only has delimiter but not the size of payload\n");
+                }
+                output = new std::string(buffer, bytesRead - strlen(delimiter));
+                allocations.emplace_back(output);
             }
-            return std::string_view{buffer, bytesRead - strlen(delimiter)};
+            return *output;
         }
 
         if (!output)
@@ -299,7 +303,6 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCNonModule(const CT
 
     TRY_READ(logicalNames, readLogicalNames, readCompilerMessage, bytesRead, file, FileType::HEADER_UNIT, isSystem);
 
-    uint32_t responsesSize = responses.size();
     TRY_READ_VAL(huDepsSize, readUInt32, readCompilerMessage, bytesRead);
     for (uint32_t i = 0; i < huDepsSize; ++i)
     {

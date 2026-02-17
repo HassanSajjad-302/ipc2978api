@@ -5,6 +5,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <set>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -15,7 +16,7 @@
 #include <unistd.h>
 #endif
 
-using fmt::print, std::string_view;
+using fmt::print, std::string_view, std::set;
 
 struct RunCommand
 {
@@ -503,6 +504,37 @@ int runTest()
         }
     }
 
+    string output;
+    set<string> files;
+    for (auto &r : tempTestFiles)
+    {
+        output.append(fmt::format("Key {}\n", r.first));
+        if (TestResponse &response = r.second; files.emplace(response.filePath).second)
+        {
+            auto getFileType = [](const FileType type) {
+                switch (type)
+                {
+                case FileType::HEADER_FILE: {
+                    return "Header-File";
+                }
+
+                case FileType::MODULE: {
+                    return "Module";
+                }
+
+                case FileType::HEADER_UNIT: {
+                    return "Header-Unit";
+                }
+                }
+            };
+
+            output.append(fmt::format("Filepath {}\n", response.filePath));
+            output.append(fmt::format("FileContent {}\n", response.fileContent));
+            output.append(fmt::format("FileType {}\n", getFileType(response.type)));
+            output.append(fmt::format("IsSystem {}\n", response.isSystem));
+        }
+    }
+
     // We have received a message for memory mapped BMI File. We will first create the server memory mapping. And then
     // close that mapping. And then create the client memory mapping, print out the file contents. And then close that
     // mapping. And then finally send the BTCLastMessage. This makes code coverage 100%.
@@ -532,10 +564,16 @@ int runTest()
     }
     else
     {
-        if (const auto &processMappingOfBMIFile = r2.value();
-            fileToString(bmi.filePath) != processMappingOfBMIFile.file)
+        string bmiText = fileToString(bmi.filePath);
+        if (bmiText != r2->file)
         {
             exitFailure(fmt::format("File Contents not similar for {}", bmi.filePath));
+        }
+        if (r2->file != output)
+        {
+            exitFailure(fmt::format("Mapping Contents not similar to output. MappingSize {} Output-Size {}\n\n "
+                                    "Mapping\n\n{}\n\n\nOutput\n\n{}\n",
+                                    r2->file.size(), output.size(), r2->file, output));
         }
         if (const auto &r3 = IPCManagerCompiler::closeBMIFileMapping(r2.value()); !r3)
         {
@@ -599,6 +637,12 @@ int runTest()
     if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(bmi2Mapping); !r2)
     {
         exitFailure(r2.error());
+    }
+
+
+    for (string *alloc : buildTestallocations)
+    {
+        delete alloc;
     }
 
     return EXIT_SUCCESS;

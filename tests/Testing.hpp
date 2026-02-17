@@ -12,7 +12,7 @@ using std::string, std::string_view, std::vector, std::map;
 using namespace N2978;
 
 inline std::random_device rd;
-inline std::mt19937 generator(rd());
+inline std::mt19937 generator(2);
 
 void exitFailure(const string &str);
 string fileToString(string_view file_name);
@@ -32,11 +32,12 @@ void printMessage(const BTCLastMessage &lastMessage, bool sent);
 struct TestResponse{
     string filePath;
     string fileContent;
-    FileType fileType;
+    FileType type;
     bool isSystem;
     TestResponse(string filePath_, string fileContent_, FileType fileType_, bool isSystem_);
 };
 
-inline map<string, TestResponse> tempTestFiles;
+inline std::map<string_view, TestResponse> tempTestFiles;
+inline vector<string *> buildTestallocations;
 
 #endif // TESTING_HPP

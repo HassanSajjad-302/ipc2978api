@@ -3,7 +3,9 @@
 #include "Testing.hpp"
 #include "fmt/printf.h"
 #include <filesystem>
+#include <fstream>
 #include <random>
+#include <set>
 #include <string>
 #include <thread>
 
@@ -13,6 +15,10 @@ using namespace N2978;
 
 struct CompilerTest
 {
+    static decltype(IPCManagerCompiler::responses) &getResponse(IPCManagerCompiler &manager)
+    {
+        return manager.responses;
+    }
     IPCManagerCompiler *compilerManager;
     explicit CompilerTest(IPCManagerCompiler *c) : compilerManager(c)
     {
@@ -34,11 +40,10 @@ struct CompilerTest
 
 int main()
 {
-    // std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(5000));
     IPCManagerCompiler manager;
     CompilerTest t(&manager);
-    std::uniform_int_distribution distribution(0, 200);
-    for (uint64_t i = 0; i < distribution(generator); ++i)
+    for (uint64_t i = 0; i < 1; ++i)
     {
         CTBNonModule nonModule;
         nonModule.isHeaderUnit = false;
@@ -55,7 +60,53 @@ int main()
         }
     }
 
-    const string bmi1Content = getRandomString();
+    map<string_view, Response> outputResponses;
+    for (auto &r : CompilerTest::getResponse(manager))
+    {
+        outputResponses.emplace(r);
+    }
+
+    set<string> files;
+    std::string output;
+    for (auto &r : outputResponses)
+    {
+        output.append(fmt::format("Key {}\n", r.first));
+
+        if (const Response &response = r.second; files.emplace(response.filePath).second)
+        {
+            auto getFileType = [](const FileType type) {
+                switch (type)
+                {
+                case FileType::HEADER_FILE: {
+                    return "Header-File";
+                }
+
+                case FileType::MODULE: {
+                    return "Module";
+                }
+
+                case FileType::HEADER_UNIT: {
+                    return "Header-Unit";
+                }
+                }
+            };
+
+            output.append(fmt::format("Filepath {}\n", response.filePath));
+            if (response.type == FileType::HEADER_FILE)
+            {
+                string fileContents = fileToString(response.filePath);
+                output.append(fmt::format("FileContent {}\n", fileContents));
+            }
+            else
+            {
+                output.append(fmt::format("FileContent {}\n", response.mapping.file));
+            }
+            output.append(fmt::format("FileType {}\n", getFileType(response.type)));
+            output.append(fmt::format("IsSystem {}\n", response.isSystem));
+        }
+    }
+
+    const string bmi1Content = output;
     print("Sending first bmi-content.");
     if (const auto &r2 =
             manager.sendCTBLastMessage(bmi1Content, (std::filesystem::current_path() / "bmi.txt").generic_string());

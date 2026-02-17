@@ -124,7 +124,9 @@ auto createTempTestFilesEntry(bool makeMapping, bool makeFile, const string_view
     const string filePath = (current_path() / str).string();
     const string fileContents = getRandomString();
     std::ofstream(filePath) << fileContents;
-    const auto &it = tempTestFiles.emplace(key, TestResponse{filePath, fileContents, fileType, isSystem});
+    string *s = new string(key);
+    buildTestallocations.emplace_back(s);
+    const auto &it = tempTestFiles.emplace(*s, TestResponse{filePath, fileContents, fileType, isSystem});
 
     if (makeMapping)
     {
@@ -172,9 +174,11 @@ BTCNonModule getBTCNonModule(const CTBNonModule &ctbNonModule)
     uint32_t logicalNameSize = getRandomNumber(2);
     for (uint32_t i = 0; i < logicalNameSize; ++i)
     {
-        const auto &it2 = tempTestFiles.emplace(getRandomString(),
-                                                TestResponse{it.first->second.filePath, it.first->second.fileContent,
-                                                             FileType::HEADER_UNIT, nonModule.isSystem});
+        string *s = new string(getRandomString());
+        buildTestallocations.emplace_back(s);
+        const auto &it2 =
+            tempTestFiles.emplace(*s, TestResponse{it.first->second.filePath, it.first->second.fileContent,
+                                                   FileType::HEADER_UNIT, nonModule.isSystem});
         nonModule.logicalNames.emplace_back(it2.first->first);
     }
 
@@ -197,10 +201,11 @@ BTCNonModule getBTCNonModule(const CTBNonModule &ctbNonModule)
 
         for (uint32_t j = 0; j < logicalNameSize; ++j)
         {
-            const auto &it2 =
-                tempTestFiles.emplace(getRandomString(), TestResponse{itHuDepMain.first->second.filePath,
-                                                                      itHuDepMain.first->second.fileContent,
-                                                                      FileType::HEADER_UNIT, huDep.isSystem});
+            string *s = new string(getRandomString());
+            buildTestallocations.emplace_back(s);
+            const auto &it2 = tempTestFiles.emplace(*s, TestResponse{itHuDepMain.first->second.filePath,
+                                                                     itHuDepMain.first->second.fileContent,
+                                                                     FileType::HEADER_UNIT, huDep.isSystem});
             huDep.logicalNames.emplace_back(it2.first->first);
         }
         nonModule.huDeps.emplace_back(std::move(huDep));
@@ -306,6 +311,6 @@ void printMessage(const BTCLastMessage &lastMessage, const bool sent)
 }
 
 TestResponse::TestResponse(string filePath_, string fileContent_, FileType fileType_, bool isSystem_)
-    : filePath(std::move(filePath_)), fileContent(std::move(fileContent_)), fileType(fileType_), isSystem(isSystem_)
+    : filePath(std::move(filePath_)), fileContent(std::move(fileContent_)), type(fileType_), isSystem(isSystem_)
 {
 }
