@@ -88,7 +88,7 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(cha
                 return std::string_view{output->data(), output->size() - strlen(delimiter)};
             }
 
-            if (bytesRead < 4 + strlen(delimiter))
+            if (bytesRead < strlen(delimiter))
             {
                 return tl::unexpected("N2978 Error: Received string only has delimiter but not the size of payload\n");
             }
@@ -98,6 +98,7 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(cha
         if (!output)
         {
             output = new std::string{};
+            allocations.emplace_back(output);
         }
         output->append(buffer, bytesRead);
     }
@@ -174,14 +175,10 @@ tl::expected<void, std::string> IPCManagerCompiler::readLogicalNames(const std::
 tl::expected<void, std::string> IPCManagerCompiler::receiveBTCLastMessage() const
 {
     char buffer[4096];
-    uint32_t bytesRead;
-    if (const auto &r = readInternal(buffer); !r)
+    const auto &r = readInternal(buffer);
+    if (!r)
     {
         return tl::unexpected(r.error());
-    }
-    else
-    {
-        // bytesRead = *r;
     }
 
     // The BTCLastMessage must be 1 byte of true signaling that build-system has successfully created a shared memory
@@ -191,9 +188,9 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCLastMessage() cons
         return tl::unexpected(getErrorString(ErrorCategory::INCORRECT_BTC_LAST_MESSAGE));
     }
 
-    if (constexpr uint32_t bytesProcessed = 1; bytesRead != bytesProcessed)
+    if (r->size() != 1)
     {
-        return tl::unexpected(getErrorString(bytesRead, bytesProcessed));
+        return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
     }
 
     return {};
@@ -226,6 +223,7 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCModule(const CTBMo
     TRY_READ_VAL(isSystem, readBool, message, bytesRead);
 
     std::string *str = new std::string(moduleName.moduleName);
+    allocations.emplace_back(str);
     responses.emplace(*str, Response(requested.file.filePath, requested.mapping, FileType::MODULE, isSystem));
 
     TRY_READ_VAL(modDepsSize, readUInt32, message, bytesRead);
@@ -284,6 +282,7 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCNonModule(const CT
     }
 
     std::string *str = new std::string(nonModule.logicalName);
+    allocations.emplace_back(str);
     if (!isHeaderUnit)
     {
         TRY_READ_VAL(filePath, readPath, readCompilerMessage, bytesRead);

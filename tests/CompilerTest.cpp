@@ -34,7 +34,7 @@ struct CompilerTest
 
 int main()
 {
-    std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    // std::this_thread::sleep_for(std::chrono::milliseconds(5000));
     IPCManagerCompiler manager;
     CompilerTest t(&manager);
     std::uniform_int_distribution distribution(0, 200);
@@ -67,7 +67,8 @@ int main()
     print("BTCLastMessage for first bmi-content has been received.\n");
 
     BMIFile bmi2 = BMIFile();
-    bmi2.filePath = (std::filesystem::current_path() / "bmi2.txt").generic_string();
+    const string bmiTwoString = (std::filesystem::current_path() / "bmi2.txt").generic_string();
+    bmi2.filePath = bmiTwoString;
     const string bmi2Content = fileToString(bmi2.filePath);
     bmi2.fileSize = bmi2Content.size();
     if (const auto &r2 = CompilerTest::readSharedMemoryBMIFile(bmi2); !r2)
@@ -85,5 +86,10 @@ int main()
             exitFailure(r3.error());
         }
     }
+    for (std::string *p : allocations)
+    {
+        delete p;
+    }
     print("Successfully Completed CompilerTest\n");
+    print(delimiter);
 }

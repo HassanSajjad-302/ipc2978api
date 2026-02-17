@@ -508,7 +508,8 @@ int runTest()
     // mapping. And then finally send the BTCLastMessage. This makes code coverage 100%.
 
     BMIFile bmi;
-    bmi.filePath = (std::filesystem::current_path() / "bmi.txt").generic_string();
+    const string bmiOneString = (std::filesystem::current_path() / "bmi.txt").generic_string();
+    bmi.filePath = bmiOneString;
     bmi.fileSize = lastMessage.fileSize;
     // Creates server mapping to already created mapping
     if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(bmi); !r2)
@@ -551,8 +552,9 @@ int runTest()
         // compilations to save them from one system call.
 
         BMIFile bmi2;
-        bmi2.filePath = (std::filesystem::current_path() / "bmi2.txt").generic_string();
-        string bmi2Content = getRandomString();
+        const string bmiTwoString = (std::filesystem::current_path() / "bmi2.txt").generic_string();
+        bmi2.filePath = bmiTwoString;
+        const string bmi2Content = getRandomString();
         std::ofstream(string(bmi2.filePath)) << bmi2Content;
 
         // creates server mapping to a new file.
@@ -605,10 +607,8 @@ int runTest()
 int main()
 {
     runTest();
-    /*
     fmt::println("\n\n\nCompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
     compilerTestPrunedOutput.clear();
     runTest();
     fmt::println("\n\n\nCompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
-*/
 }

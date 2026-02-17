@@ -10,6 +10,8 @@ struct BuildSystemTest;
 namespace N2978
 {
 
+inline std::vector<std::string*> allocations;
+
 enum class FileType : uint8_t
 {
     MODULE,

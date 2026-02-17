@@ -148,6 +148,7 @@ tl::expected<void, std::string> IPCManagerBS::sendMessage(const BTCLastMessage &
 {
     std::string buffer;
     buffer.push_back(true);
+    buffer.append(delimiter, strlen(delimiter));
     if (const auto &r = writeInternal(buffer); !r)
     {
         return tl::unexpected(r.error());
