@@ -12,7 +12,7 @@ using std::string, std::string_view, std::vector, std::map;
 using namespace N2978;
 
 inline std::random_device rd;
-inline std::mt19937 generator(2);
+inline std::mt19937 generator(rd());
 
 void exitFailure(const string &str);
 string fileToString(string_view file_name);

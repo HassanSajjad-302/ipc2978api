@@ -18,6 +18,223 @@
 
 using fmt::print, std::string_view, std::set;
 
+#include <fstream>
+#include <iostream>
+#include <map>
+#include <sstream>
+#include <string>
+#include <string_view>
+
+static FileType parseFileType(const std::string &s)
+{
+    if (s == "Header-File")
+        return FileType::HEADER_FILE;
+    if (s == "Module")
+        return FileType::MODULE;
+    if (s == "Header-Unit")
+        return FileType::HEADER_UNIT;
+    print("Unknown FileType");
+}
+
+static std::string fileTypeToString(FileType ft)
+{
+    switch (ft)
+    {
+    case FileType::HEADER_FILE:
+        return "Header-File";
+    case FileType::MODULE:
+        return "Module";
+    case FileType::HEADER_UNIT:
+        return "Header-Unit";
+    }
+    print("Unknown FileType");
+}
+
+// Each record in the text looks like:
+//   Key <value>
+//   Filepath <value>
+//   FileContent <value>
+//   FileType <value>
+//   IsSystem <value>
+//
+// Values run to the end of the line (no multi-line values).
+
+static std::map<std::string, TestResponse> parseOutput(const std::string &text)
+{
+    std::map<std::string, TestResponse> result;
+    std::istringstream ss(text);
+    std::string line;
+
+    std::string currentKey;
+    std::string currentFilePath;
+    std::string currentFileContent;
+    FileType currentFileType;
+    bool currentIsSystem = false;
+
+    // Track which fields we have collected for the current record
+    bool hasKey = false, hasPath = false, hasContent = false, hasType = false, hasSystem = false;
+
+    auto flush = [&]() {
+        if (hasKey && hasPath && hasContent && hasType && hasSystem)
+        {
+            result.emplace(currentKey,
+                           TestResponse(currentFilePath, currentFileContent, currentFileType, currentIsSystem));
+        }
+        hasKey = hasPath = hasContent = hasType = hasSystem = false;
+        currentKey.clear();
+        currentFilePath.clear();
+        currentFileContent.clear();
+        currentFileType;
+        currentIsSystem = false;
+    };
+
+    while (std::getline(ss, line))
+    {
+        // Skip empty lines
+        if (line.empty())
+            continue;
+
+        // Find first space to split tag from value
+        auto spacePos = line.find(' ');
+        if (spacePos == std::string::npos)
+            continue; // malformed line
+
+        std::string tag = line.substr(0, spacePos);
+        std::string value = line.substr(spacePos + 1);
+
+        if (tag == "Key")
+        {
+            // A new "Key" line means a new record — flush previous if any
+            flush();
+            currentKey = value;
+            hasKey = true;
+        }
+        else if (tag == "Filepath")
+        {
+            currentFilePath = value;
+            hasPath = true;
+        }
+        else if (tag == "FileContent")
+        {
+            currentFileContent = value;
+            hasContent = true;
+        }
+        else if (tag == "FileType")
+        {
+            currentFileType = parseFileType(value);
+            hasType = true;
+        }
+        else if (tag == "IsSystem")
+        {
+            currentIsSystem = (value == "true");
+            hasSystem = true;
+        }
+    }
+
+    // Flush the last record
+    flush();
+
+    return result;
+}
+
+// -------------------------------------------------------
+// Diff two maps and print every difference
+// -------------------------------------------------------
+
+static void diffMaps(const std::map<std::string, TestResponse> &mapA, const std::map<std::string, TestResponse> &mapB,
+                     const std::string &nameA = "Mapping", const std::string &nameB = "Output")
+{
+    bool anyDiff = false;
+
+    // Keys in A
+    for (auto &[key, a] : mapA)
+    {
+        auto it = mapB.find(key);
+        if (it == mapB.end())
+        {
+            std::cout << "[KEY ONLY IN " << nameA << "]\n  " << key << "\n\n";
+            anyDiff = true;
+            continue;
+        }
+        const TestResponse &b = it->second;
+
+        bool diffHere = false;
+        auto header = [&]() {
+            if (!diffHere)
+            {
+                std::cout << "[DIFF] Key: " << key.substr(0, 40) << "...\n";
+                diffHere = true;
+                anyDiff = true;
+            }
+        };
+
+        if (a.filePath != b.filePath)
+        {
+            header();
+            std::cout << "  filePath:\n"
+                      << "    " << nameA << ": " << a.filePath << "\n"
+                      << "    " << nameB << ": " << b.filePath << "\n";
+        }
+        if (a.fileContent != b.fileContent)
+        {
+            header();
+            // contents can be huge — just flag it
+            std::cout << "  fileContent: DIFFERS"
+                      << " (len " << nameA << "=" << a.fileContent.size() << ", len " << nameB << "="
+                      << b.fileContent.size() << ")\n";
+        }
+        if (a.type != b.type)
+        {
+            header();
+            std::cout << "  type:\n"
+                      << "    " << nameA << ": " << fileTypeToString(a.type) << "\n"
+                      << "    " << nameB << ": " << fileTypeToString(b.type) << "\n";
+        }
+        if (a.isSystem != b.isSystem)
+        {
+            header();
+            std::cout << "  isSystem:\n"
+                      << "    " << nameA << ": " << (a.isSystem ? "true" : "false") << "\n"
+                      << "    " << nameB << ": " << (b.isSystem ? "true" : "false") << "\n";
+        }
+
+        if (diffHere)
+            std::cout << "\n";
+    }
+
+    // Keys only in B
+    for (auto &[key, _] : mapB)
+    {
+        if (mapA.find(key) == mapA.end())
+        {
+            std::cout << "[KEY ONLY IN " << nameB << "]\n  " << key << "\n\n";
+            anyDiff = true;
+        }
+    }
+
+    if (!anyDiff)
+    {
+        std::cout << "No differences found — maps are identical.\n";
+    }
+}
+
+// -------------------------------------------------------
+// main — reads two files passed as arguments
+// -------------------------------------------------------
+
+int difference(const string &mapping, const string &output)
+{
+    const auto mapA = parseOutput(mapping);
+    const auto mapB = parseOutput(output);
+
+    std::cout << "Parsed " << mapA.size() << " entries from textA" << mapping << "\n";
+    std::cout << "Parsed " << mapB.size() << " entries from textB" << output << "\n\n";
+
+    diffMaps(mapA, mapB);
+
+    return 0;
+}
+
 struct RunCommand
 {
     string output;
@@ -571,6 +788,7 @@ int runTest()
         }
         if (r2->file != output)
         {
+            difference(string(r2->file), output);
             exitFailure(fmt::format("Mapping Contents not similar to output. MappingSize {} Output-Size {}\n\n "
                                     "Mapping\n\n{}\n\n\nOutput\n\n{}\n",
                                     r2->file.size(), output.size(), r2->file, output));
@@ -638,7 +856,6 @@ int runTest()
     {
         exitFailure(r2.error());
     }
-
 
     for (string *alloc : buildTestallocations)
     {

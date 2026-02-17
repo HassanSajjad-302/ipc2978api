@@ -299,7 +299,7 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCNonModule(const CT
     }
 
     TRY_READ_VAL(file, readProcessMappingOfBMIFile, readCompilerMessage, bytesRead);
-    responses.emplace(*str, Response{file.mapping.file, file.mapping, FileType::HEADER_UNIT, isSystem});
+    responses.emplace(*str, Response{file.file.filePath, file.mapping, FileType::HEADER_UNIT, isSystem});
 
     TRY_READ(logicalNames, readLogicalNames, readCompilerMessage, bytesRead, file, FileType::HEADER_UNIT, isSystem);
 

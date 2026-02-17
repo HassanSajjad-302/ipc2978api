@@ -62,6 +62,10 @@ string getRandomString(uint32_t length)
         }
     }
 
+    if (random_string[0] == 'e' && random_string[1] == '7' && random_string[2] == 'R')
+    {
+        bool breakpoint = true;
+    }
     return random_string;
 }
 
