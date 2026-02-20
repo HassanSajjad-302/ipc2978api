@@ -883,6 +883,8 @@ int main()
     runTest();
     fmt::println("\n\n\nCompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
     compilerTestPrunedOutput.clear();
-    // runTest();
-    // fmt::println("\n\n\nCompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
+    tempTestFiles.clear();
+    buildTestallocations.clear();
+    runTest();
+    fmt::println("\n\n\nCompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
 }
