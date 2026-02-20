@@ -40,23 +40,41 @@ struct CompilerTest
 
 int main()
 {
-    std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    // std::this_thread::sleep_for(std::chrono::milliseconds(5000));
     IPCManagerCompiler manager;
     CompilerTest t(&manager);
-    for (uint64_t i = 0; i < 200; ++i)
+    for (uint64_t i = 0; i < 300; ++i)
     {
-        CTBNonModule nonModule;
-        nonModule.isHeaderUnit = false;
-        string str = getRandomString();
-        nonModule.logicalName = str;
-
-        if (const auto &r2 = t.receiveBTCNonModule(nonModule); !r2)
+        if (getRandomBool())
         {
-            exitFailure(r2.error());
+            CTBModule ctbModule;
+            string str = getRandomString();
+            ctbModule.moduleName = str;
+
+            if (const auto &r2 = t.receiveBTCModule(ctbModule); !r2)
+            {
+                exitFailure(r2.error());
+            }
+            else
+            {
+                printMessage(ctbModule, true);
+            }
         }
         else
         {
-            printMessage(nonModule, true);
+            CTBNonModule nonModule;
+            nonModule.isHeaderUnit = false;
+            string str = getRandomString();
+            nonModule.logicalName = str;
+
+            if (const auto &r2 = t.receiveBTCNonModule(nonModule); !r2)
+            {
+                exitFailure(r2.error());
+            }
+            else
+            {
+                printMessage(nonModule, true);
+            }
         }
     }
 

@@ -229,7 +229,7 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCModule(const CTBMo
         TRY_READ_VAL(modDepFile, readProcessMappingOfBMIFile, message, bytesRead);
         TRY_READ_VAL(modDepIsSytem, readBool, message, bytesRead);
         TRY_READ(logicalNames, readLogicalNames, message, bytesRead, modDepFile,
-                 isHeaderUnit ? FileType::HEADER_UNIT : FileType::HEADER_FILE, modDepIsSytem);
+                 isHeaderUnit ? FileType::HEADER_UNIT : FileType::MODULE, modDepIsSytem);
     }
 
     if (message.size() != bytesRead)

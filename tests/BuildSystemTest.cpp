@@ -686,6 +686,19 @@ int runTest()
         switch (type)
         {
 
+        case CTB::MODULE: {
+            const auto &ctbModule = reinterpret_cast<CTBModule &>(buffer);
+            printMessage(ctbModule, false);
+            BTCModule btcModule = getBTCModule(ctbModule);
+            if (const auto &r2 = manager.sendMessage(btcModule); !r2)
+            {
+                exitFailure(r2.error());
+            }
+            printMessage(btcModule, true);
+        }
+
+        break;
+
             // Compiler will only send CTBNonModule. CTBModule is not tested as the build-system needs to create a
             // shared memory-file using IPCManangerBS::createSharedMemoryBMIFile() mapping before sending a BMIFile.
             // Similarly, IPCManagerCompiler on receiving a BMIFile will call
@@ -870,6 +883,6 @@ int main()
     runTest();
     fmt::println("\n\n\nCompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
     compilerTestPrunedOutput.clear();
-    runTest();
-    fmt::println("\n\n\nCompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
+    // runTest();
+    // fmt::println("\n\n\nCompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
 }

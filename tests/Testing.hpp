@@ -13,14 +13,14 @@ using namespace N2978;
 
 inline std::random_device rd;
 inline int randomSeed = rd();
-inline std::mt19937 generator(-1204125273);
+inline std::mt19937 generator(randomSeed);
 
 void exitFailure(const string &str);
 string fileToString(string_view file_name);
 string getRandomString(uint32_t length = 0);
 bool getRandomBool();
 uint32_t getRandomNumber(uint32_t max);
-BTCModule getBTCModule();
+BTCModule getBTCModule(const CTBModule &ctbModule);
 BTCNonModule getBTCNonModule(const CTBNonModule &nonModule);
 void printSendingOrReceiving(bool sent);
 void printMessage(const CTBModule &ctbModule, bool sent);

@@ -87,40 +87,9 @@ uint32_t getRandomNumber(const uint32_t max)
     return distribution(generator);
 }
 
-BTCModule getBTCModule()
+auto createTempTestFilesEntry(const bool makeMapping, const string_view key, const FileType fileType,
+                              const bool isSystem) -> auto
 {
-    BTCModule b;
-
-    BMIFile file;
-    file.filePath = getRandomString();
-    file.fileSize = 0;
-
-    b.requested = std::move(file);
-
-    b.isSystem = getRandomBool();
-
-    const uint32_t modDepCount = getRandomNumber(10);
-    for (uint32_t i = 0; i < modDepCount; ++i)
-    {
-        ModuleDep modDep;
-        modDep.isSystem = getRandomBool();
-        modDep.isHeaderUnit = getRandomBool();
-        modDep.logicalNames.emplace_back(getRandomString());
-        const uint32_t logicalNameSize = getRandomNumber(10);
-        for (uint32_t i = 0; i < logicalNameSize; ++i)
-        {
-            modDep.logicalNames.emplace_back(getRandomString());
-        }
-        b.modDeps.emplace_back(std::move(modDep));
-    }
-
-    return b;
-}
-
-auto createTempTestFilesEntry(bool makeMapping, const string_view key, const FileType fileType, const bool isSystem)
-    -> auto
-{
-
     string str = getRandomString(10);
     for (char &c : str)
     {
@@ -145,6 +114,68 @@ auto createTempTestFilesEntry(bool makeMapping, const string_view key, const Fil
     }
 
     return it;
+}
+
+BTCModule getBTCModule(const CTBModule &ctbModule)
+{
+    BTCModule b;
+    b.isSystem = getRandomBool();
+    auto it = createTempTestFilesEntry(true, ctbModule.moduleName, FileType::MODULE, b.isSystem);
+
+    b.requested.filePath = it.first->second.filePath;
+    b.requested.fileSize = it.first->second.fileContent.size();
+
+    const uint32_t modDepCount = getRandomNumber(10);
+    for (uint32_t i = 0; i < modDepCount; ++i)
+    {
+        string str = getRandomString(10);
+        for (char &c : str)
+        {
+            c = tolower(c);
+        }
+
+        string *filePath = new string((current_path() / str).string());
+        string *fileContents = new string(getRandomString());
+        {
+            // Creating file and the mapping
+            std::ofstream(*filePath) << *fileContents;
+            buildTestallocations.emplace_back(filePath);
+            buildTestallocations.emplace_back(fileContents);
+
+            BMIFile file;
+            file.filePath = *filePath;
+            if (const auto &mapping = IPCManagerBS::createSharedMemoryBMIFile(file); !mapping)
+            {
+                exitFailure("Failed to create shared memory bmifile");
+            }
+        }
+
+        ModuleDep modDep;
+        modDep.isSystem = getRandomBool();
+        modDep.isHeaderUnit = getRandomBool();
+        modDep.file.filePath = *filePath;
+        modDep.file.fileSize = fileContents->size();
+
+        uint32_t logicalNameSize = getRandomNumber(10);
+
+        // if module or the random-number is 0, we set the logicalNameSize = 1
+        if (logicalNameSize == 0 || !modDep.isHeaderUnit)
+        {
+            logicalNameSize = 1;
+        }
+
+        for (uint32_t j = 0; j < logicalNameSize; ++j)
+        {
+            string *s = new string(getRandomString());
+            buildTestallocations.emplace_back(s);
+            const auto &it2 = tempTestFiles.emplace(
+                *s, TestResponse{*filePath, *fileContents,
+                                 modDep.isHeaderUnit ? FileType::HEADER_UNIT : FileType::MODULE, modDep.isSystem});
+            modDep.logicalNames.emplace_back(it2.first->first);
+        }
+        b.modDeps.emplace_back(std::move(modDep));
+    }
+    return b;
 }
 
 BTCNonModule getBTCNonModule(const CTBNonModule &ctbNonModule)
@@ -199,7 +230,6 @@ BTCNonModule getBTCNonModule(const CTBNonModule &ctbNonModule)
 
         string *filePath = new string((current_path() / str).string());
         string *fileContents = new string(getRandomString());
-        bool isSystem = getRandomBool();
         {
 
             // Creating file and the mapping
@@ -215,7 +245,7 @@ BTCNonModule getBTCNonModule(const CTBNonModule &ctbNonModule)
             }
         }
         HuDep huDep;
-        huDep.isSystem = isSystem;
+        huDep.isSystem = getRandomBool();
         huDep.file.filePath = *filePath;
         huDep.file.fileSize = fileContents->size();
 
