@@ -79,32 +79,23 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(cha
             return tl::unexpected(getErrorString(ErrorCategory::READ_FILE_ZERO_BYTES_READ));
         }
 
-        // We will return once we receive the delimiter.
-        if (endsWith(std::string_view{buffer, bytesRead}, delimiter))
-        {
-            if (output)
-            {
-                output->append(buffer, bytesRead - strlen(delimiter));
-            }
-            else
-            {
-                if (bytesRead < strlen(delimiter))
-                {
-                    return tl::unexpected(
-                        "N2978 Error: Received string only has delimiter but not the size of payload\n");
-                }
-                output = new std::string(buffer, bytesRead - strlen(delimiter));
-                allocations.emplace_back(output);
-            }
-            return *output;
-        }
-
         if (!output)
         {
+            if (bytesRead < strlen(delimiter))
+            {
+                return tl::unexpected("N2978 Error: Received string only has delimiter but not the size of payload\n");
+            }
             output = new std::string{};
             allocations.emplace_back(output);
         }
+
         output->append(buffer, bytesRead);
+
+        // We return once we receive the delimiter.
+        if (endsWith(*output, delimiter))
+        {
+            return std::string_view{output->data(), output->size() - strlen(delimiter)};
+        }
     }
 #endif
 }

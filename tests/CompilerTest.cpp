@@ -40,10 +40,10 @@ struct CompilerTest
 
 int main()
 {
-    // std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(5000));
     IPCManagerCompiler manager;
     CompilerTest t(&manager);
-    for (uint64_t i = 0; i < 10; ++i)
+    for (uint64_t i = 0; i < 200; ++i)
     {
         CTBNonModule nonModule;
         nonModule.isHeaderUnit = false;
