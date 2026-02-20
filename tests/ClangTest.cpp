@@ -444,8 +444,7 @@ void pruneCompilerOutput(IPCManagerBS &manager, char (&buffer)[320], CTB &type)
     const uint32_t payloadSize =
         *reinterpret_cast<uint32_t *>(compilerTestPrunedOutput.data() + (prunedSize - (4 + strlen(delimiter))));
     const char *payloadStart = compilerTestPrunedOutput.data() + (prunedSize - (4 + strlen(delimiter) + payloadSize));
-    manager.serverReadString = string_view(payloadStart, payloadSize);
-    if (const auto &r2 = manager.receiveMessage(buffer, type); !r2)
+    if (const auto &r2 = manager.receiveMessage(buffer, type, string_view{payloadStart, payloadSize}); !r2)
     {
         exitFailure(r2.error());
     }
