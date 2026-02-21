@@ -81,7 +81,7 @@ class IPCManagerCompiler : Manager
     // response. Either it will return from the cache or it will fetch it from the build-system
     [[nodiscard]] tl::expected<Response, std::string> findResponse(std::string_view logicalName, FileType type);
 
-    // This function should be called only if the compilation succedded
+    // This function should be called only if the compilation succeeded
     [[nodiscard]] tl::expected<void, std::string> sendCTBLastMessage(const std::string &bmiFile,
                                                                      const std::string &filePath) const;
 };
