@@ -673,6 +673,17 @@ tl::unexpected<string> errorReturn()
         return errorReturn();                                                                                          \
     }
 
+#define CREATE_BMI_MAPPING(varName, filePath)                                                                          \
+    Mapping varName;                                                                                                   \
+    if (const auto &_r_##varName = IPCManagerBS::createSharedMemoryBMIFile(filePath); _r_##varName)                    \
+    {                                                                                                                  \
+        varName = *_r_##varName;                                                                                       \
+    }                                                                                                                  \
+    else                                                                                                               \
+    {                                                                                                                  \
+        return tl::unexpected("failed to created bmi mapping" + _r_##varName.error() + "\n");                          \
+    }
+
 tl::expected<void, string> runTest()
 {
     setupTest();
@@ -743,30 +754,14 @@ tl::expected<void, string> runTest()
 
         BMIFile btcModBMI;
         btcModBMI.filePath = aBPcm;
-        Mapping btcModBmiMapping;
-        if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(btcModBMI); r2)
-        {
-            btcModBmiMapping = *r2;
-        }
-        else
-        {
-            return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
-        }
+        CREATE_BMI_MAPPING(btcModBmiMapping, btcModBMI)
 
         BTCModule btcMod;
         btcMod.requested = btcModBMI;
 
         BMIFile modDepBMI;
         modDepBMI.filePath = aCPcm;
-        Mapping modDepBmiMapping;
-        if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(modDepBMI); r2)
-        {
-            modDepBmiMapping = *r2;
-        }
-        else
-        {
-            return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
-        }
+        CREATE_BMI_MAPPING(modDepBmiMapping, modDepBMI)
 
         ModuleDep modDep;
         modDep.file = modDepBMI;
@@ -792,6 +787,7 @@ tl::expected<void, string> runTest()
             return tl::unexpected("closing bmi-mapping failed");
         }
     }
+
     // compiling n.hpp
     {
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + nPcm +
@@ -846,15 +842,7 @@ tl::expected<void, string> runTest()
         BMIFile nonModNPcmBmi;
         nonModNPcmBmi.filePath = nPcm;
 
-        Mapping nonModNPcmBmiMapping;
-        if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(nonModNPcmBmi); r2)
-        {
-            nonModNPcmBmiMapping = *r2;
-        }
-        else
-        {
-            return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
-        }
+        CREATE_BMI_MAPPING(nonModNPcmBmiMapping, nonModNPcmBmi)
 
         nonModNPcm.filePath = nonModNPcmBmi.filePath;
         nonModNPcm.fileSize = nonModNPcmBmi.fileSize;
@@ -904,15 +892,7 @@ tl::expected<void, string> runTest()
         BMIFile nonModNPcmBmi;
         nonModNPcmBmi.filePath = nPcm;
 
-        Mapping nonModNPcmBmiMapping;
-        if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(nonModNPcmBmi); r2)
-        {
-            nonModNPcmBmiMapping = *r2;
-        }
-        else
-        {
-            return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
-        }
+        CREATE_BMI_MAPPING(nonModNPcmBmiMapping, nonModNPcmBmi)
 
         nonModNPcm.isHeaderUnit = true;
         nonModNPcm.filePath = nPcm;
@@ -986,15 +966,7 @@ tl::expected<void, string> runTest()
         BMIFile bigHuBmi;
         bigHuBmi.filePath = bigPcm;
 
-        Mapping bigHuBmiMapping;
-        if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(bigHuBmi); r2)
-        {
-            bigHuBmiMapping = *r2;
-        }
-        else
-        {
-            return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
-        }
+        CREATE_BMI_MAPPING(bigHuBmiMapping, bigHuBmi)
         bigHu.filePath = bigHuBmi.filePath;
         bigHu.fileSize = bigHuBmi.fileSize;
 
