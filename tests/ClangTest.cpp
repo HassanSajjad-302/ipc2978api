@@ -743,10 +743,10 @@ tl::expected<void, string> runTest()
 
         BMIFile btcModBMI;
         btcModBMI.filePath = aBPcm;
-        Mapping btcModBmiProcMap;
+        Mapping btcModBmiMapping;
         if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(btcModBMI); r2)
         {
-            btcModBmiProcMap = *r2;
+            btcModBmiMapping = *r2;
         }
         else
         {
@@ -758,10 +758,10 @@ tl::expected<void, string> runTest()
 
         BMIFile modDepBMI;
         modDepBMI.filePath = aCPcm;
-        Mapping modDepBmiProcMap;
+        Mapping modDepBmiMapping;
         if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(modDepBMI); r2)
         {
-            modDepBmiProcMap = *r2;
+            modDepBmiMapping = *r2;
         }
         else
         {
@@ -782,12 +782,12 @@ tl::expected<void, string> runTest()
 
         endCompilerTest();
 
-        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(btcModBmiProcMap); !r2)
+        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(btcModBmiMapping); !r2)
         {
             return tl::unexpected("closing bmi-mapping failed");
         }
 
-        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(modDepBmiProcMap); !r2)
+        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(modDepBmiMapping); !r2)
         {
             return tl::unexpected("closing bmi-mapping failed");
         }
@@ -846,10 +846,10 @@ tl::expected<void, string> runTest()
         BMIFile nonModNPcmBmi;
         nonModNPcmBmi.filePath = nPcm;
 
-        Mapping nonModNPcmBmiProcMap;
+        Mapping nonModNPcmBmiMapping;
         if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(nonModNPcmBmi); r2)
         {
-            nonModNPcmBmiProcMap = *r2;
+            nonModNPcmBmiMapping = *r2;
         }
         else
         {
@@ -867,7 +867,7 @@ tl::expected<void, string> runTest()
 
         endCompilerTest();
 
-        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(nonModNPcmBmiProcMap); !r2)
+        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(nonModNPcmBmiMapping); !r2)
         {
             return tl::unexpected("closing bmi-mapping failed");
         }
@@ -904,10 +904,10 @@ tl::expected<void, string> runTest()
         BMIFile nonModNPcmBmi;
         nonModNPcmBmi.filePath = nPcm;
 
-        Mapping nonModNPcmBmiProcMap;
+        Mapping nonModNPcmBmiMapping;
         if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(nonModNPcmBmi); r2)
         {
-            nonModNPcmBmiProcMap = *r2;
+            nonModNPcmBmiMapping = *r2;
         }
         else
         {
@@ -926,7 +926,7 @@ tl::expected<void, string> runTest()
 
         endCompilerTest();
 
-        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(nonModNPcmBmiProcMap); !r2)
+        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(nonModNPcmBmiMapping); !r2)
         {
             return tl::unexpected("closing bmi-mapping failed");
         }
@@ -986,10 +986,10 @@ tl::expected<void, string> runTest()
         BMIFile bigHuBmi;
         bigHuBmi.filePath = bigPcm;
 
-        Mapping bigHuBmiProcMap;
+        Mapping bigHuBmiMapping;
         if (const auto &r2 = IPCManagerBS::createSharedMemoryBMIFile(bigHuBmi); r2)
         {
-            bigHuBmiProcMap = *r2;
+            bigHuBmiMapping = *r2;
         }
         else
         {
@@ -1011,15 +1011,15 @@ tl::expected<void, string> runTest()
 
         BMIFile requested;
         requested.filePath = aPcm;
-        Mapping aPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(requested);
+        Mapping aPcmMapping = *IPCManagerBS::createSharedMemoryBMIFile(requested);
 
         BMIFile abModDepBmi;
         abModDepBmi.filePath = aBPcm;
-        Mapping aCPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(abModDepBmi);
+        Mapping aCPcmMapping = *IPCManagerBS::createSharedMemoryBMIFile(abModDepBmi);
 
         BMIFile acModDepBmi;
         acModDepBmi.filePath = aCPcm;
-        Mapping aBPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(acModDepBmi);
+        Mapping aBPcmMapping = *IPCManagerBS::createSharedMemoryBMIFile(acModDepBmi);
 
         BTCModule amod;
         amod.requested = requested;
@@ -1041,14 +1041,14 @@ tl::expected<void, string> runTest()
 
         endCompilerTest();
 
-        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(bigHuBmiProcMap); !r2)
+        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(bigHuBmiMapping); !r2)
         {
             return tl::unexpected("closing bmi-mapping failed");
         }
 
-        IPCManagerBS::closeBMIFileMapping(aPcmProcMap);
-        IPCManagerBS::closeBMIFileMapping(aBPcmProcMap);
-        IPCManagerBS::closeBMIFileMapping(aCPcmProcMap);
+        IPCManagerBS::closeBMIFileMapping(aPcmMapping);
+        IPCManagerBS::closeBMIFileMapping(aBPcmMapping);
+        IPCManagerBS::closeBMIFileMapping(aCPcmMapping);
     }
 
     // compiling main.cpp
@@ -1063,23 +1063,23 @@ tl::expected<void, string> runTest()
 
         BMIFile requested;
         requested.filePath = fooPcm;
-        Mapping requestedProcMap = *IPCManagerBS::createSharedMemoryBMIFile(requested);
+        Mapping requestedMapping = *IPCManagerBS::createSharedMemoryBMIFile(requested);
 
         BMIFile bigHuModDepBmi;
         bigHuModDepBmi.filePath = bigPcm;
-        Mapping bigHuModDepBmiProcMap = *IPCManagerBS::createSharedMemoryBMIFile(bigHuModDepBmi);
+        Mapping bigHuModDepBmiMapping = *IPCManagerBS::createSharedMemoryBMIFile(bigHuModDepBmi);
 
         BMIFile aModDepBmi;
         aModDepBmi.filePath = aPcm;
-        Mapping aPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(aModDepBmi);
+        Mapping aPcmMapping = *IPCManagerBS::createSharedMemoryBMIFile(aModDepBmi);
 
         BMIFile abModDepBmi;
         abModDepBmi.filePath = aBPcm;
-        Mapping aCPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(abModDepBmi);
+        Mapping aCPcmMapping = *IPCManagerBS::createSharedMemoryBMIFile(abModDepBmi);
 
         BMIFile acModDepBmi;
         acModDepBmi.filePath = aCPcm;
-        Mapping aBPcmProcMap = *IPCManagerBS::createSharedMemoryBMIFile(acModDepBmi);
+        Mapping aBPcmMapping = *IPCManagerBS::createSharedMemoryBMIFile(acModDepBmi);
 
         BTCModule foo;
         foo.requested = requested;
@@ -1119,11 +1119,11 @@ tl::expected<void, string> runTest()
 
         endCompilerTest();
 
-        IPCManagerBS::closeBMIFileMapping(requestedProcMap);
-        IPCManagerBS::closeBMIFileMapping(bigHuModDepBmiProcMap);
-        IPCManagerBS::closeBMIFileMapping(aPcmProcMap);
-        IPCManagerBS::closeBMIFileMapping(aBPcmProcMap);
-        IPCManagerBS::closeBMIFileMapping(aCPcmProcMap);
+        IPCManagerBS::closeBMIFileMapping(requestedMapping);
+        IPCManagerBS::closeBMIFileMapping(bigHuModDepBmiMapping);
+        IPCManagerBS::closeBMIFileMapping(aPcmMapping);
+        IPCManagerBS::closeBMIFileMapping(aBPcmMapping);
+        IPCManagerBS::closeBMIFileMapping(aCPcmMapping);
     }
 
     fflush(stdout);
