@@ -431,8 +431,7 @@ void readCompilerMessage(const uint64_t serverFd, const uint64_t readFd)
     }
 #endif
 }
-
-void pruneCompilerOutput(IPCManagerBS &manager, char (&buffer)[320], CTB &type)
+void pruneCompilerOutput(IPCManagerBS &manager)
 {
     // Prune the compiler output. and make a new string of the compiler-message output.
     const uint32_t prunedSize = compilerTestPrunedOutput.size();
@@ -444,7 +443,7 @@ void pruneCompilerOutput(IPCManagerBS &manager, char (&buffer)[320], CTB &type)
     const uint32_t payloadSize =
         *reinterpret_cast<uint32_t *>(compilerTestPrunedOutput.data() + (prunedSize - (4 + strlen(delimiter))));
     const char *payloadStart = compilerTestPrunedOutput.data() + (prunedSize - (4 + strlen(delimiter) + payloadSize));
-    if (const auto &r2 = manager.receiveMessage(buffer, type, string_view{payloadStart, payloadSize}); !r2)
+    if (const auto &r2 = IPCManagerBS::receiveMessage(buffer, type, string_view{payloadStart, payloadSize}); !r2)
     {
         exitFailure(r2.error());
     }
@@ -467,22 +466,19 @@ IPCManagerBS readFirstCompilerStdout(const string_view compileCommand, const boo
         {
             exitFailure("early exit by CompilerTest");
         }
-        pruneCompilerOutput(manager, buffer, type);
+        pruneCompilerOutput(manager);
     }
     return manager;
 }
 
-void readCompilerStdout(IPCManagerBS &manager, const bool ctbMessageExpected)
+void readCompilerStdout(IPCManagerBS &manager)
 {
     readCompilerMessage(serverFd, runCommand.readPipe);
-    if (ctbMessageExpected)
+    if (!endsWith(compilerTestPrunedOutput, delimiter))
     {
-        if (!endsWith(compilerTestPrunedOutput, delimiter))
-        {
-            exitFailure("early exit by CompilerTest");
-        }
-        pruneCompilerOutput(manager, buffer, type);
+        exitFailure("early exit by CompilerTest");
     }
+    pruneCompilerOutput(manager);
 }
 
 void endCompilerTest()
@@ -666,7 +662,6 @@ export void Foo()
     ofstream("main.cpp") << mainDotCpp;
 }
 
-
 tl::unexpected<string> errorReturn()
 {
     return tl::unexpected<string>("IPC2978 Test Error: Wrong Message Received\n");
@@ -759,7 +754,7 @@ tl::expected<void, string> runTest()
         }
 
         BTCModule btcMod;
-        btcMod.requested = std::move(btcModBMI);
+        btcMod.requested = btcModBMI;
 
         BMIFile modDepBMI;
         modDepBMI.filePath = aCPcm;
@@ -774,14 +769,14 @@ tl::expected<void, string> runTest()
         }
 
         ModuleDep modDep;
-        modDep.file = std::move(modDepBMI);
+        modDep.file = modDepBMI;
         modDep.logicalNames.emplace_back("A:C");
         modDep.isHeaderUnit = false;
         btcMod.modDeps.emplace_back(std::move(modDep));
 
         if (const auto &r2 = manager.sendMessage(btcMod); !r2)
         {
-            string str = r2.error();
+            string str2 = r2.error();
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
@@ -813,7 +808,7 @@ tl::expected<void, string> runTest()
         nonModMPcm.filePath = mHpp;
         if (const auto &r2 = manager.sendMessage(nonModMPcm); !r2)
         {
-            string str = r2.error();
+            string str2 = r2.error();
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
@@ -834,13 +829,13 @@ tl::expected<void, string> runTest()
         BTCNonModule nonModMPcm;
         nonModMPcm.isHeaderUnit = false;
         nonModMPcm.filePath = mHpp;
-        if (const auto &r2 = manager.sendMessage(std::move(nonModMPcm)); !r2)
+        if (const auto &r2 = manager.sendMessage(nonModMPcm); !r2)
         {
-            string str = r2.error();
+            string str2 = r2.error();
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
-        readCompilerStdout(manager, true);
+        readCompilerStdout(manager);
         CHECK(type == CTB::NON_MODULE)
         const auto &ctbNonModNHpp = reinterpret_cast<CTBNonModule &>(buffer);
         CHECK(ctbNonModNHpp.logicalName == "n.hpp" || ctbNonModNHpp.isHeaderUnit == true)
@@ -861,12 +856,12 @@ tl::expected<void, string> runTest()
             return tl::unexpected("failed to created bmi mapping" + r2.error() + "\n");
         }
 
-        nonModNPcm.filePath = std::move(nonModNPcmBmi.filePath);
+        nonModNPcm.filePath = nonModNPcmBmi.filePath;
         nonModNPcm.fileSize = nonModNPcmBmi.fileSize;
 
-        if (const auto &r2 = manager.sendMessage(std::move(nonModNPcm)); !r2)
+        if (const auto &r2 = manager.sendMessage(nonModNPcm); !r2)
         {
-            string str = r2.error();
+            string str2 = r2.error();
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
@@ -893,13 +888,13 @@ tl::expected<void, string> runTest()
         BTCNonModule nonModMPcm;
         nonModMPcm.isHeaderUnit = false;
         nonModMPcm.filePath = mHpp;
-        if (const auto &r2 = manager.sendMessage(std::move(nonModMPcm)); !r2)
+        if (const auto &r2 = manager.sendMessage(nonModMPcm); !r2)
         {
-            string str = r2.error();
+            string str2 = r2.error();
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
-        readCompilerStdout(manager, true);
+        readCompilerStdout(manager);
         CHECK(type == CTB::NON_MODULE)
         const auto &ctbNonModNHpp = reinterpret_cast<CTBNonModule &>(buffer);
         CHECK(ctbNonModNHpp.logicalName == "n.hpp" || ctbNonModNHpp.isHeaderUnit == false)
@@ -923,9 +918,9 @@ tl::expected<void, string> runTest()
         nonModNPcm.filePath = nPcm;
         nonModNPcm.fileSize = nonModNPcmBmi.fileSize;
 
-        if (const auto &r2 = manager.sendMessage(std::move(nonModNPcm)); !r2)
+        if (const auto &r2 = manager.sendMessage(nonModNPcm); !r2)
         {
-            string str = r2.error();
+            string str2 = r2.error();
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
@@ -955,16 +950,16 @@ tl::expected<void, string> runTest()
         yHeaderFile.logicalName = "y.hpp";
         yHeaderFile.filePath = yHpp;
         yHeaderFile.isSystem = true;
-        headerFile.headerFiles.emplace_back(std::move(yHeaderFile));
+        headerFile.headerFiles.emplace_back(yHeaderFile);
         HeaderFile zHeaderFile;
         zHeaderFile.logicalName = "z.hpp";
         zHeaderFile.filePath = zHpp;
         zHeaderFile.isSystem = true;
-        headerFile.headerFiles.emplace_back(std::move(zHeaderFile));
+        headerFile.headerFiles.emplace_back(zHeaderFile);
 
-        if (const auto &r2 = manager.sendMessage(std::move(headerFile)); !r2)
+        if (const auto &r2 = manager.sendMessage(headerFile); !r2)
         {
-            string str = r2.error();
+            string str2 = r2.error();
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
@@ -1005,11 +1000,11 @@ tl::expected<void, string> runTest()
 
         if (const auto &r2 = manager.sendMessage(bigHu); !r2)
         {
-            string str = r2.error();
+            string str2 = r2.error();
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
-        readCompilerStdout(manager, true);
+        readCompilerStdout(manager);
         CHECK(type == CTB::MODULE)
         const auto &aModule = reinterpret_cast<CTBModule &>(buffer);
         CHECK(aModule.moduleName == "A")
@@ -1040,7 +1035,7 @@ tl::expected<void, string> runTest()
 
         if (const auto &r2 = manager.sendMessage(amod); !r2)
         {
-            string str = r2.error();
+            string str2 = r2.error();
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
@@ -1118,7 +1113,7 @@ tl::expected<void, string> runTest()
 
         if (const auto &r2 = manager.sendMessage(foo); !r2)
         {
-            string str = r2.error();
+            string str2 = r2.error();
             return tl::unexpected("manager send message failed" + r2.error() + "\n");
         }
 
