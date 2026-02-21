@@ -983,15 +983,15 @@ tl::expected<void, string> runTest()
 
         BMIFile requested;
         requested.filePath = aPcm;
-        Mapping aPcmMapping = *IPCManagerBS::createSharedMemoryBMIFile(requested);
+        CREATE_BMI_MAPPING(aPcmMapping, requested)
 
         BMIFile abModDepBmi;
         abModDepBmi.filePath = aBPcm;
-        Mapping aCPcmMapping = *IPCManagerBS::createSharedMemoryBMIFile(abModDepBmi);
+        CREATE_BMI_MAPPING(aBPcmMapping, abModDepBmi)
 
         BMIFile acModDepBmi;
         acModDepBmi.filePath = aCPcm;
-        Mapping aBPcmMapping = *IPCManagerBS::createSharedMemoryBMIFile(acModDepBmi);
+        CREATE_BMI_MAPPING(aCPcmMapping, acModDepBmi)
 
         BTCModule amod;
         amod.requested = requested;
@@ -1035,23 +1035,23 @@ tl::expected<void, string> runTest()
 
         BMIFile requested;
         requested.filePath = fooPcm;
-        Mapping requestedMapping = *IPCManagerBS::createSharedMemoryBMIFile(requested);
+        CREATE_BMI_MAPPING(requestedMapping, requested)
 
         BMIFile bigHuModDepBmi;
         bigHuModDepBmi.filePath = bigPcm;
-        Mapping bigHuModDepBmiMapping = *IPCManagerBS::createSharedMemoryBMIFile(bigHuModDepBmi);
+        CREATE_BMI_MAPPING(bigHuModDepBmiMapping, bigHuModDepBmi)
 
         BMIFile aModDepBmi;
         aModDepBmi.filePath = aPcm;
-        Mapping aPcmMapping = *IPCManagerBS::createSharedMemoryBMIFile(aModDepBmi);
+        CREATE_BMI_MAPPING(aPcmMapping, aModDepBmi)
 
         BMIFile abModDepBmi;
         abModDepBmi.filePath = aBPcm;
-        Mapping aCPcmMapping = *IPCManagerBS::createSharedMemoryBMIFile(abModDepBmi);
+        CREATE_BMI_MAPPING(aBPcmMapping, abModDepBmi)
 
         BMIFile acModDepBmi;
         acModDepBmi.filePath = aCPcm;
-        Mapping aBPcmMapping = *IPCManagerBS::createSharedMemoryBMIFile(acModDepBmi);
+        CREATE_BMI_MAPPING(aCPcmMapping, acModDepBmi)
 
         BTCModule foo;
         foo.requested = requested;
