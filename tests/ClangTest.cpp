@@ -684,6 +684,18 @@ tl::unexpected<string> errorReturn()
         return tl::unexpected("failed to created bmi mapping" + _r_##varName.error() + "\n");                          \
     }
 
+#define SEND_MESSAGE(message)                                                                                          \
+    if (const auto &_r_send_##message = manager.sendMessage(message); !_r_send_##message)                              \
+    {                                                                                                                  \
+        return tl::unexpected("manager send message failed" + _r_send_##message.error() + "\n");                       \
+    }
+
+#define CLOSE_BMI_MAPPING(mapping)                                                                                     \
+    if (const auto &_r_close_##mapping = IPCManagerBS::closeBMIFileMapping(mapping); !_r_close_##mapping)              \
+    {                                                                                                                  \
+        return tl::unexpected("closing bmi-mapping failed");                                                           \
+    }
+
 tl::expected<void, string> runTest()
 {
     setupTest();
@@ -769,23 +781,11 @@ tl::expected<void, string> runTest()
         modDep.isHeaderUnit = false;
         btcMod.modDeps.emplace_back(std::move(modDep));
 
-        if (const auto &r2 = manager.sendMessage(btcMod); !r2)
-        {
-            string str2 = r2.error();
-            return tl::unexpected("manager send message failed" + r2.error() + "\n");
-        }
+        SEND_MESSAGE(btcMod)
 
         endCompilerTest();
-
-        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(btcModBmiMapping); !r2)
-        {
-            return tl::unexpected("closing bmi-mapping failed");
-        }
-
-        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(modDepBmiMapping); !r2)
-        {
-            return tl::unexpected("closing bmi-mapping failed");
-        }
+        CLOSE_BMI_MAPPING(btcModBmiMapping)
+        CLOSE_BMI_MAPPING(modDepBmiMapping)
     }
 
     // compiling n.hpp
@@ -802,12 +802,7 @@ tl::expected<void, string> runTest()
         BTCNonModule nonModMPcm;
         nonModMPcm.isHeaderUnit = false;
         nonModMPcm.filePath = mHpp;
-        if (const auto &r2 = manager.sendMessage(nonModMPcm); !r2)
-        {
-            string str2 = r2.error();
-            return tl::unexpected("manager send message failed" + r2.error() + "\n");
-        }
-
+        SEND_MESSAGE(nonModMPcm)
         endCompilerTest();
     }
 
@@ -825,11 +820,7 @@ tl::expected<void, string> runTest()
         BTCNonModule nonModMPcm;
         nonModMPcm.isHeaderUnit = false;
         nonModMPcm.filePath = mHpp;
-        if (const auto &r2 = manager.sendMessage(nonModMPcm); !r2)
-        {
-            string str2 = r2.error();
-            return tl::unexpected("manager send message failed" + r2.error() + "\n");
-        }
+        SEND_MESSAGE(nonModMPcm)
 
         readCompilerStdout(manager);
         CHECK(type == CTB::NON_MODULE)
@@ -847,18 +838,9 @@ tl::expected<void, string> runTest()
         nonModNPcm.filePath = nonModNPcmBmi.filePath;
         nonModNPcm.fileSize = nonModNPcmBmi.fileSize;
 
-        if (const auto &r2 = manager.sendMessage(nonModNPcm); !r2)
-        {
-            string str2 = r2.error();
-            return tl::unexpected("manager send message failed" + r2.error() + "\n");
-        }
-
+        SEND_MESSAGE(nonModNPcm)
         endCompilerTest();
-
-        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(nonModNPcmBmiMapping); !r2)
-        {
-            return tl::unexpected("closing bmi-mapping failed");
-        }
+        CLOSE_BMI_MAPPING(nonModNPcmBmiMapping)
     }
 
     // compiling o.hpp with include-translation. BTCNonModule for n.hpp will be received with
@@ -876,11 +858,7 @@ tl::expected<void, string> runTest()
         BTCNonModule nonModMPcm;
         nonModMPcm.isHeaderUnit = false;
         nonModMPcm.filePath = mHpp;
-        if (const auto &r2 = manager.sendMessage(nonModMPcm); !r2)
-        {
-            string str2 = r2.error();
-            return tl::unexpected("manager send message failed" + r2.error() + "\n");
-        }
+        SEND_MESSAGE(nonModMPcm)
 
         readCompilerStdout(manager);
         CHECK(type == CTB::NON_MODULE)
@@ -898,18 +876,9 @@ tl::expected<void, string> runTest()
         nonModNPcm.filePath = nPcm;
         nonModNPcm.fileSize = nonModNPcmBmi.fileSize;
 
-        if (const auto &r2 = manager.sendMessage(nonModNPcm); !r2)
-        {
-            string str2 = r2.error();
-            return tl::unexpected("manager send message failed" + r2.error() + "\n");
-        }
-
+        SEND_MESSAGE(nonModNPcm)
         endCompilerTest();
-
-        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(nonModNPcmBmiMapping); !r2)
-        {
-            return tl::unexpected("closing bmi-mapping failed");
-        }
+        CLOSE_BMI_MAPPING(nonModNPcmBmiMapping)
     }
 
     // compiling big.hpp
@@ -937,12 +906,7 @@ tl::expected<void, string> runTest()
         zHeaderFile.isSystem = true;
         headerFile.headerFiles.emplace_back(zHeaderFile);
 
-        if (const auto &r2 = manager.sendMessage(headerFile); !r2)
-        {
-            string str2 = r2.error();
-            return tl::unexpected("manager send message failed" + r2.error() + "\n");
-        }
-
+        SEND_MESSAGE(headerFile)
         endCompilerTest();
     }
 
@@ -970,11 +934,7 @@ tl::expected<void, string> runTest()
         bigHu.filePath = bigHuBmi.filePath;
         bigHu.fileSize = bigHuBmi.fileSize;
 
-        if (const auto &r2 = manager.sendMessage(bigHu); !r2)
-        {
-            string str2 = r2.error();
-            return tl::unexpected("manager send message failed" + r2.error() + "\n");
-        }
+        SEND_MESSAGE(bigHu)
 
         readCompilerStdout(manager);
         CHECK(type == CTB::MODULE)
@@ -1005,19 +965,9 @@ tl::expected<void, string> runTest()
         acModDep.logicalNames.emplace_back("A:C");
         amod.modDeps.emplace_back(std::move(acModDep));
 
-        if (const auto &r2 = manager.sendMessage(amod); !r2)
-        {
-            string str2 = r2.error();
-            return tl::unexpected("manager send message failed" + r2.error() + "\n");
-        }
-
+        SEND_MESSAGE(amod)
         endCompilerTest();
-
-        if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(bigHuBmiMapping); !r2)
-        {
-            return tl::unexpected("closing bmi-mapping failed");
-        }
-
+        CLOSE_BMI_MAPPING(bigHuBmiMapping)
         IPCManagerBS::closeBMIFileMapping(aPcmMapping);
         IPCManagerBS::closeBMIFileMapping(aBPcmMapping);
         IPCManagerBS::closeBMIFileMapping(aCPcmMapping);
@@ -1083,11 +1033,7 @@ tl::expected<void, string> runTest()
         cModDep.logicalNames.emplace_back("A:C");
         foo.modDeps.emplace_back(std::move(cModDep));
 
-        if (const auto &r2 = manager.sendMessage(foo); !r2)
-        {
-            string str2 = r2.error();
-            return tl::unexpected("manager send message failed" + r2.error() + "\n");
-        }
+        SEND_MESSAGE(foo)
 
         endCompilerTest();
 
