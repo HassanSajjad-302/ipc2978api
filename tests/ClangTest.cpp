@@ -886,15 +886,9 @@ tl::expected<void, string> runTest()
 
         IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
 
-        if (type != CTB::NON_MODULE)
-        {
-            return tl::unexpected("received message of wrong type");
-        }
+        CHECK(type == CTB::NON_MODULE)
         const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
-        if (ctbNonModMHpp.logicalName != "m.hpp" || ctbNonModMHpp.isHeaderUnit == true)
-        {
-            return tl::unexpected("wrong message received");
-        }
+        CHECK(ctbNonModMHpp.logicalName == "m.hpp" || ctbNonModMHpp.isHeaderUnit == false)
 
         BTCNonModule nonModMPcm;
         nonModMPcm.isHeaderUnit = false;
@@ -906,15 +900,9 @@ tl::expected<void, string> runTest()
         }
 
         readCompilerStdout(manager, true);
-        if (type != CTB::NON_MODULE)
-        {
-            return tl::unexpected("received message of wrong type");
-        }
+        CHECK(type == CTB::NON_MODULE)
         const auto &ctbNonModNHpp = reinterpret_cast<CTBNonModule &>(buffer);
-        if (ctbNonModNHpp.logicalName != "n.hpp" || ctbNonModNHpp.isHeaderUnit == true)
-        {
-            return tl::unexpected("wrong message received");
-        }
+        CHECK(ctbNonModNHpp.logicalName == "n.hpp" || ctbNonModNHpp.isHeaderUnit == false)
 
         BTCNonModule nonModNPcm;
 
@@ -956,16 +944,9 @@ tl::expected<void, string> runTest()
 
         IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
 
-        if (type != CTB::NON_MODULE)
-        {
-            return tl::unexpected("received message of wrong type");
-        }
+        CHECK(type == CTB::NON_MODULE)
         const auto &ctbNonModMHpp = reinterpret_cast<CTBNonModule &>(buffer);
-
-        if (ctbNonModMHpp.logicalName != "x.hpp" || ctbNonModMHpp.isHeaderUnit == true)
-        {
-            return tl::unexpected("wrong message received");
-        }
+        CHECK(ctbNonModMHpp.logicalName == "x.hpp" || ctbNonModMHpp.isHeaderUnit == false)
 
         BTCNonModule headerFile;
         headerFile.isHeaderUnit = false;
@@ -997,16 +978,9 @@ tl::expected<void, string> runTest()
 
         IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
 
-        if (type != CTB::NON_MODULE)
-        {
-            return tl::unexpected("received message of wrong type");
-        }
+        CHECK(type == CTB::NON_MODULE)
         const auto &xHeader = reinterpret_cast<CTBNonModule &>(buffer);
-
-        if (xHeader.logicalName != "x.hpp" || xHeader.isHeaderUnit == true)
-        {
-            return tl::unexpected("wrong message received");
-        }
+        CHECK(xHeader.logicalName == "x.hpp" || xHeader.isHeaderUnit == false)
 
         BTCNonModule bigHu;
         bigHu.isHeaderUnit = true;
@@ -1036,16 +1010,9 @@ tl::expected<void, string> runTest()
         }
 
         readCompilerStdout(manager, true);
-        if (type != CTB::MODULE)
-        {
-            return tl::unexpected("received message of wrong type");
-        }
+        CHECK(type == CTB::MODULE)
         const auto &aModule = reinterpret_cast<CTBModule &>(buffer);
-
-        if (aModule.moduleName != "A")
-        {
-            return tl::unexpected("wrong message received");
-        }
+        CHECK(aModule.moduleName == "A")
 
         BMIFile requested;
         requested.filePath = aPcm;
@@ -1095,17 +1062,9 @@ tl::expected<void, string> runTest()
 
         IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
 
-        if (type != CTB::MODULE)
-        {
-            return tl::unexpected("received message of wrong type");
-        }
-
+        CHECK(type == CTB::MODULE)
         const auto &ctbModule = reinterpret_cast<CTBModule &>(buffer);
-
-        if (ctbModule.moduleName != "Foo")
-        {
-            return tl::unexpected("wrong logical name received while compiling a-b.cpp");
-        }
+        CHECK(ctbModule.moduleName == "Foo")
 
         BMIFile requested;
         requested.filePath = fooPcm;
