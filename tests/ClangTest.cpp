@@ -968,9 +968,9 @@ tl::expected<void, string> runTest()
         SEND_MESSAGE(amod)
         endCompilerTest();
         CLOSE_BMI_MAPPING(bigHuBmiMapping)
-        IPCManagerBS::closeBMIFileMapping(aPcmMapping);
-        IPCManagerBS::closeBMIFileMapping(aBPcmMapping);
-        IPCManagerBS::closeBMIFileMapping(aCPcmMapping);
+        CLOSE_BMI_MAPPING(aPcmMapping);
+        CLOSE_BMI_MAPPING(aBPcmMapping);
+        CLOSE_BMI_MAPPING(aCPcmMapping);
     }
 
     // compiling main.cpp
@@ -1037,11 +1037,11 @@ tl::expected<void, string> runTest()
 
         endCompilerTest();
 
-        IPCManagerBS::closeBMIFileMapping(requestedMapping);
-        IPCManagerBS::closeBMIFileMapping(bigHuModDepBmiMapping);
-        IPCManagerBS::closeBMIFileMapping(aPcmMapping);
-        IPCManagerBS::closeBMIFileMapping(aBPcmMapping);
-        IPCManagerBS::closeBMIFileMapping(aCPcmMapping);
+        CLOSE_BMI_MAPPING(requestedMapping);
+        CLOSE_BMI_MAPPING(bigHuModDepBmiMapping);
+        CLOSE_BMI_MAPPING(aPcmMapping);
+        CLOSE_BMI_MAPPING(aBPcmMapping);
+        CLOSE_BMI_MAPPING(aCPcmMapping);
     }
 
     fflush(stdout);
