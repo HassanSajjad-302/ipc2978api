@@ -230,10 +230,18 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCModule(const CTBMo
         TRY_READ_VAL(modDepIsSytem, readBool, message, bytesRead);
         if (isHeaderUnit)
         {
-            readLogicalNames(message, bytesRead, modDepFile, FileType::HEADER_UNIT, modDepIsSytem);        }
+            if (const auto &r = readLogicalNames(message, bytesRead, modDepFile, FileType::HEADER_UNIT, modDepIsSytem);
+                !r)
+            {
+                return tl::unexpected(r.error());
+            }
+        }
         else
         {
-            readLogicalNames(message, bytesRead, modDepFile, FileType::MODULE, modDepIsSytem);
+            if (const auto &r = readLogicalNames(message, bytesRead, modDepFile, FileType::MODULE, modDepIsSytem); !r)
+            {
+                return tl::unexpected(r.error());
+            }
         }
     }
 

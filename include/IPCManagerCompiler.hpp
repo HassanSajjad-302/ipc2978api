@@ -80,9 +80,8 @@ class IPCManagerCompiler : Manager
     // For FileType::HEADER_FILE, it can return FileType::HEADER_UNIT, otherwise it will return the request
     // response. Either it will return from the cache or it will fetch it from the build-system
     [[nodiscard]] tl::expected<Response, std::string> findResponse(std::string_view logicalName, FileType type);
-    // This function should not be called if the compilation failed as the build-system does not expect to receive BMI
-    // if the compilation failed. Hence, it will not create the file-mapping and nor will it send BTCLastMessage, so the
-    // compiler process will indefinitely hang.
+
+    // This function should be called only if the compilation succedded
     [[nodiscard]] tl::expected<void, std::string> sendCTBLastMessage(const std::string &bmiFile,
                                                                      const std::string &filePath) const;
 };
