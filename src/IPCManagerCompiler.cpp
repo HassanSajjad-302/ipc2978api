@@ -2,7 +2,6 @@
 #include "IPCManagerCompiler.hpp"
 #include "Manager.hpp"
 #include "Messages.hpp"
-#include "rapidhash.h"
 
 #include <string>
 #include <utility>

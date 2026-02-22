@@ -8,7 +8,6 @@
 #ifdef _WIN32
 #include <Windows.h>
 #else
-#include "rapidhash.h"
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
