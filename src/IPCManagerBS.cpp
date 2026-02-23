@@ -160,18 +160,9 @@ tl::expected<Mapping, std::string> IPCManagerBS::createSharedMemoryBMIFile(BMIFi
     Mapping sharedFile{};
 #ifdef _WIN32
 
-    std::string mappingName = bmiFile.filePath;
-    for (char &c : mappingName)
-    {
-        if (c == '\\')
-        {
-            c = '/';
-        }
-    }
-
     if (bmiFile.fileSize == UINT32_MAX)
     {
-        const HANDLE hFile = CreateFileA(bmiFile.filePath.c_str(), GENERIC_READ,
+        const HANDLE hFile = CreateFileA(bmiFile.filePath.data(), GENERIC_READ,
                                          0, // no sharing during setup
                                          nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
         if (hFile == INVALID_HANDLE_VALUE)
@@ -185,8 +176,8 @@ tl::expected<Mapping, std::string> IPCManagerBS::createSharedMemoryBMIFile(BMIFi
             return tl::unexpected(getErrorString());
         }
 
-        sharedFile.mapping =
-            CreateFileMappingA(hFile, nullptr, PAGE_READONLY, fileSize.HighPart, fileSize.LowPart, mappingName.c_str());
+        sharedFile.mapping = CreateFileMappingA(hFile, nullptr, PAGE_READONLY, fileSize.HighPart, fileSize.LowPart,
+                                                bmiFile.filePath.data());
 
         CloseHandle(hFile);
 
@@ -200,9 +191,9 @@ tl::expected<Mapping, std::string> IPCManagerBS::createSharedMemoryBMIFile(BMIFi
     }
 
     // 1) Open the existing file‐mapping object (must have been created by another process)
-    sharedFile.mapping = OpenFileMappingA(FILE_MAP_READ,      // read‐only access
-                                          FALSE,              // do not inherit handle
-                                          mappingName.c_str() // name of mapping
+    sharedFile.mapping = OpenFileMappingA(FILE_MAP_READ,          // read‐only access
+                                          FALSE,                  // do not inherit handle
+                                          bmiFile.filePath.data() // name of mapping
     );
 
     if (sharedFile.mapping == nullptr)

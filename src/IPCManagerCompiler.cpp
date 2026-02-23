@@ -52,27 +52,30 @@ static bool endsWith(const std::string_view str, const std::string &suffix)
 
 tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(char (&buffer)[4096]) const
 {
-#ifdef _WIN32
-    const bool success = ReadFile((HANDLE)STD_INPUT_HANDLE, // pipe handle
-                                  buffer,                   // buffer to receive reply
-                                  4096,                     // size of buffer
-                                  LPDWORD(&bytesRead),      // number of bytes read
-                                  nullptr);                 // not overlapped
-
-    if (const uint32_t lastError = GetLastError(); !success && lastError != ERROR_MORE_DATA)
-    {
-        return tl::unexpected(getErrorString());
-    }
-
-#else
     std::string *output = nullptr;
     while (true)
     {
-        const uint32_t bytesRead = read(STDIN_FILENO, buffer, 4096);
+        uint32_t bytesRead;
+#ifdef _WIN32
+        const bool success = ReadFile((HANDLE)STD_INPUT_HANDLE, // pipe handle
+                                      buffer,                   // buffer to receive reply
+                                      4096,                     // size of buffer
+                                      LPDWORD(&bytesRead),      // number of bytes read
+                                      nullptr);                 // not overlapped
+
+        if (const uint32_t lastError = GetLastError(); !success && lastError != ERROR_MORE_DATA)
+        {
+            return tl::unexpected(getErrorString());
+        }
+
+#else
+        bytesRead = read(STDIN_FILENO, buffer, 4096);
         if (bytesRead == -1)
         {
             return tl::unexpected(getErrorString());
         }
+
+#endif
         if (!bytesRead)
         {
             return tl::unexpected(getErrorString(ErrorCategory::READ_FILE_ZERO_BYTES_READ));
@@ -96,7 +99,6 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(cha
             return std::string_view{output->data(), output->size() - strlen(delimiter)};
         }
     }
-#endif
 }
 
 tl::expected<void, std::string> IPCManagerCompiler::writeInternal(const std::string_view buffer) const
@@ -325,16 +327,17 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCNonModule(const CT
 tl::expected<Response, std::string> IPCManagerCompiler::findResponse(std::string_view logicalName, const FileType type)
 {
 #ifdef _WIN32
+    std::string logicalName2{logicalName};
     if (type != FileType::MODULE)
     {
-        for (char &c : logicalName)
+        for (char &c : logicalName2)
         {
             c = std::tolower(c);
         }
     }
 #endif
 
-    if (const auto &it = responses.find(logicalName);
+    if (const auto &it = responses.find(logicalName2);
         // This requests from the build-system if we don't have an entry for the logicalName or if there is a type
         // mismatch between the request and the response. Only allowed mismatch is if the request is of header-file and
         // the response is a header-unit instead. For other mismatches compiler will request the build-system which will
@@ -346,7 +349,7 @@ tl::expected<Response, std::string> IPCManagerCompiler::findResponse(std::string
         if (type == FileType::MODULE)
         {
             CTBModule ctbModule;
-            ctbModule.moduleName = logicalName;
+            ctbModule.moduleName = logicalName2;
             if (const auto &r2 = receiveBTCModule(ctbModule); !r2)
             {
                 return tl::unexpected(r2.error());
@@ -355,7 +358,7 @@ tl::expected<Response, std::string> IPCManagerCompiler::findResponse(std::string
         else
         {
             CTBNonModule ctbNonModule;
-            ctbNonModule.logicalName = logicalName;
+            ctbNonModule.logicalName = logicalName2;
             ctbNonModule.isHeaderUnit = type == FileType::HEADER_UNIT;
             if (const auto &r2 = receiveBTCNonModule(ctbNonModule); !r2)
             {
@@ -363,7 +366,7 @@ tl::expected<Response, std::string> IPCManagerCompiler::findResponse(std::string
             }
         }
 
-        return responses.at(logicalName);
+        return responses.at(logicalName2);
     }
     else
     {
@@ -422,7 +425,7 @@ tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const std
     UnmapViewOfFile(pView);
     CloseHandle(hFile);
 
-    if (const auto &r = sendCTBLastMessage(logicalName, fileSize); !r)
+    if (const auto &r = sendCTBLastMessage(fileSize.QuadPart); !r)
     {
         return tl::unexpected(r.error());
     }
@@ -489,18 +492,10 @@ tl::expected<Mapping, std::string> IPCManagerCompiler::readSharedMemoryBMIFile(c
 {
     Mapping f{};
 #ifdef _WIN32
-    std::string mappingName = file.filePath;
-    for (char &c : mappingName)
-    {
-        if (c == '\\')
-        {
-            c = '/';
-        }
-    }
     // 1) Open the existing file‐mapping object (must have been created by another process)
     const HANDLE mapping = OpenFileMappingA(FILE_MAP_READ,      // read‐only access
                                             FALSE,              // do not inherit a handle
-                                            mappingName.c_str() // name of mapping
+                                            file.filePath.data() // name of mapping
     );
 
     if (mapping == nullptr)
