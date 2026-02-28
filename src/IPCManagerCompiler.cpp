@@ -338,7 +338,7 @@ tl::expected<Response, std::string> IPCManagerCompiler::findResponse(std::string
     }
 #endif
 
-    if (const auto &it = responses.find(logicalName2);
+    if (const auto &it = responses.find(logicalName);
         // This requests from the build-system if we don't have an entry for the logicalName or if there is a type
         // mismatch between the request and the response. Only allowed mismatch is if the request is of header-file and
         // the response is a header-unit instead. For other mismatches compiler will request the build-system which will
@@ -350,7 +350,7 @@ tl::expected<Response, std::string> IPCManagerCompiler::findResponse(std::string
         if (type == FileType::MODULE)
         {
             CTBModule ctbModule;
-            ctbModule.moduleName = logicalName2;
+            ctbModule.moduleName = logicalName;
             if (const auto &r2 = receiveBTCModule(ctbModule); !r2)
             {
                 return tl::unexpected(r2.error());
@@ -359,7 +359,7 @@ tl::expected<Response, std::string> IPCManagerCompiler::findResponse(std::string
         else
         {
             CTBNonModule ctbNonModule;
-            ctbNonModule.logicalName = logicalName2;
+            ctbNonModule.logicalName = logicalName;
             ctbNonModule.isHeaderUnit = type == FileType::HEADER_UNIT;
             if (const auto &r2 = receiveBTCNonModule(ctbNonModule); !r2)
             {
@@ -367,7 +367,7 @@ tl::expected<Response, std::string> IPCManagerCompiler::findResponse(std::string
             }
         }
 
-        return responses.at(logicalName2);
+        return responses.at(logicalName);
     }
     else
     {
