@@ -96,8 +96,16 @@ auto createTempTestFilesEntry(const bool makeMapping, const string_view key, con
         c = tolower(c);
     }
 
-    const string filePath = (current_path() / str).string();
-    const string fileContents = getRandomString();
+    string filePath = (current_path() / str).string();
+    for (char &c : filePath)
+    {
+        c = tolower(c);
+    }
+    string fileContents = getRandomString();
+    if (fileContents.empty())
+    {
+        fileContents.push_back('a');
+    }
     std::ofstream(filePath) << fileContents;
     string *s = new string(key);
     buildTestallocations.emplace_back(s);
@@ -135,7 +143,15 @@ BTCModule getBTCModule(const CTBModule &ctbModule)
         }
 
         string *filePath = new string((current_path() / str).string());
+        for (char &c : *filePath)
+        {
+            c = tolower(c);
+        }
         string *fileContents = new string(getRandomString());
+        if (fileContents->empty())
+        {
+            fileContents->push_back('a');
+        }
         {
             // Creating file and the mapping
             std::ofstream(*filePath) << *fileContents;
@@ -229,7 +245,15 @@ BTCNonModule getBTCNonModule(const CTBNonModule &ctbNonModule)
         }
 
         string *filePath = new string((current_path() / str).string());
+        for (char &c : *filePath)
+        {
+            c = tolower(c);
+        }
         string *fileContents = new string(getRandomString());
+        if (fileContents->empty())
+        {
+            fileContents->push_back('a');
+        }
         {
 
             // Creating file and the mapping

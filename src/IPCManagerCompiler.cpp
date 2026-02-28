@@ -400,11 +400,23 @@ tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const std
         return tl::unexpected(getErrorString());
     }
 
+    // mappingName is needed as the Windows kernel object names can't have \\ in them.
+    const uint64_t hash = rapidhash(filePath.data(), filePath.size());
+    char mappingName[17];
+    static constexpr char hex[] = "0123456789abcdef";
+    for (int i = 0; i < 8; i++)
+    {
+        const uint8_t byte = hash >> (56 - i * 8) & 0xFF;
+        mappingName[i * 2] = hex[byte >> 4];
+        mappingName[i * 2 + 1] = hex[byte & 0xF];
+    }
+    mappingName[16] = '\0';
+
     LARGE_INTEGER fileSize;
     fileSize.QuadPart = bmiFile.size();
     // 3) Create a RW mapping of that file:
     const HANDLE hMap =
-        CreateFileMappingA(hFile, nullptr, PAGE_READWRITE, fileSize.HighPart, fileSize.LowPart, filePath.c_str());
+        CreateFileMappingA(hFile, nullptr, PAGE_READWRITE, fileSize.HighPart, fileSize.LowPart, mappingName);
     if (!hMap)
     {
         return tl::unexpected(getErrorString());
