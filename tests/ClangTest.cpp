@@ -12,7 +12,6 @@
 
 #include <cstring>
 #include <iostream>
-#include <wordexp.h>
 #ifdef IS_THIS_CLANG_REPO
 #include "clang/IPC2978/IPCManagerBS.hpp"
 #include "gtest/gtest.h"
@@ -30,6 +29,7 @@
 #include <sys/epoll.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <wordexp.h>
 #endif
 
 using namespace std::filesystem;
@@ -387,7 +387,7 @@ void readCompilerMessage(const uint64_t serverFd, const uint64_t readFd)
         }
 
         // Check for terminator
-        if (ends_with(compilerTestPrunedOutput, delimiter))
+        if (endsWith(compilerTestPrunedOutput, delimiter))
         {
             return;
         }
