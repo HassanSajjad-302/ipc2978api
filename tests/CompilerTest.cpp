@@ -11,7 +11,7 @@
 
 using fmt::print;
 using namespace std;
-using namespace N2978;
+using namespace P2978;
 
 struct CompilerTest
 {

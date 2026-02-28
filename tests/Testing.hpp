@@ -9,7 +9,7 @@
 #include <string>
 
 using std::string, std::string_view, std::vector, std::map;
-using namespace N2978;
+using namespace P2978;
 
 inline std::random_device rd;
 inline int randomSeed = rd();
@@ -30,7 +30,8 @@ void printMessage(const BTCModule &btcModule, bool sent);
 void printMessage(const BTCNonModule &nonModule, bool sent);
 void printMessage(const BTCLastMessage &lastMessage, bool sent);
 
-struct TestResponse{
+struct TestResponse
+{
     string filePath;
     string fileContent;
     FileType type;

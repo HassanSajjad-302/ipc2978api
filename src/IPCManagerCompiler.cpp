@@ -34,7 +34,7 @@
     }                                                                                                                  \
     auto &var = *var##_result;
 
-namespace N2978
+namespace P2978
 {
 
 Response::Response(std::string_view filePath_, const Mapping &mapping_, const FileType type_, const bool isSystem_)
@@ -86,7 +86,7 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(cha
         {
             if (bytesRead < strlen(delimiter))
             {
-                return tl::unexpected("N2978 Error: Received string only has delimiter but not the size of payload\n");
+                return tl::unexpected("P2978 Error: Received string only has delimiter but not the size of payload\n");
             }
             output = new std::string{};
             allocations.emplace_back(output);
@@ -586,4 +586,4 @@ bool operator==(const CTBNonModule &lhs, const CTBNonModule &rhs)
 {
     return lhs.isHeaderUnit == rhs.isHeaderUnit && lhs.logicalName == rhs.logicalName;
 }
-} // namespace N2978
+} // namespace P2978

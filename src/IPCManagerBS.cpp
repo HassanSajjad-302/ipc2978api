@@ -31,7 +31,7 @@
     }                                                                                                                  \
     auto &var = *var##_result;
 
-namespace N2978
+namespace P2978
 {
 
 tl::expected<void, std::string> IPCManagerBS::writeInternal(const std::string_view buffer) const
@@ -261,4 +261,4 @@ tl::expected<void, std::string> IPCManagerBS::closeBMIFileMapping(const Mapping 
     return {};
 }
 
-} // namespace N2978
+} // namespace P2978

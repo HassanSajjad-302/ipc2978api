@@ -33,7 +33,7 @@
 #endif
 
 using namespace std::filesystem;
-using namespace N2978;
+using namespace P2978;
 using namespace std;
 
 #ifdef _WIN32
