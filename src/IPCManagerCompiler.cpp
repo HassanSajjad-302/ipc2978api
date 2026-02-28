@@ -7,6 +7,7 @@
 #include <utility>
 
 #ifdef _WIN32
+#include "rapidhash.h"
 #include <Windows.h>
 #else
 #include <cstring>
@@ -492,10 +493,23 @@ tl::expected<Mapping, std::string> IPCManagerCompiler::readSharedMemoryBMIFile(c
 {
     Mapping f{};
 #ifdef _WIN32
+
+    // mappingName is needed as the Windows kernel object names can't have \\ in them.
+    const uint64_t hash = rapidhash(file.filePath.data(), file.filePath.size());
+    char mappingName[17];
+    static constexpr char hex[] = "0123456789abcdef";
+    for (int i = 0; i < 8; i++)
+    {
+        const uint8_t byte = hash >> (56 - i * 8) & 0xFF;
+        mappingName[i * 2] = hex[byte >> 4];
+        mappingName[i * 2 + 1] = hex[byte & 0xF];
+    }
+    mappingName[16] = '\0';
+
     // 1) Open the existing file‐mapping object (must have been created by another process)
-    const HANDLE mapping = OpenFileMappingA(FILE_MAP_READ,      // read‐only access
-                                            FALSE,              // do not inherit a handle
-                                            file.filePath.data() // name of mapping
+    const HANDLE mapping = OpenFileMappingA(FILE_MAP_READ, // read‐only access
+                                            FALSE,         // do not inherit a handle
+                                            mappingName    // name of mapping
     );
 
     if (mapping == nullptr)

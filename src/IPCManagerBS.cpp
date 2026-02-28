@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 
 #ifdef _WIN32
+#include "rapidhash.h"
 #include <Windows.h>
 #else
 #include <fcntl.h>
@@ -160,6 +161,18 @@ tl::expected<Mapping, std::string> IPCManagerBS::createSharedMemoryBMIFile(BMIFi
     Mapping sharedFile{};
 #ifdef _WIN32
 
+    // mappingName is needed as the Windows kernel object names can't have \\ in them.
+    const uint64_t hash = rapidhash(bmiFile.filePath.data(), bmiFile.filePath.size());
+    char mappingName[17];
+    static constexpr char hex[] = "0123456789abcdef";
+    for (int i = 0; i < 8; i++)
+    {
+        const uint8_t byte = hash >> (56 - i * 8) & 0xFF;
+        mappingName[i * 2] = hex[byte >> 4];
+        mappingName[i * 2 + 1] = hex[byte & 0xF];
+    }
+    mappingName[16] = '\0';
+
     if (bmiFile.fileSize == UINT32_MAX)
     {
         const HANDLE hFile = CreateFileA(bmiFile.filePath.data(), GENERIC_READ,
@@ -176,8 +189,8 @@ tl::expected<Mapping, std::string> IPCManagerBS::createSharedMemoryBMIFile(BMIFi
             return tl::unexpected(getErrorString());
         }
 
-        sharedFile.mapping = CreateFileMappingA(hFile, nullptr, PAGE_READONLY, fileSize.HighPart, fileSize.LowPart,
-                                                bmiFile.filePath.data());
+        sharedFile.mapping =
+            CreateFileMappingA(hFile, nullptr, PAGE_READONLY, fileSize.HighPart, fileSize.LowPart, mappingName);
 
         CloseHandle(hFile);
 
@@ -191,9 +204,9 @@ tl::expected<Mapping, std::string> IPCManagerBS::createSharedMemoryBMIFile(BMIFi
     }
 
     // 1) Open the existing file‐mapping object (must have been created by another process)
-    sharedFile.mapping = OpenFileMappingA(FILE_MAP_READ,          // read‐only access
-                                          FALSE,                  // do not inherit handle
-                                          bmiFile.filePath.data() // name of mapping
+    sharedFile.mapping = OpenFileMappingA(FILE_MAP_READ, // read‐only access
+                                          FALSE,         // do not inherit handle
+                                          mappingName    // name of mapping
     );
 
     if (sharedFile.mapping == nullptr)
