@@ -40,7 +40,7 @@ struct CompilerTest
 
 int main()
 {
-   // std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    // std::this_thread::sleep_for(std::chrono::milliseconds(5000));
     IPCManagerCompiler manager;
     CompilerTest t(&manager);
     for (uint64_t i = 0; i < 300; ++i)
@@ -163,6 +163,7 @@ int main()
     print(delimiter);
 }
 
-extern "C" const char* __asan_default_options() {
+extern "C" const char *__asan_default_options()
+{
     return "detect_container_overflow=0";
 }

@@ -873,7 +873,7 @@ int runTest()
         delete alloc;
     }
 
-        print("Exiting Successfully\n\n ");
+    print("Exiting Successfully\n\n ");
     return EXIT_SUCCESS;
 }
 
@@ -888,6 +888,7 @@ int main()
     fmt::println("\n\n\nCompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
 }
 
-extern "C" const char* __asan_default_options() {
+extern "C" const char *__asan_default_options()
+{
     return "detect_container_overflow=0";
 }
