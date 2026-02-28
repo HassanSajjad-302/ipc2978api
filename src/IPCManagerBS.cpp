@@ -248,7 +248,10 @@ tl::expected<Mapping, std::string> IPCManagerBS::createSharedMemoryBMIFile(BMIFi
 tl::expected<void, std::string> IPCManagerBS::closeBMIFileMapping(const Mapping &processMappingOfBMIFile)
 {
 #ifdef _WIN32
-    CloseHandle(processMappingOfBMIFile.mapping);
+    if (!CloseHandle(processMappingOfBMIFile.mapping))
+    {
+        return tl::unexpected(getErrorString());
+    }
 #else
     if (munmap((void *)processMappingOfBMIFile.file.data(), processMappingOfBMIFile.file.size()) == -1)
     {

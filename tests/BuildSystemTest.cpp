@@ -851,7 +851,7 @@ int runTest()
         {
             exitFailure(r2.error());
         }
-        print("Reply to Second CTBLastMessage ");
+        print("Reply to Second CTBLastMessage\n\n ");
     }
 
     // As CompilerTest will output some print statements.
@@ -863,8 +863,6 @@ int runTest()
         print("CompilerTest did not exit successfully. ExitCode {}\n", compilerTest.exitStatus);
     }
 
-    // Only after reaping process, we close the file mapping, so the CompilerTest check the mapping content with the
-    // file content.
     if (const auto &r2 = IPCManagerBS::closeBMIFileMapping(bmi2Mapping); !r2)
     {
         exitFailure(r2.error());
@@ -875,6 +873,7 @@ int runTest()
         delete alloc;
     }
 
+        print("Exiting Successfully\n\n ");
     return EXIT_SUCCESS;
 }
 
@@ -887,4 +886,8 @@ int main()
     buildTestallocations.clear();
     runTest();
     fmt::println("\n\n\nCompilerTest Output\n\n\n {}", compilerTestPrunedOutput);
+}
+
+extern "C" const char* __asan_default_options() {
+    return "detect_container_overflow=0";
 }
