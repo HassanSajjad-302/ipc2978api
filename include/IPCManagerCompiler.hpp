@@ -77,6 +77,8 @@ class IPCManagerCompiler : Manager
     // lexically normal and lower-case on Windows.
     std::unordered_map<std::string, Mapping> filePathProcessMapping;
 
+    // TODO
+    // For FileType:HEADER_FILE, it could also return FileType::MODULE, but Clang currently does not support it.
     // For FileType::HEADER_FILE, it can return FileType::HEADER_UNIT, otherwise it will return the request
     // response. Either it will return from the cache or it will fetch it from the build-system
     [[nodiscard]] tl::expected<Response, std::string> findResponse(std::string_view logicalName, FileType type);

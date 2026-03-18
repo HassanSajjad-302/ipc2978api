@@ -476,12 +476,6 @@ void RunCommand::reapProcess() const
 
 string compilerTestPrunedOutput;
 
-#ifdef _WIN32
-#define COMPILER_TEST ".\\CompilerTest.exe"
-#else
-#define COMPILER_TEST "./CompilerTest"
-#endif
-
 struct BuildSystemTest
 {
 

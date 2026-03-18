@@ -97,15 +97,19 @@ auto createTempTestFilesEntry(const bool makeMapping, const string_view key, con
     }
 
     string filePath = (current_path() / str).string();
+#ifdef _WIN32
     for (char &c : filePath)
     {
         c = tolower(c);
     }
+#endif
     string fileContents = getRandomString();
     if (fileContents.empty())
     {
         fileContents.push_back('a');
     }
+    print(filePath);
+    fflush(stdout);
     std::ofstream(filePath) << fileContents;
     string *s = new string(key);
     buildTestallocations.emplace_back(s);
@@ -143,10 +147,12 @@ BTCModule getBTCModule(const CTBModule &ctbModule)
         }
 
         string *filePath = new string((current_path() / str).string());
+#ifdef _WIN32
         for (char &c : *filePath)
         {
             c = tolower(c);
         }
+#endif
         string *fileContents = new string(getRandomString());
         if (fileContents->empty())
         {
@@ -245,10 +251,12 @@ BTCNonModule getBTCNonModule(const CTBNonModule &ctbNonModule)
         }
 
         string *filePath = new string((current_path() / str).string());
+#ifdef _WIN32
         for (char &c : *filePath)
         {
             c = tolower(c);
         }
+#endif
         string *fileContents = new string(getRandomString());
         if (fileContents->empty())
         {

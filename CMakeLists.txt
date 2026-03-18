@@ -8,7 +8,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" OR "${CMAKE_CXX_COMPILER_ID}" MAT
     add_compile_options(-fno-exceptions -fno-rtti)
 elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "MSVC")
     if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-        add_compile_options(/fsanitize=address)
+        add_compile_options($<$<CONFIG:Debug>:/fsanitize=address>)
     endif ()
     string(REGEX REPLACE "/GR" "/GR-" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     string(REGEX REPLACE "/EHsc" "/EHs-c-" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
@@ -35,6 +35,9 @@ target_link_libraries(Testing PUBLIC fmt Compiler BuildSystem)
 add_executable(CompilerTest tests/CompilerTest.cpp)
 add_executable(BuildSystemTest tests/BuildSystemTest.cpp)
 
+target_compile_definitions(BuildSystemTest PRIVATE
+        COMPILER_TEST="$<TARGET_FILE:CompilerTest>"
+)
 
 target_link_libraries(CompilerTest PUBLIC Compiler Testing)
 target_link_libraries(BuildSystemTest PUBLIC BuildSystem Compiler Testing)
@@ -44,3 +47,9 @@ add_executable(ClangTest tests/ClangTest.cpp)
 
 target_link_libraries(ClangTest PUBLIC BuildSystem Compiler Testing)
 target_include_directories(ClangTest PUBLIC include)
+
+enable_testing()
+add_test(
+        NAME MyTest
+        COMMAND $<TARGET_FILE:BuildSystemTest>  # resolves correct path on all platforms
+)
