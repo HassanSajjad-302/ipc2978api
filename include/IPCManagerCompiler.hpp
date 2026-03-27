@@ -46,9 +46,6 @@ class IPCManagerCompiler : Manager
 
     tl::expected<BMIFileMapping, std::string> readProcessMappingOfBMIFile(std::string_view message,
                                                                           uint32_t &bytesRead);
-    static tl::expected<ModuleDep, std::string> readModuleDep(std::string_view message, uint32_t &bytesRead);
-    static tl::expected<HuDep, std::string> readHuDep(std::string_view message, uint32_t &bytesRead);
-    static tl::expected<HeaderFile, std::string> readHeaderFile(std::string_view message, uint32_t &bytesRead);
     tl::expected<void, std::string> readLogicalNames(std::string_view message, uint32_t &bytesRead,
                                                      const BMIFileMapping &mapping, FileType type, bool isSystem);
 
