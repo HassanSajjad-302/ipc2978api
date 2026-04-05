@@ -414,7 +414,7 @@ static std::string fileToString(const std::string_view fileName)
     return fileBuffer;
 }
 
-tl::expected<void, std::string> IPCManagerCompiler::readEntriesFromFile(const std::string &filePath)
+tl::expected<void, std::string> IPCManagerCompiler::readEntriesFromFile(const std::string_view filePath)
 {
     scanCacheFileData = fileToString(filePath);
 

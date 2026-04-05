@@ -72,7 +72,7 @@ class IPCManagerCompiler : Manager
 
   public:
     // This is an IPC mock. This reads all entries from the file
-    tl::expected<void, std::string> readEntriesFromFile(const std::string& filePath);
+    tl::expected<void, std::string> readEntriesFromFile(std::string_view filePath);
 
     // Compiler process can use this function to close the BMI file-mapping to reduce references to shared memory file.
     // Not needed as it will be cleared at process exit.
