@@ -4,6 +4,7 @@
 #include "Messages.hpp"
 
 #include <string>
+#include <unordered_set>
 #include <utility>
 
 #ifdef _WIN32
@@ -424,20 +425,28 @@ tl::expected<void, std::string> IPCManagerCompiler::readEntriesFromFile(const st
     {
         TRY_READ_VAL(responseKey, readString, scanCacheFileData, bytesRead);
 
-        TRY_READ_VAL(valueFilePath, readString, scanCacheFileData, bytesRead);
+        TRY_READ_VAL(valueFilePath, readPath, scanCacheFileData, bytesRead);
         TRY_READ_VAL(fileType, readUInt8, scanCacheFileData, bytesRead);
         TRY_READ_VAL(isSystem, readBool, scanCacheFileData, bytesRead);
 
         Mapping mapping{};
-        if (static_cast<FileType>(fileType) != FileType::HEADER_FILE)
+        if (auto it = filePathProcessMapping.find(std::string(valueFilePath)); it == filePathProcessMapping.end())
         {
-            const std::string *fileText = new std::string{fileToString(filePath)};
-            mapping.file = *fileText;
-            filePathProcessMapping.emplace(valueFilePath, mapping);
+            if (static_cast<FileType>(fileType) != FileType::HEADER_FILE)
+            {
+                const std::string *fileText = new std::string{fileToString(valueFilePath)};
+                mapping.file = *fileText;
+                filePathProcessMapping.emplace(valueFilePath, mapping);
+            }
+        }
+        else
+        {
+            mapping.file = it->second.file;
         }
         responses.emplace(responseKey, Response{valueFilePath, mapping, static_cast<FileType>(fileType), isSystem});
     }
 
+    mockFilePath = filePath;
     isMocking = true;
     return {};
 }

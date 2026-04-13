@@ -739,7 +739,7 @@ tl::expected<void, string> runTest()
     // compiling a-c.cpp
     {
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aCObj +
-                                "\" -noScanIPC -c -xc++-module a-c.cpp -fmodule-output=\"" + aCPcm + "\"";
+                                "\" -useIPC -c -xc++-module a-c.cpp -fmodule-output=\"" + aCPcm + "\"";
 
         IPCManagerBS manager = readFirstCompilerStdout(compileCommand, false);
         endCompilerTest();
@@ -748,7 +748,7 @@ tl::expected<void, string> runTest()
     // compiling a-b.cpp
     {
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aBObj +
-                                "\" -noScanIPC -c -xc++-module a-b.cpp -fmodule-output=\"" + aBPcm + "\"";
+                                "\" -useIPC -c -xc++-module a-b.cpp -fmodule-output=\"" + aBPcm + "\"";
 
         IPCManagerBS manager = readFirstCompilerStdout(compileCommand, false);
         endCompilerTest();
@@ -756,7 +756,7 @@ tl::expected<void, string> runTest()
     // compiling a.cpp
     {
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + aObj +
-                                "\" -noScanIPC -c -xc++-module a.cpp -fmodule-output=\"" + aPcm + "\"";
+                                "\" -useIPC -c -xc++-module a.cpp -fmodule-output=\"" + aPcm + "\"";
 
         IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
 
@@ -791,7 +791,7 @@ tl::expected<void, string> runTest()
     // compiling n.hpp
     {
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + nPcm +
-                                "\" -noScanIPC -xc++-header n.hpp -DCOMMAND_MACRO";
+                                "\" -useIPC -xc++-header n.hpp -DCOMMAND_MACRO";
 
         IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
 
@@ -809,7 +809,7 @@ tl::expected<void, string> runTest()
     // compiling o.hpp
     {
         string compileCommand =
-            CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm + "\" -noScanIPC -xc++-header o.hpp";
+            CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm + "\" -useIPC -xc++-header o.hpp";
 
         IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
 
@@ -847,7 +847,7 @@ tl::expected<void, string> runTest()
     // isHeaderUnit = true.
     {
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + oPcm +
-                                "\" -noScanIPC -xc++-header o.hpp -DTRANSLATING";
+                                "\" -useIPC -xc++-header o.hpp -DTRANSLATING";
 
         IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
 
@@ -884,7 +884,7 @@ tl::expected<void, string> runTest()
     // compiling big.hpp
     {
         string compileCommand =
-            CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + bigPcm + "\" -noScanIPC -xc++-header big.hpp";
+            CLANG_CMD R"( -std=c++20 -fmodule-header=user -o ")" + bigPcm + "\" -useIPC -xc++-header big.hpp";
 
         IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
 
@@ -913,7 +913,7 @@ tl::expected<void, string> runTest()
     // compiling foo.cpp
     {
         string compileCommand = CLANG_CMD R"( -std=c++20 -fmodules-reduced-bmi -o ")" + fooObj +
-                                "\" -noScanIPC -c -xc++-module foo.cpp -fmodule-output=\"" + fooPcm + "\"";
+                                "\" -useIPC -c -xc++-module foo.cpp -fmodule-output=\"" + fooPcm + "\"";
 
         IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
 
@@ -975,7 +975,7 @@ tl::expected<void, string> runTest()
 
     // compiling main.cpp
     {
-        string compileCommand = CLANG_CMD R"( -std=c++20 -o ")" + mainObj + "\" -noScanIPC -c main.cpp";
+        string compileCommand = CLANG_CMD R"( -std=c++20 -o ")" + mainObj + "\" -useIPC -c main.cpp";
 
         IPCManagerBS manager = readFirstCompilerStdout(compileCommand, true);
 
