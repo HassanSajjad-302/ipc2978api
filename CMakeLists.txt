@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" OR "${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
     add_link_options(-fsanitize=address -fno-omit-frame-pointer)
-    add_compile_options(-fno-exceptions -fno-rtti)
+    add_compile_options(-fsanitize=address -fno-omit-frame-pointer -fno-exceptions -fno-rtti)
 elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "MSVC")
     if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
         add_compile_options($<$<CONFIG:Debug>:/fsanitize=address>)
@@ -47,9 +47,24 @@ add_executable(ClangTest tests/ClangTest.cpp)
 
 target_link_libraries(ClangTest PUBLIC BuildSystem Compiler Testing)
 target_include_directories(ClangTest PUBLIC include)
+set(IPC2978_CLANG_EXECUTABLE "" CACHE FILEPATH "Clang rebuilt with the current IPC2978 library")
+if (IPC2978_CLANG_EXECUTABLE)
+    get_filename_component(IPC2978_CLANG_EXECUTABLE "${IPC2978_CLANG_EXECUTABLE}" ABSOLUTE)
+    target_compile_definitions(ClangTest PRIVATE IPC2978_CLANG_EXECUTABLE="${IPC2978_CLANG_EXECUTABLE}")
+endif ()
 
 enable_testing()
 add_test(
         NAME MyTest
         COMMAND $<TARGET_FILE:BuildSystemTest>  # resolves correct path on all platforms
 )
+add_executable(MappingTest tests/MappingTest.cpp)
+target_link_libraries(MappingTest PRIVATE Compiler BuildSystem)
+add_test(NAME MappingTest COMMAND MappingTest)
+if (IPC2978_CLANG_EXECUTABLE)
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/ClangTest-work")
+    add_test(NAME ClangTest COMMAND ClangTest "${IPC2978_CLANG_EXECUTABLE}")
+    set_tests_properties(ClangTest PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/ClangTest-work"
+            TIMEOUT 120)
+endif ()

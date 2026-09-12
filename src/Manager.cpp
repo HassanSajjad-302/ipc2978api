@@ -2,12 +2,15 @@
 #include "Manager.hpp"
 #include "Messages.hpp"
 #include "expected.hpp"
+#include <algorithm>
+#include <cerrno>
+#include <cstdio>
+#include <cstring>
 
 #ifdef _WIN32
 #include <Windows.h>
 #else
-#include <cstring>
-#include <sys/mman.h>
+#include <limits.h>
 #include <unistd.h>
 #endif
 
@@ -19,7 +22,7 @@ std::string getErrorString()
 #ifdef _WIN32
     const DWORD err = GetLastError();
 
-    char *msg_buf;
+    char *msg_buf = nullptr;
     FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr,
                    err, MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT), reinterpret_cast<char *>(&msg_buf), 0, nullptr);
 
@@ -38,7 +41,7 @@ std::string getErrorString()
 #endif
 }
 
-std::string getErrorString(const uint32_t bytesRead_, const uint32_t bytesProcessed_)
+std::string getErrorString(const uint64_t bytesRead_, const uint64_t bytesProcessed_)
 {
     return "Error: Bytes Readd vs Bytes Processed Mismatch.\nBytes Read: " + std::to_string(bytesRead_) +
            ", Bytes Processed: " + std::to_string(bytesProcessed_);
@@ -56,9 +59,6 @@ std::string getErrorString(const ErrorCategory errorCategory_)
     case ErrorCategory::READ_FILE_ZERO_BYTES_READ:
         errorString = "Error: ReadFile Zero Bytes Read.";
         break;
-    case ErrorCategory::INCORRECT_BTC_LAST_MESSAGE:
-        errorString = "Error: Incorrect BTC Last Message.";
-        break;
     case ErrorCategory::UNKNOWN_CTB_TYPE:
         errorString = "Error: Unknown CTB message received.";
         break;
@@ -74,14 +74,16 @@ std::string getErrorString(const ErrorCategory errorCategory_)
 }
 
 #ifndef _WIN32
-tl::expected<void, std::string> Manager::writeAll(const int fd, const char *buffer, const uint32_t count)
+tl::expected<void, std::string> Manager::writeAll(const int fd, const char *buffer, const uint64_t count)
 {
-    uint32_t bytesWritten = 0;
+    uint64_t bytesWritten = 0;
 
     while (bytesWritten != count)
     {
-        const int32_t result = write(fd, buffer + bytesWritten, count - bytesWritten);
-        if (result == -1)
+        // Converting the syscall's -1 result to uint64_t gives UINT64_MAX.
+        const uint64_t result = write(fd, buffer + bytesWritten,
+                                      std::min<uint64_t>(count - bytesWritten, SSIZE_MAX));
+        if (result == UINT64_MAX)
         {
             if (errno == EINTR)
             {
@@ -100,6 +102,22 @@ tl::expected<void, std::string> Manager::writeAll(const int fd, const char *buff
 
     return {};
 }
+#else
+tl::expected<void, std::string> Manager::writeAll(void *handle, std::string_view buffer)
+{
+    uint64_t offset = 0;
+    while (offset < buffer.size())
+    {
+        const DWORD count = static_cast<DWORD>(std::min<uint64_t>(buffer.size() - offset, MAXDWORD));
+        DWORD written = 0;
+        if (!WriteFile(handle, buffer.data() + offset, count, &written, nullptr))
+            return tl::unexpected(getErrorString());
+        if (!written)
+            return tl::unexpected(std::string("WriteFile wrote zero bytes"));
+        offset += written;
+    }
+    return {};
+}
 #endif
 
 std::string Manager::getBufferWithType(CTB type)
@@ -112,7 +130,7 @@ std::string Manager::getBufferWithType(CTB type)
 void Manager::writeUInt32(std::string &buffer, const uint32_t value)
 {
     const auto ptr = reinterpret_cast<const char *>(&value);
-    buffer.append(ptr, ptr + 4);
+    buffer.append(ptr, sizeof(value));
 }
 
 void Manager::writeString(std::string &buffer, const std::string_view &str)
@@ -165,15 +183,6 @@ void Manager::writeVectorOfStrings(std::string &buffer, const std::vector<std::s
     }
 }
 
-void Manager::writeVectorOfProcessMappingOfBMIFiles(std::string &buffer, const std::vector<BMIFile> &files)
-{
-    writeUInt32(buffer, files.size());
-    for (const BMIFile &file : files)
-    {
-        writeBMIFile(buffer, file);
-    }
-}
-
 void Manager::writeVectorOfModuleDep(std::string &buffer, const std::vector<ModuleDep> &deps)
 {
     writeUInt32(buffer, deps.size());
@@ -201,20 +210,23 @@ void Manager::writeVectorOfHeaderFiles(std::string &buffer, const std::vector<He
     }
 }
 
-tl::expected<bool, std::string> Manager::readBool(const std::string_view message, uint32_t &bytesRead)
+tl::expected<bool, std::string> Manager::readBool(const std::string_view message, uint64_t &bytesRead)
 {
-    if (bytesRead + 1 > message.size())
+    if (bytesRead >= message.size())
     {
         return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
     }
-    bool result = *reinterpret_cast<const bool *>(message.data() + bytesRead);
+    const unsigned char value = static_cast<unsigned char>(message[bytesRead]);
+    if (value > 1)
+        return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
+    bool result = value != 0;
     bytesRead += 1;
     return result;
 }
 
-tl::expected<uint8_t, std::string> Manager::readUInt8(const std::string_view message, uint32_t &bytesRead)
+tl::expected<uint8_t, std::string> Manager::readUInt8(const std::string_view message, uint64_t &bytesRead)
 {
-    if (bytesRead + 1 > message.size())
+    if (bytesRead >= message.size())
     {
         return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
     }
@@ -223,27 +235,27 @@ tl::expected<uint8_t, std::string> Manager::readUInt8(const std::string_view mes
     return result;
 }
 
-
-tl::expected<uint32_t, std::string> Manager::readUInt32(const std::string_view message, uint32_t &bytesRead)
+tl::expected<uint32_t, std::string> Manager::readUInt32(const std::string_view message, uint64_t &bytesRead)
 {
-    if (bytesRead + 4 > message.size())
+    if (bytesRead > message.size() || message.size() - bytesRead < sizeof(uint32_t))
     {
         return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
     }
-    uint32_t result = *reinterpret_cast<const uint32_t *>(message.data() + bytesRead);
-    bytesRead += 4;
+    uint32_t result;
+    memcpy(&result, message.data() + bytesRead, sizeof(result));
+    bytesRead += sizeof(result);
     return result;
 }
 
-tl::expected<std::string_view, std::string> Manager::readString(const std::string_view message, uint32_t &bytesRead)
+tl::expected<std::string_view, std::string> Manager::readString(const std::string_view message, uint64_t &bytesRead)
 {
     auto r = readUInt32(message, bytesRead);
     if (!r)
     {
         return tl::unexpected(r.error());
     }
-    const uint32_t stringSize = *r;
-    if (bytesRead + stringSize > message.size())
+    const uint64_t stringSize = *r;
+    if (bytesRead > message.size() || stringSize > message.size() - bytesRead)
     {
         return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
     }
@@ -252,15 +264,16 @@ tl::expected<std::string_view, std::string> Manager::readString(const std::strin
     return result;
 }
 
-tl::expected<std::string_view, std::string> Manager::readPath(const std::string_view message, uint32_t &bytesRead)
+tl::expected<std::string_view, std::string> Manager::readPath(const std::string_view message, uint64_t &bytesRead)
 {
     auto r = readUInt32(message, bytesRead);
     if (!r)
     {
         return tl::unexpected(r.error());
     }
-    const uint32_t stringSize = *r;
-    if (bytesRead + stringSize > message.size())
+    const uint64_t stringSize = *r;
+    if (bytesRead > message.size() || stringSize >= message.size() - bytesRead ||
+        message[bytesRead + stringSize] != '\0')
     {
         return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
     }

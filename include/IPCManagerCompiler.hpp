@@ -5,12 +5,20 @@
 #include "Manager.hpp"
 #include "expected.hpp"
 
+#include <memory>
+#include <unordered_map>
+
 struct CompilerTest;
 struct BuildSystemTest;
 namespace P2978
 {
 
-inline std::vector<std::string *> allocations;
+// Copies share ownership so aliases and cached responses cannot unmap each other.
+struct Mapping
+{
+    std::string_view file;
+    std::shared_ptr<const void> owner;
+};
 
 enum class FileType : uint8_t
 {
@@ -44,12 +52,10 @@ class IPCManagerCompiler : Manager
     };
 
     tl::expected<BMIFileMapping, std::string> readProcessMappingOfBMIFile(std::string_view message,
-                                                                          uint32_t &bytesRead);
-    tl::expected<void, std::string> readLogicalNames(std::string_view message, uint32_t &bytesRead,
+                                                                          uint64_t &bytesRead);
+    tl::expected<void, std::string> readLogicalNames(std::string_view message, uint64_t &bytesRead,
                                                      const BMIFileMapping &mapping, FileType type, bool isSystem);
 
-    // Called by sendCTBLastMessage. Build-system will send this after it has created the BMI file-mapping.
-    [[nodiscard]] tl::expected<void, std::string> receiveBTCLastMessage() const;
     // This function is called by findResponse if it did not find the module in the IPCManagerCompiler::responses cache.
     [[nodiscard]] tl::expected<void, std::string> receiveBTCModule(const CTBModule &moduleName);
     // This function is called by findResponse if it did not find the header-unit or header-file in the
@@ -62,13 +68,14 @@ class IPCManagerCompiler : Manager
     // Holds scan-cache file bytes; keys and paths in responses are views into this buffer.
     std::string scanCacheFileData;
 
-    //  Compiler can use this function to read the BMI file. BMI should be read using this function to conserve memory.
-    static tl::expected<Mapping, std::string> readSharedMemoryBMIFile(const BMIFile &file);
+    // Open a completed BMI independently of the build-system process.
+    static tl::expected<Mapping, std::string> readBMIFile(const BMIFile &file);
 
-    [[nodiscard]] tl::expected<void, std::string> sendCTBLastMessage(uint32_t fileSize) const;
+    // Keeps the message bytes backing response keys and paths alive for this session.
+    mutable std::vector<std::unique_ptr<std::string>> allocations;
 
   public:
-   // Stores the mockFilePath. Needed so compiler could generate argument correctly.
+    // Stores the mockFilePath. Needed so compiler could generate argument correctly.
     std::string mockFilePath;
 
     // Whether we are mocking or are we doing IPC with the build-system
@@ -76,10 +83,6 @@ class IPCManagerCompiler : Manager
 
     // This is an IPC mock. This reads all entries from the file
     tl::expected<void, std::string> readEntriesFromFile(std::string_view filePath);
-
-    // Compiler process can use this function to close the BMI file-mapping to reduce references to shared memory file.
-    // Not needed as it will be cleared at process exit.
-    static tl::expected<void, std::string> closeBMIFileMapping(const Mapping &processMappingOfBMIFile);
 
     // Cache mapping between the file-path and bmi-file-mapping. Only to be queried by the compiler. Passed path must be
     // lexically normal and lower-case on Windows.
@@ -90,10 +93,6 @@ class IPCManagerCompiler : Manager
     // For FileType::HEADER_FILE, it can return FileType::HEADER_UNIT, otherwise it will return the request
     // response. Either it will return from the cache or it will fetch it from the build-system
     [[nodiscard]] tl::expected<Response, std::string> findResponse(std::string_view logicalName, FileType type);
-
-    // This function should be called only if the compilation succeeded
-    [[nodiscard]] tl::expected<void, std::string> sendCTBLastMessage(const std::string &bmiFile,
-                                                                     const std::string &filePath) const;
 };
 
 inline IPCManagerCompiler *managerCompiler;

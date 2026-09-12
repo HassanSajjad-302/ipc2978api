@@ -12,12 +12,11 @@
 
 using fmt::print, std::filesystem::current_path;
 
-void exitFailure(const string &str)
+[[noreturn]] void exitFailure(const string &str)
 {
     print("\n\n random-int {}\n\n", randomSeed);
     print(stderr, "{}\n", str);
     print("Test Failed\n");
-    string str2 = str;
     exit(EXIT_FAILURE);
 }
 
@@ -43,34 +42,16 @@ string fileToString(const string_view file_name)
     return str_stream.str();
 }
 
-bool startsWith(const std::string &str, const std::string &prefix)
-{
-    return str.size() >= prefix.size() && str.compare(0, prefix.size(), prefix) == 0;
-}
-
-string getRandomString(const uint32_t length)
+string getRandomString(const uint64_t length)
 {
     const string characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     std::uniform_int_distribution<> distribution(0, characters.size() - 1);
-    std::uniform_int_distribution distribution2(0, 10000);
+    std::uniform_int_distribution<uint64_t> distribution2(1, 10000);
     const uint64_t length2 = length ? length : distribution2(generator);
     string randomString(length2, '\0');
-    for (int i = 0; i < length2; ++i)
+    for (uint64_t i = 0; i < length2; ++i)
     {
-        // ; is not added to string as it is being used as delimiter.
-        if (const char c = characters[distribution(generator)]; c != ';')
-        {
-            randomString[i] = c;
-        }
-        else
-        {
-            --i;
-        }
-    }
-
-    if (startsWith(randomString, "OUzgC3g2BUwkUh1p1kSJVtXsv0bpJYCSZ"))
-    {
-        bool brekapoint = true;
+        randomString[i] = characters[distribution(generator)];
     }
     return randomString;
 }
@@ -81,224 +62,118 @@ bool getRandomBool()
     return distribution(generator);
 }
 
-uint32_t getRandomNumber(const uint32_t max)
+uint64_t getRandomNumber(const uint64_t max)
 {
-    std::uniform_int_distribution<> distribution(0, max);
+    std::uniform_int_distribution<uint64_t> distribution(0, max);
     return distribution(generator);
 }
 
-auto createTempTestFilesEntry(const bool makeMapping, const string_view key, const FileType fileType,
-                              const bool isSystem) -> auto
+static TestResponse createTestFile(FileType type, bool isSystem)
 {
-    string str = getRandomString(10);
-    for (char &c : str)
-    {
+    string name = getRandomString(10);
+    for (char &c : name)
         c = tolower(c);
-    }
-
-    string filePath = (current_path() / str).string();
+    string filePath = (current_path() / name).string();
 #ifdef _WIN32
     for (char &c : filePath)
-    {
         c = tolower(c);
-    }
 #endif
-    string fileContents = getRandomString();
-    if (fileContents.empty())
-    {
-        fileContents.push_back('a');
-    }
-    print(filePath);
-    fflush(stdout);
-    std::ofstream(filePath) << fileContents;
-    string *s = new string(key);
-    buildTestallocations.emplace_back(s);
-    const auto &it = tempTestFiles.emplace(*s, TestResponse{filePath, fileContents, fileType, isSystem});
-
-    if (makeMapping)
-    {
-        BMIFile file;
-        file.filePath = filePath;
-        if (const auto &mapping = IPCManagerBS::createSharedMemoryBMIFile(file); !mapping)
-        {
-            exitFailure("Failed to create shared memory bmifile");
-        }
-    }
-
-    return it;
+    string contents = getRandomString();
+    if (contents.empty())
+        contents.push_back('a');
+    std::ofstream(filePath, std::ios::binary) << contents;
+    return {std::move(filePath), std::move(contents), type, isSystem};
 }
 
-BTCModule getBTCModule(const CTBModule &ctbModule)
+static auto addTestFile(string_view key, const TestResponse &file)
 {
-    BTCModule b;
-    b.isSystem = getRandomBool();
-    auto it = createTempTestFilesEntry(true, ctbModule.moduleName, FileType::MODULE, b.isSystem);
-
-    b.requested.filePath = it.first->second.filePath;
-    b.requested.fileSize = it.first->second.fileContent.size();
-
-    const uint32_t modDepCount = getRandomNumber(10);
-    for (uint32_t i = 0; i < modDepCount; ++i)
-    {
-        string str = getRandomString(10);
-        for (char &c : str)
-        {
-            c = tolower(c);
-        }
-
-        string *filePath = new string((current_path() / str).string());
-#ifdef _WIN32
-        for (char &c : *filePath)
-        {
-            c = tolower(c);
-        }
-#endif
-        string *fileContents = new string(getRandomString());
-        if (fileContents->empty())
-        {
-            fileContents->push_back('a');
-        }
-        {
-            // Creating file and the mapping
-            std::ofstream(*filePath) << *fileContents;
-            buildTestallocations.emplace_back(filePath);
-            buildTestallocations.emplace_back(fileContents);
-
-            BMIFile file;
-            file.filePath = *filePath;
-            if (const auto &mapping = IPCManagerBS::createSharedMemoryBMIFile(file); !mapping)
-            {
-                exitFailure("Failed to create shared memory bmifile");
-            }
-        }
-
-        ModuleDep modDep;
-        modDep.isSystem = getRandomBool();
-        modDep.isHeaderUnit = getRandomBool();
-        modDep.file.filePath = *filePath;
-        modDep.file.fileSize = fileContents->size();
-
-        uint32_t logicalNameSize = getRandomNumber(10);
-
-        // if module or the random-number is 0, we set the logicalNameSize = 1
-        if (logicalNameSize == 0 || !modDep.isHeaderUnit)
-        {
-            logicalNameSize = 1;
-        }
-
-        for (uint32_t j = 0; j < logicalNameSize; ++j)
-        {
-            string *s = new string(getRandomString());
-            buildTestallocations.emplace_back(s);
-            const auto &it2 = tempTestFiles.emplace(
-                *s, TestResponse{*filePath, *fileContents,
-                                 modDep.isHeaderUnit ? FileType::HEADER_UNIT : FileType::MODULE, modDep.isSystem});
-            modDep.logicalNames.emplace_back(it2.first->first);
-        }
-        b.modDeps.emplace_back(std::move(modDep));
-    }
-    return b;
+    return tempTestFiles.emplace(string(key), file).first;
 }
 
-BTCNonModule getBTCNonModule(const CTBNonModule &ctbNonModule)
+static BMIFile addLogicalNames(vector<string_view> &names, uint64_t count, const TestResponse &file)
 {
-    BTCNonModule nonModule;
-    nonModule.isHeaderUnit = getRandomBool();
-    nonModule.isSystem = getRandomBool();
-
-    const uint32_t headerFilesSize = getRandomNumber(10);
-
-    for (uint32_t i = 0; i < headerFilesSize; ++i)
+    BMIFile bmi;
+    for (uint64_t i = 0; i < count; ++i)
     {
-        auto it = createTempTestFilesEntry(false, getRandomString(), FileType::HEADER_FILE, getRandomBool());
-        HeaderFile h;
-        h.logicalName = it.first->first;
-        h.isSystem = it.first->second.isSystem;
-        h.filePath = it.first->second.filePath;
-        nonModule.headerFiles.emplace_back(h);
+        const auto entry = addTestFile(getRandomString(), file);
+        names.emplace_back(entry->first);
+        bmi = {entry->second.filePath, static_cast<uint32_t>(entry->second.fileContent.size())};
     }
+    return bmi;
+}
 
-    if (!nonModule.isHeaderUnit)
+BTCModule getBTCModule(const CTBModule &request)
+{
+    BTCModule response;
+    response.isSystem = getRandomBool();
+    const auto requested = addTestFile(request.moduleName, createTestFile(FileType::MODULE, response.isSystem));
+    response.requested = {requested->second.filePath, static_cast<uint32_t>(requested->second.fileContent.size())};
+    const uint64_t count = getRandomNumber(10);
+    for (uint64_t i = 0; i < count; ++i)
     {
-        auto it = createTempTestFilesEntry(false, ctbNonModule.logicalName, FileType::HEADER_FILE, nonModule.isSystem);
-        nonModule.filePath = it.first->second.filePath;
-        return nonModule;
+        ModuleDep dep;
+        dep.isSystem = getRandomBool();
+        dep.isHeaderUnit = getRandomBool();
+        const auto type = dep.isHeaderUnit ? FileType::HEADER_UNIT : FileType::MODULE;
+        uint64_t names = getRandomNumber(10);
+        if (!names || !dep.isHeaderUnit)
+            names = 1;
+        dep.file = addLogicalNames(dep.logicalNames, names, createTestFile(type, dep.isSystem));
+        response.modDeps.emplace_back(std::move(dep));
     }
+    return response;
+}
 
-    auto it = createTempTestFilesEntry(true, ctbNonModule.logicalName, FileType::HEADER_UNIT, nonModule.isSystem);
-    nonModule.filePath = it.first->second.filePath;
-    nonModule.fileSize = it.first->second.fileContent.size();
-
-    uint32_t logicalNameSize = getRandomNumber(2);
-    for (uint32_t i = 0; i < logicalNameSize; ++i)
+BTCNonModule getBTCNonModule(const CTBNonModule &request)
+{
+    BTCNonModule response;
+    response.isHeaderUnit = request.isHeaderUnit || getRandomBool();
+    response.isSystem = getRandomBool();
+    const uint64_t headers = getRandomNumber(10);
+    for (uint64_t i = 0; i < headers; ++i)
     {
-        string *s = new string(getRandomString());
-        buildTestallocations.emplace_back(s);
-        const auto &it2 =
-            tempTestFiles.emplace(*s, TestResponse{it.first->second.filePath, it.first->second.fileContent,
-                                                   FileType::HEADER_UNIT, nonModule.isSystem});
-        nonModule.logicalNames.emplace_back(it2.first->first);
+        const auto entry = addTestFile(getRandomString(), createTestFile(FileType::HEADER_FILE, getRandomBool()));
+        response.headerFiles.push_back({entry->first, entry->second.filePath, entry->second.isSystem});
     }
-
-    uint32_t huDepSize = getRandomNumber(10);
-
-    for (uint32_t i = 1; i < huDepSize; ++i)
+    const auto type = response.isHeaderUnit ? FileType::HEADER_UNIT : FileType::HEADER_FILE;
+    const auto requested = addTestFile(request.logicalName, createTestFile(type, response.isSystem));
+    response.filePath = requested->second.filePath;
+    if (!response.isHeaderUnit)
+        return response;
+    response.fileSize = requested->second.fileContent.size();
+    addLogicalNames(response.logicalNames, getRandomNumber(2), requested->second);
+    const uint64_t deps = getRandomNumber(10);
+    for (uint64_t i = 0; i < deps; ++i)
     {
-        string str = getRandomString(10);
-        for (char &c : str)
-        {
-            c = tolower(c);
-        }
-
-        string *filePath = new string((current_path() / str).string());
-#ifdef _WIN32
-        for (char &c : *filePath)
-        {
-            c = tolower(c);
-        }
-#endif
-        string *fileContents = new string(getRandomString());
-        if (fileContents->empty())
-        {
-            fileContents->push_back('a');
-        }
-        {
-
-            // Creating file and the mapping
-            std::ofstream(*filePath) << *fileContents;
-            buildTestallocations.emplace_back(filePath);
-            buildTestallocations.emplace_back(fileContents);
-
-            BMIFile file;
-            file.filePath = *filePath;
-            if (const auto &mapping = IPCManagerBS::createSharedMemoryBMIFile(file); !mapping)
-            {
-                exitFailure("Failed to create shared memory bmifile");
-            }
-        }
-        HuDep huDep;
-        huDep.isSystem = getRandomBool();
-        huDep.file.filePath = *filePath;
-        huDep.file.fileSize = fileContents->size();
-
-        logicalNameSize = getRandomNumber(10);
-        if (logicalNameSize == 0)
-        {
-            logicalNameSize = 1;
-        }
-
-        for (uint32_t j = 0; j < logicalNameSize; ++j)
-        {
-            string *s = new string(getRandomString());
-            buildTestallocations.emplace_back(s);
-            const auto &it2 = tempTestFiles.emplace(
-                *s, TestResponse{*filePath, *fileContents, FileType::HEADER_UNIT, huDep.isSystem});
-            huDep.logicalNames.emplace_back(it2.first->first);
-        }
-        nonModule.huDeps.emplace_back(std::move(huDep));
+        HuDep dep;
+        dep.isSystem = getRandomBool();
+        uint64_t names = getRandomNumber(10);
+        if (!names)
+            names = 1;
+        dep.file = addLogicalNames(dep.logicalNames, names, createTestFile(FileType::HEADER_UNIT, dep.isSystem));
+        response.huDeps.emplace_back(std::move(dep));
     }
+    return response;
+}
 
-    return nonModule;
+std::string_view fileTypeToString(FileType type)
+{
+    switch (type)
+    {
+    case FileType::HEADER_FILE:
+        return "Header-File";
+    case FileType::MODULE:
+        return "Module";
+    case FileType::HEADER_UNIT:
+        return "Header-Unit";
+    }
+    return "Unknown";
+}
+
+void appendResponse(std::string &output, std::string_view path, std::string_view contents, FileType type, bool isSystem)
+{
+    output += fmt::format("Filepath {}\nFileContent {}\nFileType {}\nIsSystem {}\n", path, contents,
+                          fileTypeToString(type), isSystem);
 }
 
 void printSendingOrReceiving(const bool sent)
@@ -328,13 +203,6 @@ void printMessage(const CTBNonModule &nonModule, const bool sent)
     print("logicalNames: {}\n\n", nonModule.logicalName);
 }
 
-void printMessage(const CTBLastMessage &lastMessage, const bool sent)
-{
-    printSendingOrReceiving(sent);
-    print("CTBLastMessage\n\n");
-    print("FileSize: {}\n\n", lastMessage.fileSize);
-}
-
 void printMessage(const BTCModule &btcModule, const bool sent)
 {
     printSendingOrReceiving(sent);
@@ -344,13 +212,13 @@ void printMessage(const BTCModule &btcModule, const bool sent)
     print("Requested User: {}\n\n", btcModule.isSystem);
     print("Requested FileSize: {}\n\n", btcModule.requested.fileSize);
     print("Deps Size: {}\n\n", btcModule.modDeps.size());
-    for (uint32_t i = 0; i < btcModule.modDeps.size(); i++)
+    for (uint64_t i = 0; i < btcModule.modDeps.size(); i++)
     {
         print("Mod-Dep[{}] IsHeaderUnit: {}\n\n", i, btcModule.modDeps[i].isHeaderUnit);
         print("Mod-Dep[{}] FilePath: {}\n\n", i, btcModule.modDeps[i].file.filePath);
         print("Mod-Dep[{}] FileSize: {}\n\n", i, btcModule.modDeps[i].file.fileSize);
         print("Mod-Dep[{}] LogicalName Size: {}\n\n", i, btcModule.modDeps[i].logicalNames.size());
-        for (uint32_t j = 0; j < btcModule.modDeps[i].logicalNames.size(); ++j)
+        for (uint64_t j = 0; j < btcModule.modDeps[i].logicalNames.size(); ++j)
         {
             print("Mod-Dep[{}] LogicalName[{}]: {}\n\n", i, j, btcModule.modDeps[i].logicalNames[j]);
         }
@@ -367,34 +235,28 @@ void printMessage(const BTCNonModule &nonModule, const bool sent)
     print("FilePath {}\n\n", nonModule.filePath);
     print("FileSize {}\n\n", nonModule.fileSize);
 
-    for (uint32_t i = 0; i < nonModule.logicalNames.size(); i++)
+    for (uint64_t i = 0; i < nonModule.logicalNames.size(); i++)
     {
         print("Logical-Name[{}]: {}\n\n", i, nonModule.logicalNames[i]);
     }
 
-    for (uint32_t i = 0; i < nonModule.headerFiles.size(); i++)
+    for (uint64_t i = 0; i < nonModule.headerFiles.size(); i++)
     {
         print("Header-File[{}] LogicalName: {}\n\n", i, nonModule.headerFiles[i].logicalName);
         print("Header-File[{}] FilePath: {}\n\n", i, nonModule.headerFiles[i].filePath);
         print("Header-File[{}] User: {}\n\n", i, nonModule.headerFiles[i].isSystem);
     }
 
-    for (uint32_t i = 0; i < nonModule.huDeps.size(); i++)
+    for (uint64_t i = 0; i < nonModule.huDeps.size(); i++)
     {
         print("Hu-Dep[{}] FilePath: {}\n\n", i, nonModule.huDeps[i].file.filePath);
         print("Hu-Dep[{}] FileSize: {}\n\n", i, nonModule.huDeps[i].file.fileSize);
-        for (uint32_t j = 0; j < nonModule.huDeps[i].logicalNames.size(); ++j)
+        for (uint64_t j = 0; j < nonModule.huDeps[i].logicalNames.size(); ++j)
         {
             print("Mod-Dep[{}] LogicalName[{}]: {}\n\n", i, j, nonModule.huDeps[i].logicalNames[j]);
         }
         print("Hu-Dep[{}] User: {}\n\n", i, nonModule.huDeps[i].isSystem);
     }
-}
-
-void printMessage(const BTCLastMessage &lastMessage, const bool sent)
-{
-    printSendingOrReceiving(sent);
-    print("BTCLastMessage\n\n");
 }
 
 TestResponse::TestResponse(string filePath_, string fileContent_, FileType fileType_, bool isSystem_)

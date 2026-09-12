@@ -5,7 +5,6 @@
 #include <filesystem>
 #include <fstream>
 #include <random>
-#include <set>
 #include <string>
 #include <thread>
 
@@ -30,11 +29,6 @@ struct CompilerTest
     [[nodiscard]] tl::expected<void, std::string> receiveBTCNonModule(const CTBNonModule &nonModule)
     {
         return compilerManager->receiveBTCNonModule(nonModule);
-    }
-
-    static tl::expected<Mapping, std::string> readSharedMemoryBMIFile(const BMIFile &file)
-    {
-        return IPCManagerCompiler::readSharedMemoryBMIFile(file);
     }
 };
 
@@ -84,83 +78,23 @@ int main()
         outputResponses.emplace(r);
     }
 
-    set<string> files;
     std::string output;
     for (auto &r : outputResponses)
     {
         output.append(fmt::format("Key {}\n", r.first));
 
-        if (const Response &response = r.second; files.emplace(response.filePath).second)
-        {
-            auto getFileType = [](const FileType type) {
-                switch (type)
-                {
-                case FileType::HEADER_FILE: {
-                    return "Header-File";
-                }
-
-                case FileType::MODULE: {
-                    return "Module";
-                }
-
-                case FileType::HEADER_UNIT: {
-                    return "Header-Unit";
-                }
-                }
-            };
-
-            output.append(fmt::format("Filepath {}\n", response.filePath));
-            if (response.type == FileType::HEADER_FILE)
-            {
-                string fileContents = fileToString(response.filePath);
-                output.append(fmt::format("FileContent {}\n", fileContents));
-            }
-            else
-            {
-                output.append(fmt::format("FileContent {}\n", response.mapping.file));
-            }
-            output.append(fmt::format("FileType {}\n", getFileType(response.type)));
-            output.append(fmt::format("IsSystem {}\n", response.isSystem));
-        }
+        const Response &response = r.second;
+        const string contents =
+            response.type == FileType::HEADER_FILE ? fileToString(response.filePath) : string(response.mapping.file);
+        appendResponse(output, response.filePath, contents, response.type, response.isSystem);
     }
 
-    const string bmi1Content = output;
-    print("Sending first bmi-content.");
-    if (const auto &r2 =
-            manager.sendCTBLastMessage(bmi1Content, (std::filesystem::current_path() / "bmi.txt").generic_string());
-        !r2)
-    {
-        exitFailure(r2.error());
-    }
-
-    print("BTCLastMessage for first bmi-content has been received.\n");
-
-    BMIFile bmi2 = BMIFile();
-    const string bmiTwoString = (std::filesystem::current_path() / "bmi2.txt").generic_string();
-    bmi2.filePath = bmiTwoString;
-    const string bmi2Content = fileToString(bmi2.filePath);
-    bmi2.fileSize = bmi2Content.size();
-    if (const auto &r2 = CompilerTest::readSharedMemoryBMIFile(bmi2); !r2)
-    {
-        exitFailure(r2.error());
-    }
-    else
-    {
-        if (const auto &processMapping = r2.value(); bmi2Content != processMapping.file)
-        {
-            exitFailure(fmt::format("File Contents not similar for {}", bmi2.filePath));
-        }
-        if (const auto &r3 = IPCManagerCompiler::closeBMIFileMapping(r2.value()); !r3)
-        {
-            exitFailure(r3.error());
-        }
-    }
-    for (std::string *p : allocations)
-    {
-        delete p;
-    }
+    std::ofstream result("bmi.txt", std::ios::binary);
+    result << output;
+    result.close();
+    if (!result)
+        exitFailure("Could not write bmi.txt");
     print("Successfully Completed CompilerTest\n");
-    print(delimiter);
 }
 
 extern "C" const char *__asan_default_options()

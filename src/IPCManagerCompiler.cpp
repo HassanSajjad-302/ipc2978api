@@ -3,20 +3,23 @@
 #include "Manager.hpp"
 #include "Messages.hpp"
 
+#include <algorithm>
+#include <cctype>
+#include <cstdio>
+#include <cstring>
+#include <fstream>
+#include <iterator>
+#include <limits>
 #include <string>
-#include <unordered_set>
 #include <utility>
 
 #ifdef _WIN32
-#include "rapidhash.h"
 #include <Windows.h>
 #else
 #include <cstring>
 #include <fcntl.h>
 #include <sys/mman.h>
-#include <sys/socket.h>
 #include <sys/stat.h>
-#include <sys/un.h>
 #include <unistd.h>
 #endif
 
@@ -57,23 +60,27 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(cha
     std::string *output = nullptr;
     while (true)
     {
-        uint32_t bytesRead;
+        uint64_t bytesRead = 0;
 #ifdef _WIN32
-        const bool success = ReadFile((HANDLE)STD_INPUT_HANDLE, // pipe handle
-                                      buffer,                   // buffer to receive reply
-                                      4096,                     // size of buffer
-                                      LPDWORD(&bytesRead),      // number of bytes read
-                                      nullptr);                 // not overlapped
+        DWORD readCount = 0;
+        const bool success = ReadFile(GetStdHandle(STD_INPUT_HANDLE), // pipe handle
+                                      buffer,                         // buffer to receive reply
+                                      4096,                           // size of buffer
+                                      &readCount,                     // number of bytes read
+                                      nullptr);                       // not overlapped
 
-        if (const uint32_t lastError = GetLastError(); !success && lastError != ERROR_MORE_DATA)
+        bytesRead = readCount;
+        if (const DWORD lastError = GetLastError(); !success && lastError != ERROR_MORE_DATA)
         {
             return tl::unexpected(getErrorString());
         }
 
 #else
         bytesRead = read(STDIN_FILENO, buffer, 4096);
-        if (bytesRead == -1)
+        if (bytesRead == UINT64_MAX)
         {
+            if (errno == EINTR)
+                continue;
             return tl::unexpected(getErrorString());
         }
 
@@ -85,10 +92,6 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(cha
 
         if (!output)
         {
-            if (bytesRead < strlen(delimiter))
-            {
-                return tl::unexpected("P2978 Error: Received string only has delimiter but not the size of payload\n");
-            }
             output = new std::string{};
             allocations.emplace_back(output);
         }
@@ -106,15 +109,7 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(cha
 tl::expected<void, std::string> IPCManagerCompiler::writeInternal(const std::string_view buffer) const
 {
 #ifdef _WIN32
-    const bool success = WriteFile(reinterpret_cast<HANDLE>(STD_OUTPUT_HANDLE), // pipe handle
-                                   buffer.data(),                               // message
-                                   buffer.size(),                               // message length
-                                   nullptr,                                     // bytes written
-                                   nullptr);                                    // not overlapped
-    if (!success)
-    {
-        return tl::unexpected(getErrorString());
-    }
+    return writeAll(GetStdHandle(STD_OUTPUT_HANDLE), buffer);
 #else
     if (const auto &r = writeAll(STDOUT_FILENO, buffer.data(), buffer.size()); !r)
     {
@@ -125,7 +120,7 @@ tl::expected<void, std::string> IPCManagerCompiler::writeInternal(const std::str
 }
 
 tl::expected<IPCManagerCompiler::BMIFileMapping, std::string> IPCManagerCompiler::readProcessMappingOfBMIFile(
-    const std::string_view message, uint32_t &bytesRead)
+    const std::string_view message, uint64_t &bytesRead)
 {
     const auto &r = readPath(message, bytesRead);
     if (!r)
@@ -142,9 +137,17 @@ tl::expected<IPCManagerCompiler::BMIFileMapping, std::string> IPCManagerCompiler
     file.filePath = *r;
     file.fileSize = *r2;
 
-    if (const auto &r3 = readSharedMemoryBMIFile(file); r3)
+    std::string path(file.filePath);
+    if (const auto it = filePathProcessMapping.find(path); it != filePathProcessMapping.end())
     {
-        filePathProcessMapping.emplace(file.filePath, r3.value());
+        if (file.fileSize != UINT32_MAX && file.fileSize != it->second.file.size())
+            return tl::unexpected(std::string("Invalid BMI file size: ") + path);
+        return BMIFileMapping{file, it->second};
+    }
+
+    if (const auto &r3 = readBMIFile(file); r3)
+    {
+        filePathProcessMapping.emplace(std::move(path), r3.value());
         BMIFileMapping bmiFileMapping;
         bmiFileMapping.file = file;
         bmiFileMapping.mapping = *r3;
@@ -157,38 +160,14 @@ tl::expected<IPCManagerCompiler::BMIFileMapping, std::string> IPCManagerCompiler
 }
 
 tl::expected<void, std::string> IPCManagerCompiler::readLogicalNames(const std::string_view message,
-                                                                     uint32_t &bytesRead, const BMIFileMapping &mapping,
+                                                                     uint64_t &bytesRead, const BMIFileMapping &mapping,
                                                                      const FileType type, const bool isSystem)
 {
     TRY_READ_VAL(logicalNamesSize, readUInt32, message, bytesRead);
-    for (uint32_t i = 0; i < logicalNamesSize; ++i)
+    for (uint64_t i = 0; i < logicalNamesSize; ++i)
     {
         TRY_READ_VAL(logicalName, readString, message, bytesRead);
         responses.emplace(logicalName, Response(mapping.file.filePath, mapping.mapping, type, isSystem));
-    }
-
-    return {};
-}
-
-tl::expected<void, std::string> IPCManagerCompiler::receiveBTCLastMessage() const
-{
-    char buffer[4096];
-    const auto &r = readInternal(buffer);
-    if (!r)
-    {
-        return tl::unexpected(r.error());
-    }
-
-    // The BTCLastMessage must be 1 byte of true signaling that build-system has successfully created a shared memory
-    // mapping of the BMI file.
-    if (buffer[0] != static_cast<char>(true))
-    {
-        return tl::unexpected(getErrorString(ErrorCategory::INCORRECT_BTC_LAST_MESSAGE));
-    }
-
-    if (r->size() != 1)
-    {
-        return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
     }
 
     return {};
@@ -215,7 +194,7 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCModule(const CTBMo
     }
     const std::string_view message = *received;
 
-    uint32_t bytesRead = 0;
+    uint64_t bytesRead = 0;
 
     TRY_READ_VAL(requested, readProcessMappingOfBMIFile, message, bytesRead);
     TRY_READ_VAL(isSystem, readBool, message, bytesRead);
@@ -226,7 +205,7 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCModule(const CTBMo
 
     TRY_READ_VAL(modDepsSize, readUInt32, message, bytesRead);
 
-    for (uint32_t i = 0; i < modDepsSize; ++i)
+    for (uint64_t i = 0; i < modDepsSize; ++i)
     {
         TRY_READ_VAL(isHeaderUnit, readBool, message, bytesRead);
         TRY_READ_VAL(modDepFile, readProcessMappingOfBMIFile, message, bytesRead);
@@ -277,13 +256,13 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCNonModule(const CT
     }
 
     std::string_view readCompilerMessage = *received;
-    uint32_t bytesRead = 0;
+    uint64_t bytesRead = 0;
 
     TRY_READ_VAL(isHeaderUnit, readBool, readCompilerMessage, bytesRead);
     TRY_READ_VAL(isSystem, readBool, readCompilerMessage, bytesRead);
     TRY_READ_VAL(headerFilesSize, readUInt32, readCompilerMessage, bytesRead);
 
-    for (uint32_t i = 0; i < headerFilesSize; ++i)
+    for (uint64_t i = 0; i < headerFilesSize; ++i)
     {
         TRY_READ_VAL(logicalName, readString, readCompilerMessage, bytesRead);
         TRY_READ_VAL(filePath, readPath, readCompilerMessage, bytesRead);
@@ -311,7 +290,7 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCNonModule(const CT
     TRY_READ(logicalNames, readLogicalNames, readCompilerMessage, bytesRead, file, FileType::HEADER_UNIT, isSystem);
 
     TRY_READ_VAL(huDepsSize, readUInt32, readCompilerMessage, bytesRead);
-    for (uint32_t i = 0; i < huDepsSize; ++i)
+    for (uint64_t i = 0; i < huDepsSize; ++i)
     {
         TRY_READ_VAL(huDepFile, readProcessMappingOfBMIFile, readCompilerMessage, bytesRead);
         TRY_READ_VAL(huDepIsSystem, readBool, readCompilerMessage, bytesRead);
@@ -384,51 +363,34 @@ tl::expected<Response, std::string> IPCManagerCompiler::findResponse(const std::
     }
 }
 
-tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const uint32_t fileSize) const
+static tl::expected<std::string, std::string> fileToString(const std::string_view fileName)
 {
-    std::string buffer = getBufferWithType(CTB::LAST_MESSAGE);
-    writeUInt32(buffer, fileSize);
-    writeUInt32(buffer, buffer.size());
-    buffer.append(delimiter, strlen(delimiter));
-    if (const auto &r = writeInternal(buffer); !r)
-    {
-        return tl::unexpected(r.error());
-    }
-    return {};
-}
-
-static std::string fileToString(const std::string_view fileName)
-{
-    std::string fileBuffer;
-    FILE *fp;
-
-#ifdef WIN32
-    fopen_s(&fp, fileName.data(), "rb");
-#else
-    fp = fopen(fileName.data(), "r");
-#endif
-
-    fseek(fp, 0, SEEK_END);
-    const size_t filesize = (size_t)ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-    fileBuffer.resize(filesize);
-    const uint64_t readLength = fread(fileBuffer.data(), 1, filesize, fp);
-    fclose(fp);
+    std::ifstream file(std::string(fileName), std::ios::binary);
+    if (!file)
+        return tl::unexpected(std::string("Could not open IPC mock file: ") + std::string(fileName));
+    std::string fileBuffer{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+    if (file.bad())
+        return tl::unexpected(std::string("Could not read IPC mock file: ") + std::string(fileName));
     return fileBuffer;
 }
 
 tl::expected<void, std::string> IPCManagerCompiler::readEntriesFromFile(const std::string_view filePath)
 {
-    scanCacheFileData = fileToString(filePath);
+    auto contents = fileToString(filePath);
+    if (!contents)
+        return tl::unexpected(contents.error());
+    scanCacheFileData = std::move(*contents);
 
-    uint32_t bytesRead = 0;
+    uint64_t bytesRead = 0;
     TRY_READ_VAL(entriesSize, readUInt32, scanCacheFileData, bytesRead);
-    for (uint32_t i = 0; i < entriesSize; ++i)
+    for (uint64_t i = 0; i < entriesSize; ++i)
     {
         TRY_READ_VAL(responseKey, readString, scanCacheFileData, bytesRead);
 
         TRY_READ_VAL(valueFilePath, readPath, scanCacheFileData, bytesRead);
         TRY_READ_VAL(fileType, readUInt8, scanCacheFileData, bytesRead);
+        if (fileType > static_cast<uint8_t>(FileType::HEADER_FILE))
+            return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
         TRY_READ_VAL(isSystem, readBool, scanCacheFileData, bytesRead);
 
         Mapping mapping{};
@@ -436,215 +398,106 @@ tl::expected<void, std::string> IPCManagerCompiler::readEntriesFromFile(const st
         {
             if (static_cast<FileType>(fileType) != FileType::HEADER_FILE)
             {
-                const std::string *fileText = new std::string{fileToString(valueFilePath)};
-                mapping.file = *fileText;
+                TRY_READ_VAL(fileMapping, readBMIFile, (BMIFile{valueFilePath}));
+                mapping = fileMapping;
                 filePathProcessMapping.emplace(valueFilePath, mapping);
             }
         }
         else
         {
-            mapping.file = it->second.file;
+            mapping = it->second;
         }
         responses.emplace(responseKey, Response{valueFilePath, mapping, static_cast<FileType>(fileType), isSystem});
     }
+
+    if (bytesRead != scanCacheFileData.size())
+        return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
 
     mockFilePath = filePath;
     isMocking = true;
     return {};
 }
 
-tl::expected<void, std::string> IPCManagerCompiler::sendCTBLastMessage(const std::string &bmiFile,
-                                                                       const std::string &filePath) const
+tl::expected<Mapping, std::string> IPCManagerCompiler::readBMIFile(const BMIFile &file)
 {
+    // Own a terminated path; callers may supply arbitrary string_views.
+    const std::string path(file.filePath);
 #ifdef _WIN32
-    const HANDLE hFile = CreateFileA(filePath.c_str(), GENERIC_READ | GENERIC_WRITE,
-                                     0, // no sharing during setup
-                                     nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (hFile == INVALID_HANDLE_VALUE)
-    {
+    const HANDLE handle = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr,
+                                      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (handle == INVALID_HANDLE_VALUE)
         return tl::unexpected(getErrorString());
-    }
 
-    // mappingName is needed as the Windows kernel object names can't have \\ in them.
-    const uint64_t hash = rapidhash(filePath.data(), filePath.size());
-    char mappingName[17];
-    static constexpr char hex[] = "0123456789abcdef";
-    for (int i = 0; i < 8; i++)
+    LARGE_INTEGER size;
+    if (!GetFileSizeEx(handle, &size))
     {
-        const uint8_t byte = hash >> (56 - i * 8) & 0xFF;
-        mappingName[i * 2] = hex[byte >> 4];
-        mappingName[i * 2 + 1] = hex[byte & 0xF];
+        const std::string error = getErrorString();
+        CloseHandle(handle);
+        return tl::unexpected(error);
     }
-    mappingName[16] = '\0';
-
-    LARGE_INTEGER fileSize;
-    fileSize.QuadPart = bmiFile.size();
-    // 3) Create a RW mapping of that file:
-    const HANDLE hMap =
-        CreateFileMappingA(hFile, nullptr, PAGE_READWRITE, fileSize.HighPart, fileSize.LowPart, mappingName);
-    if (!hMap)
+    if (size.QuadPart <= 0 || static_cast<uint64_t>(size.QuadPart) > (std::numeric_limits<size_t>::max)() ||
+        (file.fileSize != UINT32_MAX && static_cast<uint64_t>(size.QuadPart) != file.fileSize))
     {
-        return tl::unexpected(getErrorString());
+        CloseHandle(handle);
+        return tl::unexpected(std::string("Invalid BMI file size: ") + path);
     }
 
-    void *pView = MapViewOfFile(hMap, FILE_MAP_WRITE, 0, 0, bmiFile.size());
-    if (!pView)
+    // No name or build-system-owned object is needed. All readers open the completed file.
+    const HANDLE mapping = CreateFileMappingA(handle, nullptr, PAGE_READONLY, 0, 0, nullptr);
+    if (!mapping)
     {
-        return tl::unexpected(getErrorString());
+        const std::string error = getErrorString();
+        CloseHandle(handle);
+        return tl::unexpected(error);
     }
+    CloseHandle(handle);
 
-    memcpy(pView, bmiFile.c_str(), bmiFile.size());
-
-    if (!FlushViewOfFile(pView, bmiFile.size()))
+    const void *view = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, 0);
+    if (!view)
     {
-        return tl::unexpected(getErrorString());
+        const std::string error = getErrorString();
+        CloseHandle(mapping);
+        return tl::unexpected(error);
     }
-
-    UnmapViewOfFile(pView);
-    CloseHandle(hFile);
-
-    if (const auto &r = sendCTBLastMessage(fileSize.QuadPart); !r)
-    {
-        return tl::unexpected(r.error());
-    }
-
-    // Build-system will send the BTCLastMessage after it has created the BMI file-mapping. Compiler process can not
-    // exit before that.
-    if (const auto &r = receiveBTCLastMessage(); !r)
-    {
-        return tl::unexpected(r.error());
-    }
-
-    CloseHandle(hMap);
+    std::shared_ptr<const void> owner(view, [mapping](const void *address) {
+        UnmapViewOfFile(address);
+        CloseHandle(mapping);
+    });
+    return Mapping{{static_cast<const char *>(view), static_cast<size_t>(size.QuadPart)}, std::move(owner)};
 #else
-
-    const uint64_t fileSize = bmiFile.size();
-    // 1. Open & size
-    const int fd = open(filePath.c_str(), O_RDWR | O_CREAT, 0666);
+    const int fd = open(path.c_str(), O_RDONLY);
     if (fd == -1)
-    {
         return tl::unexpected(getErrorString());
-    }
-    if (ftruncate(fd, fileSize) == -1)
-    {
-        return tl::unexpected(getErrorString());
-    }
 
-    // 2. Map for write
-    void *mapping = mmap(nullptr, fileSize, PROT_WRITE, MAP_SHARED, fd, 0);
-    if (mapping == MAP_FAILED)
+    struct stat st;
+    if (fstat(fd, &st) == -1)
     {
-        return tl::unexpected(getErrorString());
+        const std::string error = getErrorString();
+        close(fd);
+        return tl::unexpected(error);
     }
-
-    // 3. We no longer need the FD
+    if (st.st_size <= 0 || static_cast<uint64_t>(st.st_size) > (std::numeric_limits<size_t>::max)() ||
+        (file.fileSize != UINT32_MAX && static_cast<uint64_t>(st.st_size) != file.fileSize))
+    {
+        close(fd);
+        return tl::unexpected(std::string("Invalid BMI file size: ") + path);
+    }
+    const size_t size = static_cast<size_t>(st.st_size);
+    int flags = MAP_SHARED;
+#ifdef MAP_POPULATE
+    flags |= MAP_POPULATE;
+#endif
+    void *view = mmap(nullptr, size, PROT_READ, flags, fd, 0);
+    if (view == MAP_FAILED)
+    {
+        const std::string error = getErrorString();
+        close(fd);
+        return tl::unexpected(error);
+    }
     close(fd);
-
-    memcpy(mapping, bmiFile.data(), bmiFile.size());
-
-    // 4. Flush to disk synchronously
-    if (msync(mapping, fileSize, MS_SYNC) == -1)
-    {
-        return tl::unexpected(getErrorString());
-    }
-
-    if (const auto &r = sendCTBLastMessage(fileSize); !r)
-    {
-        return tl::unexpected(r.error());
-    }
-
-    // Build-system will send the BTCLastMessage after it has created the BMI file-mapping. Compiler process can not
-    // exit before that.
-    if (const auto &r = receiveBTCLastMessage(); !r)
-    {
-        return tl::unexpected(r.error());
-    }
-    munmap(mapping, fileSize);
-
+    std::shared_ptr<const void> owner(view, [size](const void *address) { munmap(const_cast<void *>(address), size); });
+    return Mapping{{static_cast<const char *>(view), size}, std::move(owner)};
 #endif
-
-    return {};
-}
-
-tl::expected<Mapping, std::string> IPCManagerCompiler::readSharedMemoryBMIFile(const BMIFile &file)
-{
-    Mapping f{};
-#ifdef _WIN32
-
-    // mappingName is needed as the Windows kernel object names can't have \\ in them.
-    const uint64_t hash = rapidhash(file.filePath.data(), file.filePath.size());
-    char mappingName[17];
-    static constexpr char hex[] = "0123456789abcdef";
-    for (int i = 0; i < 8; i++)
-    {
-        const uint8_t byte = hash >> (56 - i * 8) & 0xFF;
-        mappingName[i * 2] = hex[byte >> 4];
-        mappingName[i * 2 + 1] = hex[byte & 0xF];
-    }
-    mappingName[16] = '\0';
-
-    // 1) Open the existing file‐mapping object (must have been created by another process)
-    const HANDLE mapping = OpenFileMappingA(FILE_MAP_READ, // read‐only access
-                                            FALSE,         // do not inherit a handle
-                                            mappingName    // name of mapping
-    );
-
-    if (mapping == nullptr)
-    {
-        return tl::unexpected(getErrorString());
-    }
-
-    // 2) Map a view of the file into our address space
-    const LPVOID view = MapViewOfFile(mapping,       // handle to mapping object
-                                      FILE_MAP_READ, // read‐only view
-                                      0,             // file offset high
-                                      0,             // file offset low
-                                      file.fileSize  // number of bytes to map (0 maps the whole file)
-    );
-
-    if (view == nullptr)
-    {
-        return tl::unexpected(getErrorString());
-    }
-
-    f.mapping = mapping;
-    f.view = view;
-    f.file = {static_cast<char *>(view), file.fileSize};
-#else
-    const int fd = open(file.filePath.data(), O_RDONLY);
-    if (fd == -1)
-    {
-        return tl::unexpected(getErrorString());
-    }
-    void *mapping = mmap(nullptr, file.fileSize, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
-
-    if (close(fd) == -1)
-    {
-        return tl::unexpected(getErrorString());
-    }
-
-    if (mapping == MAP_FAILED)
-    {
-        return tl::unexpected(getErrorString());
-    }
-
-    f.file = {static_cast<char *>(mapping), file.fileSize};
-#endif
-    return f;
-}
-
-tl::expected<void, std::string> IPCManagerCompiler::closeBMIFileMapping(const Mapping &processMappingOfBMIFile)
-{
-#ifdef _WIN32
-    UnmapViewOfFile(processMappingOfBMIFile.view);
-    CloseHandle(processMappingOfBMIFile.mapping);
-#else
-    if (munmap((void *)processMappingOfBMIFile.file.data(), processMappingOfBMIFile.file.size()) == -1)
-    {
-        return tl::unexpected(getErrorString());
-    }
-#endif
-    return {};
 }
 
 bool operator==(const CTBNonModule &lhs, const CTBNonModule &rhs)

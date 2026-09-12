@@ -22,7 +22,6 @@ enum class CTB : uint8_t
 {
     MODULE = 0,
     NON_MODULE = 1,
-    LAST_MESSAGE = 2,
 };
 
 // This is sent when the compiler needs a module.
@@ -39,17 +38,6 @@ struct CTBNonModule
     std::string_view logicalName;
 };
 
-// This is the last message sent by the compiler if the compiler
-// has any exported BMI.
-struct CTBLastMessage
-{
-    // This is communicated because the receiving process has no
-    // way to learn the shared memory file size on both Windows
-    // and Linux without a filesystem call.
-    // Meaningless if the compilation does not produce BMI.
-    uint32_t fileSize = UINT32_MAX;
-};
-
 // Build System to Compiler
 // Unlike CTB, this is not written as the first byte
 // since the compiler knows what message it will receive.
@@ -57,12 +45,12 @@ enum class BTC : uint8_t
 {
     MODULE = 0,
     NON_MODULE = 1,
-    LAST_MESSAGE = 2,
 };
 
 struct BMIFile
 {
     std::string_view filePath;
+    // UINT32_MAX asks the compiler to obtain the size from the completed file.
     uint32_t fileSize = UINT32_MAX;
 };
 
@@ -119,7 +107,7 @@ struct BTCNonModule
     std::string_view filePath;
     // if isHeaderUnit == false, the following are meaning-less and are not sent.
     // if isHeaderUnit == true, fileSize of the requested file.
-    uint32_t fileSize;
+    uint32_t fileSize = UINT32_MAX;
     // A header-unit can be composed of
     // multiple header-files. And if later,
     // any of the following logicalNames is included or
@@ -128,9 +116,5 @@ struct BTCNonModule
     std::vector<HuDep> huDeps;
 };
 
-// Reply for CTBLastMessage if the compilation succeeded.
-struct BTCLastMessage
-{
-};
 } // namespace P2978
 #endif // MESSAGES_HPP
