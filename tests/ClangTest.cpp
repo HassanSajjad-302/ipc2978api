@@ -382,17 +382,11 @@ tl::expected<void, string> runTest(const path &compiler)
         const auto &ctbModule = reinterpret_cast<CTBModule &>(buffer);
         CHECK(ctbModule.moduleName == "A:B")
 
-        BMIFile btcModBMI;
-        btcModBMI.filePath = aBPcm;
-
         BTCModule btcMod;
-        btcMod.requested = btcModBMI;
-
-        BMIFile modDepBMI;
-        modDepBMI.filePath = aCPcm;
+        btcMod.filePath = aBPcm;
 
         ModuleDep modDep;
-        modDep.file = modDepBMI;
+        modDep.filePath = aCPcm;
         modDep.logicalNames.emplace_back("A:C");
         modDep.isHeaderUnit = false;
         btcMod.modDeps.emplace_back(std::move(modDep));
@@ -448,11 +442,7 @@ tl::expected<void, string> runTest(const path &compiler)
         BTCNonModule nonModNPcm;
         nonModNPcm.isHeaderUnit = true;
 
-        BMIFile nonModNPcmBmi;
-        nonModNPcmBmi.filePath = nPcm;
-
-        nonModNPcm.filePath = nonModNPcmBmi.filePath;
-        nonModNPcm.fileSize = nonModNPcmBmi.fileSize;
+        nonModNPcm.filePath = nPcm;
 
         SEND_MESSAGE(nonModNPcm)
         CHECK_RESULT(session.finish())
@@ -484,12 +474,8 @@ tl::expected<void, string> runTest(const path &compiler)
 
         BTCNonModule nonModNPcm;
 
-        BMIFile nonModNPcmBmi;
-        nonModNPcmBmi.filePath = nPcm;
-
         nonModNPcm.isHeaderUnit = true;
         nonModNPcm.filePath = nPcm;
-        nonModNPcm.fileSize = nonModNPcmBmi.fileSize;
 
         SEND_MESSAGE(nonModNPcm)
         CHECK_RESULT(session.finish())
@@ -545,11 +531,7 @@ tl::expected<void, string> runTest(const path &compiler)
         bigHu.logicalNames.emplace_back("y.hpp");
         bigHu.logicalNames.emplace_back("z.hpp");
 
-        BMIFile bigHuBmi;
-        bigHuBmi.filePath = bigPcm;
-
-        bigHu.filePath = bigHuBmi.filePath;
-        bigHu.fileSize = bigHuBmi.fileSize;
+        bigHu.filePath = bigPcm;
 
         SEND_MESSAGE(bigHu)
 
@@ -558,25 +540,16 @@ tl::expected<void, string> runTest(const path &compiler)
         const auto &aModule = reinterpret_cast<CTBModule &>(buffer);
         CHECK(aModule.moduleName == "A")
 
-        BMIFile requested;
-        requested.filePath = aPcm;
-
-        BMIFile abModDepBmi;
-        abModDepBmi.filePath = aBPcm;
-
-        BMIFile acModDepBmi;
-        acModDepBmi.filePath = aCPcm;
-
         BTCModule amod;
-        amod.requested = requested;
+        amod.filePath = aPcm;
         ModuleDep abModDep;
         abModDep.isHeaderUnit = false;
-        abModDep.file = abModDepBmi;
+        abModDep.filePath = aBPcm;
         abModDep.logicalNames.emplace_back("A:B");
         amod.modDeps.emplace_back(std::move(abModDep));
         ModuleDep acModDep;
         acModDep.isHeaderUnit = false;
-        acModDep.file = acModDepBmi;
+        acModDep.filePath = aCPcm;
         acModDep.logicalNames.emplace_back("A:C");
         amod.modDeps.emplace_back(std::move(acModDep));
 
@@ -596,27 +569,12 @@ tl::expected<void, string> runTest(const path &compiler)
         const auto &ctbModule = reinterpret_cast<CTBModule &>(buffer);
         CHECK(ctbModule.moduleName == "Foo")
 
-        BMIFile requested;
-        requested.filePath = fooPcm;
-
-        BMIFile bigHuModDepBmi;
-        bigHuModDepBmi.filePath = bigPcm;
-
-        BMIFile aModDepBmi;
-        aModDepBmi.filePath = aPcm;
-
-        BMIFile abModDepBmi;
-        abModDepBmi.filePath = aBPcm;
-
-        BMIFile acModDepBmi;
-        acModDepBmi.filePath = aCPcm;
-
         BTCModule foo;
-        foo.requested = requested;
+        foo.filePath = fooPcm;
 
         ModuleDep bigModDep;
         bigModDep.isHeaderUnit = true;
-        bigModDep.file = bigHuModDepBmi;
+        bigModDep.filePath = bigPcm;
         bigModDep.logicalNames.emplace_back("big.hpp");
         bigModDep.logicalNames.emplace_back("x.hpp");
         bigModDep.logicalNames.emplace_back("y.hpp");
@@ -625,19 +583,19 @@ tl::expected<void, string> runTest(const path &compiler)
 
         ModuleDep aModDep;
         aModDep.isHeaderUnit = false;
-        aModDep.file = aModDepBmi;
+        aModDep.filePath = aPcm;
         aModDep.logicalNames.emplace_back("A");
         foo.modDeps.emplace_back(std::move(aModDep));
 
         ModuleDep bModDep;
         bModDep.isHeaderUnit = false;
-        bModDep.file = abModDepBmi;
+        bModDep.filePath = aBPcm;
         bModDep.logicalNames.emplace_back("A:B");
         foo.modDeps.emplace_back(std::move(bModDep));
 
         ModuleDep cModDep;
         cModDep.isHeaderUnit = false;
-        cModDep.file = acModDepBmi;
+        cModDep.filePath = aCPcm;
         cModDep.logicalNames.emplace_back("A:C");
         foo.modDeps.emplace_back(std::move(cModDep));
 

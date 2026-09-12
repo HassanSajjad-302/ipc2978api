@@ -11,23 +11,19 @@ namespace fs = std::filesystem;
 
 struct CompilerTest
 {
-    static auto read(const BMIFile &file)
+    static auto read(std::string_view filePath)
     {
-        return IPCManagerCompiler::readBMIFile(file);
+        return IPCManagerCompiler::readBMIFile(filePath);
     }
     static std::string_view cached(IPCManagerCompiler &manager, const std::string &path)
     {
-        auto result = manager.getOrMapBMIFile({path});
+        auto result = manager.getOrMapBMIFile(path);
         if (!result)
         {
             std::cerr << result.error() << '\n';
             std::exit(1);
         }
         return *result;
-    }
-    static bool rejectsWrongCachedSize(IPCManagerCompiler &manager, const std::string &path)
-    {
-        return !manager.getOrMapBMIFile({path, 1});
     }
 };
 
@@ -64,19 +60,17 @@ static void checkMappings(const fs::path &directory, const std::string &content)
         auto first = CompilerTest::cached(manager, path);
         auto alias = CompilerTest::cached(manager, path);
         require(first.data() == alias.data() && first == content, "Repeated BMI opened a second mapping");
-        require(CompilerTest::rejectsWrongCachedSize(manager, path), "Cached BMI accepted an incorrect size");
         const auto found = manager.findBMIContents(path);
         require(found && found->data() == first.data(), "BMI lookup did not return cached contents");
         require(!manager.findBMIContents("uncached.pcm"), "Unknown BMI lookup succeeded");
         survivingContents = first;
     }
     require(survivingContents == content, "Manager destruction invalidated process-lifetime BMI contents");
-    require(!CompilerTest::read({path, 1}), "Incorrect known BMI size accepted");
     const std::string missing = (directory / "missing").string();
-    require(!CompilerTest::read({missing}), "Missing BMI accepted");
+    require(!CompilerTest::read(missing), "Missing BMI accepted");
     const std::string empty = (directory / "empty").string();
     std::ofstream(empty).close();
-    require(!CompilerTest::read({empty}), "Empty BMI accepted");
+    require(!CompilerTest::read(empty), "Empty BMI accepted");
 
 #ifndef _WIN32
     require(!Manager::writeAll(-1, "x", 1), "Failed syscall treated as an unsigned byte count");
@@ -97,6 +91,26 @@ static void checkMappings(const fs::path &directory, const std::string &content)
     Manager::writeString(encoded, "unterminated");
     offset = 0;
     require(!Manager::readPath(encoded, offset), "Unterminated IPC path accepted");
+
+    // A dependency's system flag and alias count follow its path directly; no BMI size is transmitted.
+    ModuleDep dependency;
+    dependency.filePath = path;
+    dependency.isSystem = true;
+    dependency.logicalNames = {"Module"};
+    encoded.clear();
+    Manager::writeModuleDep(encoded, dependency);
+    require(encoded.size() == 1 + sizeof(uint32_t) + path.size() + 1 + 1 + sizeof(uint32_t) + sizeof(uint32_t) +
+                                  std::string_view("Module").size(),
+            "Module dependency still contains a BMI size field");
+    offset = 0;
+    const auto isHeaderUnit = Manager::readBool(encoded, offset);
+    const auto decodedPath = Manager::readPath(encoded, offset);
+    const auto isSystem = Manager::readBool(encoded, offset);
+    const auto aliasCount = Manager::readUInt32(encoded, offset);
+    const auto aliasName = Manager::readString(encoded, offset);
+    require(isHeaderUnit && !*isHeaderUnit && decodedPath && *decodedPath == path && isSystem && *isSystem &&
+                aliasCount && *aliasCount == 1 && aliasName && *aliasName == "Module" && offset == encoded.size(),
+            "Module dependency fields do not immediately follow its path");
 
     const std::string mock = (directory / "dependencies.bin").string();
     encoded.clear();
@@ -161,7 +175,7 @@ int main(int argc, char **argv)
         }
         else if (mode == "--consume")
         {
-            const auto contents = CompilerTest::read({path});
+            const auto contents = CompilerTest::read(path);
             require(bool(contents), "Consumer could not open BMI after producer exit");
             require(*contents == content, "Consumer read incorrect BMI bytes");
         }

@@ -108,22 +108,17 @@ tl::expected<Response, std::string> IPCManagerCompiler::readBMIResponse(const st
                                                                         const bool isSystem)
 {
     TRY_READ_VAL(filePath, readPath, message, bytesRead);
-    TRY_READ_VAL(fileSize, readUInt32, message, bytesRead);
-    TRY_READ_VAL(contents, getOrMapBMIFile, (BMIFile{filePath, fileSize}));
+    TRY_READ_VAL(contents, getOrMapBMIFile, filePath);
     return Response{filePath, contents, type, isSystem};
 }
 
-tl::expected<std::string_view, std::string> IPCManagerCompiler::getOrMapBMIFile(const BMIFile &file)
+tl::expected<std::string_view, std::string> IPCManagerCompiler::getOrMapBMIFile(const std::string_view filePath)
 {
-    std::string path(file.filePath);
+    std::string path(filePath);
     if (const auto it = bmiContentsByPath.find(path); it != bmiContentsByPath.end())
-    {
-        if (file.fileSize != UINT32_MAX && file.fileSize != it->second.size())
-            return tl::unexpected(std::string("Invalid BMI file size: ") + path);
         return it->second;
-    }
 
-    TRY_READ_VAL(contents, readBMIFile, file);
+    TRY_READ_VAL(contents, readBMIFile, path);
     bmiContentsByPath.emplace(std::move(path), contents);
     return contents;
 }
@@ -356,7 +351,7 @@ tl::expected<void, std::string> IPCManagerCompiler::readEntriesFromFile(const st
         std::string_view contents;
         if (type != FileType::HEADER_FILE)
         {
-            TRY_READ_VAL(mapped, getOrMapBMIFile, (BMIFile{valueFilePath}));
+            TRY_READ_VAL(mapped, getOrMapBMIFile, valueFilePath);
             contents = mapped;
         }
         responses.emplace(responseKey, Response{valueFilePath, contents, type, isSystem});
@@ -369,10 +364,10 @@ tl::expected<void, std::string> IPCManagerCompiler::readEntriesFromFile(const st
     return {};
 }
 
-tl::expected<std::string_view, std::string> IPCManagerCompiler::readBMIFile(const BMIFile &file)
+tl::expected<std::string_view, std::string> IPCManagerCompiler::readBMIFile(const std::string_view filePath)
 {
     // Own a terminated path; callers may supply arbitrary string_views.
-    const std::string path(file.filePath);
+    const std::string path(filePath);
 #ifdef _WIN32
     const HANDLE handle = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr,
                                       OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -386,8 +381,7 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readBMIFile(cons
         CloseHandle(handle);
         return tl::unexpected(error);
     }
-    if (size.QuadPart <= 0 || static_cast<uint64_t>(size.QuadPart) > (std::numeric_limits<size_t>::max)() ||
-        (file.fileSize != UINT32_MAX && static_cast<uint64_t>(size.QuadPart) != file.fileSize))
+    if (size.QuadPart <= 0 || static_cast<uint64_t>(size.QuadPart) > (std::numeric_limits<size_t>::max)())
     {
         CloseHandle(handle);
         return tl::unexpected(std::string("Invalid BMI file size: ") + path);
@@ -425,8 +419,7 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readBMIFile(cons
         close(fd);
         return tl::unexpected(error);
     }
-    if (st.st_size <= 0 || static_cast<uint64_t>(st.st_size) > (std::numeric_limits<size_t>::max)() ||
-        (file.fileSize != UINT32_MAX && static_cast<uint64_t>(st.st_size) != file.fileSize))
+    if (st.st_size <= 0 || static_cast<uint64_t>(st.st_size) > (std::numeric_limits<size_t>::max)())
     {
         close(fd);
         return tl::unexpected(std::string("Invalid BMI file size: ") + path);

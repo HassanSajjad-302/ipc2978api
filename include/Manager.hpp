@@ -47,12 +47,11 @@ class Manager
 #endif
 
     static std::string getBufferWithType(CTB type);
-    // Wire lengths, counts, and BMI sizes remain native-endian uint32_t values.
+    // Wire lengths and counts use native-endian uint32_t values.
     static void writeUInt32(std::string &buffer, uint32_t value);
     static void writeString(std::string &buffer, const std::string_view &str);
     // Paths include a trailing NUL for OS calls; the encoded length excludes it.
     static void writePath(std::string &buffer, const std::string_view &str);
-    static void writeBMIFile(std::string &buffer, const BMIFile &file);
     static void writeModuleDep(std::string &buffer, const ModuleDep &dep);
     static void writeHuDep(std::string &buffer, const HuDep &dep);
     static void writeHeaderFile(std::string &buffer, const HeaderFile &dep);

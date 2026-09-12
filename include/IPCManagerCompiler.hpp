@@ -39,7 +39,7 @@ class IPCManagerCompiler : Manager
     tl::expected<std::string_view, std::string> readInternal(char (&buffer)[4096]) const;
     tl::expected<void, std::string> writeInternal(std::string_view buffer) const override;
 
-    // Decode a BMI path and size, reusing its mapped contents if an earlier response supplied it.
+    // Decode a BMI path, reusing its mapped contents if an earlier response supplied it.
     tl::expected<Response, std::string> readBMIResponse(std::string_view message, uint64_t &bytesRead, FileType type,
                                                         bool isSystem = true);
     tl::expected<void, std::string> readLogicalNames(std::string_view message, uint64_t &bytesRead,
@@ -60,8 +60,8 @@ class IPCManagerCompiler : Manager
     bool isMocking = false;
 
     // Successful mappings belong to the process, not to the manager or the returned string_view.
-    static tl::expected<std::string_view, std::string> readBMIFile(const BMIFile &file);
-    tl::expected<std::string_view, std::string> getOrMapBMIFile(const BMIFile &file);
+    static tl::expected<std::string_view, std::string> readBMIFile(std::string_view filePath);
+    tl::expected<std::string_view, std::string> getOrMapBMIFile(std::string_view filePath);
 
     // Separate allocations keep string addresses stable as subsequent messages arrive.
     mutable std::vector<std::unique_ptr<std::string>> allocations;

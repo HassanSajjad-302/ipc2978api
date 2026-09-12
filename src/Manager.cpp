@@ -143,23 +143,17 @@ void Manager::writePath(std::string &buffer, const std::string_view &str)
     buffer.push_back('\0');
 }
 
-void Manager::writeBMIFile(std::string &buffer, const BMIFile &file)
-{
-    writePath(buffer, file.filePath);
-    writeUInt32(buffer, file.fileSize);
-}
-
 void Manager::writeModuleDep(std::string &buffer, const ModuleDep &dep)
 {
     buffer.push_back(dep.isHeaderUnit);
-    writeBMIFile(buffer, dep.file);
+    writePath(buffer, dep.filePath);
     buffer.push_back(dep.isSystem);
     writeVectorOfStrings(buffer, dep.logicalNames);
 }
 
 void Manager::writeHuDep(std::string &buffer, const HuDep &dep)
 {
-    writeBMIFile(buffer, dep.file);
+    writePath(buffer, dep.filePath);
     buffer.push_back(dep.isSystem);
     writeVectorOfStrings(buffer, dep.logicalNames);
 }

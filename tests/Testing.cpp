@@ -88,16 +88,16 @@ static auto addTestFile(string_view key, const TestResponse &file)
     return tempTestFiles.emplace(string(key), file).first;
 }
 
-static BMIFile addLogicalNames(vector<string_view> &names, uint64_t count, const TestResponse &file)
+static string_view addLogicalNames(vector<string_view> &names, uint64_t count, const TestResponse &file)
 {
-    BMIFile bmi;
+    string_view filePath;
     for (uint64_t i = 0; i < count; ++i)
     {
         const auto entry = addTestFile(getRandomString(), file);
         names.emplace_back(entry->first);
-        bmi = {entry->second.filePath, static_cast<uint32_t>(entry->second.fileContent.size())};
+        filePath = entry->second.filePath;
     }
-    return bmi;
+    return filePath;
 }
 
 BTCModule getBTCModule(const CTBModule &request)
@@ -105,7 +105,7 @@ BTCModule getBTCModule(const CTBModule &request)
     BTCModule response;
     response.isSystem = getRandomBool();
     const auto requested = addTestFile(request.moduleName, createTestFile(FileType::MODULE, response.isSystem));
-    response.requested = {requested->second.filePath, static_cast<uint32_t>(requested->second.fileContent.size())};
+    response.filePath = requested->second.filePath;
     const uint64_t count = getRandomNumber(10);
     for (uint64_t i = 0; i < count; ++i)
     {
@@ -116,7 +116,7 @@ BTCModule getBTCModule(const CTBModule &request)
         uint64_t names = getRandomNumber(10);
         if (!names || !dep.isHeaderUnit)
             names = 1;
-        dep.file = addLogicalNames(dep.logicalNames, names, createTestFile(type, dep.isSystem));
+        dep.filePath = addLogicalNames(dep.logicalNames, names, createTestFile(type, dep.isSystem));
         response.modDeps.emplace_back(std::move(dep));
     }
     return response;
@@ -138,7 +138,6 @@ BTCNonModule getBTCNonModule(const CTBNonModule &request)
     response.filePath = requested->second.filePath;
     if (!response.isHeaderUnit)
         return response;
-    response.fileSize = requested->second.fileContent.size();
     addLogicalNames(response.logicalNames, getRandomNumber(2), requested->second);
     const uint64_t deps = getRandomNumber(10);
     for (uint64_t i = 0; i < deps; ++i)
@@ -148,7 +147,7 @@ BTCNonModule getBTCNonModule(const CTBNonModule &request)
         uint64_t names = getRandomNumber(10);
         if (!names)
             names = 1;
-        dep.file = addLogicalNames(dep.logicalNames, names, createTestFile(FileType::HEADER_UNIT, dep.isSystem));
+        dep.filePath = addLogicalNames(dep.logicalNames, names, createTestFile(FileType::HEADER_UNIT, dep.isSystem));
         response.huDeps.emplace_back(std::move(dep));
     }
     return response;
@@ -206,15 +205,13 @@ void printMessage(const BTCModule &btcModule, const bool sent)
     printSendingOrReceiving(sent);
     print("BTCModule\n\n");
 
-    print("Requested FilePath: {}\n\n", btcModule.requested.filePath);
+    print("Requested FilePath: {}\n\n", btcModule.filePath);
     print("Requested User: {}\n\n", btcModule.isSystem);
-    print("Requested FileSize: {}\n\n", btcModule.requested.fileSize);
     print("Deps Size: {}\n\n", btcModule.modDeps.size());
     for (uint64_t i = 0; i < btcModule.modDeps.size(); i++)
     {
         print("Mod-Dep[{}] IsHeaderUnit: {}\n\n", i, btcModule.modDeps[i].isHeaderUnit);
-        print("Mod-Dep[{}] FilePath: {}\n\n", i, btcModule.modDeps[i].file.filePath);
-        print("Mod-Dep[{}] FileSize: {}\n\n", i, btcModule.modDeps[i].file.fileSize);
+        print("Mod-Dep[{}] FilePath: {}\n\n", i, btcModule.modDeps[i].filePath);
         print("Mod-Dep[{}] LogicalName Size: {}\n\n", i, btcModule.modDeps[i].logicalNames.size());
         for (uint64_t j = 0; j < btcModule.modDeps[i].logicalNames.size(); ++j)
         {
@@ -231,7 +228,6 @@ void printMessage(const BTCNonModule &nonModule, const bool sent)
     print("IsHeaderUnit {}\n\n", nonModule.isHeaderUnit);
     print("User {}\n\n", nonModule.isSystem);
     print("FilePath {}\n\n", nonModule.filePath);
-    print("FileSize {}\n\n", nonModule.fileSize);
 
     for (uint64_t i = 0; i < nonModule.logicalNames.size(); i++)
     {
@@ -247,8 +243,7 @@ void printMessage(const BTCNonModule &nonModule, const bool sent)
 
     for (uint64_t i = 0; i < nonModule.huDeps.size(); i++)
     {
-        print("Hu-Dep[{}] FilePath: {}\n\n", i, nonModule.huDeps[i].file.filePath);
-        print("Hu-Dep[{}] FileSize: {}\n\n", i, nonModule.huDeps[i].file.fileSize);
+        print("Hu-Dep[{}] FilePath: {}\n\n", i, nonModule.huDeps[i].filePath);
         for (uint64_t j = 0; j < nonModule.huDeps[i].logicalNames.size(); ++j)
         {
             print("Mod-Dep[{}] LogicalName[{}]: {}\n\n", i, j, nonModule.huDeps[i].logicalNames[j]);

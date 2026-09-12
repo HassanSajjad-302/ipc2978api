@@ -1,8 +1,9 @@
 # IPC2978
 
 IPC2978 provides the compiler/build-system protocol for module and header-unit
-dependencies. Wire lengths, counts, and file sizes retain their original
-`uint32_t` format; local byte counts and parsing offsets use `uint64_t`.
+dependencies. Wire lengths and counts retain their original `uint32_t` format;
+local byte counts and parsing offsets use `uint64_t`. Responses identify each
+BMI by its file path; the compiler obtains its size from the completed file.
 
 Completed BMI files are opened and mapped by the compiler process when a
 response is received. The build system publishes the file path and completion
@@ -40,9 +41,10 @@ once on a fresh manager with `readEntriesFromFile`; a second attempt is rejected
 including after the first attempt failed, and does not invalidate existing views.
 
 The build system should send a BMI only after its producer succeeds and keep
-the completed file available and immutable until all consumers finish. Set
-`BMIFile::fileSize` to `UINT32_MAX` (the default) to let the compiler determine
-its size. No mapping acknowledgement is required.
+the completed file available and immutable until all consumers finish. No BMI
+size or mapping acknowledgement is transmitted. Removing the old size field
+changes the response layout, so refresh and rebuild the compiler and build
+system together before using them.
 
 `IPCManagerBS::receiveMessage` parses compiler requests after the build system
 removes the framing. HMake writes responses through its own event loop. The

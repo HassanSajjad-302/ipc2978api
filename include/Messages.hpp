@@ -35,17 +35,10 @@ struct CTBNonModule
 
 // Responses need no type tag: the outstanding request determines which layout to read.
 // A BMI must be complete before publication and remain available to its consumers.
-struct BMIFile
-{
-    std::string_view filePath;
-    // UINT32_MAX asks the compiler to obtain the size from the completed file.
-    uint32_t fileSize = UINT32_MAX;
-};
-
 struct ModuleDep
 {
     bool isHeaderUnit = false;
-    BMIFile file;
+    std::string_view filePath;
     // Classify the dependency as system input for compiler diagnostics.
     bool isSystem = true;
     // A module has one name. A composed header unit may provide several include-name aliases.
@@ -55,7 +48,7 @@ struct ModuleDep
 // Reply to CTBModule, including dependencies needed to load the requested BMI.
 struct BTCModule
 {
-    BMIFile requested;
+    std::string_view filePath;
     bool isSystem = true;
     // Omit dependencies already supplied to this compiler; their cached responses remain valid.
     std::vector<ModuleDep> modDeps;
@@ -63,7 +56,7 @@ struct BTCModule
 
 struct HuDep
 {
-    BMIFile file;
+    std::string_view filePath;
     // Classify the header unit as system input for compiler diagnostics.
     bool isSystem = true;
     // Include names that resolve to this same header-unit BMI.
@@ -86,7 +79,6 @@ struct BTCNonModule
     std::vector<HeaderFile> headerFiles;
     std::string_view filePath;
     // The remaining fields are sent only for a header-unit response. Otherwise filePath names a textual header.
-    uint32_t fileSize = UINT32_MAX;
     // Additional aliases for the requested BMI; the request's logical name is cached implicitly.
     std::vector<std::string_view> logicalNames;
     std::vector<HuDep> huDeps;
