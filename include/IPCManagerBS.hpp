@@ -8,19 +8,15 @@
 namespace P2978
 {
 
-// IPC Manager BuildSystem
-class IPCManagerBS : public Manager
+// Parses dependency requests received by the build system.
+class IPCManagerBS
 {
   public:
-    uint64_t writeFd = 0;
-
-    tl::expected<void, std::string> writeInternal(std::string_view buffer) const override;
-
-    explicit IPCManagerBS(uint64_t writeFd_);
+    // Parse one payload after the caller removes diagnostics, payload size, and delimiter.
+    // ctbBuffer must be aligned for CTBModule/CTBNonModule. Parsed string views borrow
+    // serverReadString, whose bytes must remain alive until the request is consumed.
     static tl::expected<void, std::string> receiveMessage(char (&ctbBuffer)[320], CTB &messageType,
                                                           std::string_view serverReadString);
-    [[nodiscard]] tl::expected<void, std::string> sendMessage(const BTCModule &moduleFile) const;
-    [[nodiscard]] tl::expected<void, std::string> sendMessage(const BTCNonModule &nonModule) const;
 };
 } // namespace P2978
 #endif // IPC_MANAGER_BS_HPP

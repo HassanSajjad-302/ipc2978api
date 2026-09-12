@@ -34,7 +34,6 @@ struct CompilerTest
 
 int main()
 {
-    // std::this_thread::sleep_for(std::chrono::milliseconds(5000));
     IPCManagerCompiler manager;
     CompilerTest t(&manager);
     for (uint64_t i = 0; i < 300; ++i)
@@ -85,7 +84,7 @@ int main()
 
         const Response &response = r.second;
         const string contents =
-            response.type == FileType::HEADER_FILE ? fileToString(response.filePath) : string(response.mapping.file);
+            response.type == FileType::HEADER_FILE ? fileToString(response.filePath) : string(response.bmiContents);
         appendResponse(output, response.filePath, contents, response.type, response.isSystem);
     }
 

@@ -1,5 +1,5 @@
-#include "IPCManagerBS.hpp"
 #include "IPCManagerCompiler.hpp"
+#include "TestBuildSystem.hpp"
 #include "TestProcess.hpp"
 #include "Testing.hpp"
 #include "fmt/printf.h"
@@ -16,7 +16,7 @@ int runTest()
     ipc2978_test::TestProcess compilerTest{exitFailure};
     const std::string command = std::string("\"") + COMPILER_TEST + '"';
     compilerTest.startAsyncProcess(command.c_str());
-    IPCManagerBS manager{compilerTest.writePipe};
+    ipc2978_test::TestBuildSystem manager{compilerTest.writePipe};
 
     CTB type;
     alignas(std::max_align_t) char buffer[320];

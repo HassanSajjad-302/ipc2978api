@@ -26,16 +26,14 @@ string fileToString(const string_view file_name)
 
     if (file_stream.fail())
     {
-        // Error opening file.
         exitFailure(fmt::format("Error opening file {}\n", file_name));
     }
 
     const std::ostringstream str_stream;
-    file_stream >> str_stream.rdbuf(); // NOT str_stream << file_stream.rdbuf()
+    file_stream >> str_stream.rdbuf();
 
     if (file_stream.fail() && !file_stream.eof())
     {
-        // Error reading file.
         exitFailure(fmt::format("Error reading file {}\n", file_name));
     }
 

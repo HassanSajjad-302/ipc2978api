@@ -43,7 +43,7 @@ std::string getErrorString()
 
 std::string getErrorString(const uint64_t bytesRead_, const uint64_t bytesProcessed_)
 {
-    return "Error: Bytes Readd vs Bytes Processed Mismatch.\nBytes Read: " + std::to_string(bytesRead_) +
+    return "Error: Message size does not match the parsed byte count.\nBytes Read: " + std::to_string(bytesRead_) +
            ", Bytes Processed: " + std::to_string(bytesProcessed_);
 }
 
@@ -57,7 +57,7 @@ std::string getErrorString(const ErrorCategory errorCategory_)
         errorString = "P2978 Message Parsing Error.";
         break;
     case ErrorCategory::READ_FILE_ZERO_BYTES_READ:
-        errorString = "Error: ReadFile Zero Bytes Read.";
+        errorString = "Compiler input closed before a complete IPC response was received.";
         break;
     case ErrorCategory::UNKNOWN_CTB_TYPE:
         errorString = "Error: Unknown CTB message received.";
@@ -65,8 +65,8 @@ std::string getErrorString(const ErrorCategory errorCategory_)
     case ErrorCategory::NONE:
         std::string str = __FILE__;
         str += ':';
-        str += __LINE__;
-        errorString = "P2978 IPC API internal error" + str;
+        str += std::to_string(__LINE__);
+        errorString = "P2978 IPC API internal error at " + str;
         break;
     }
 
@@ -81,21 +81,19 @@ tl::expected<void, std::string> Manager::writeAll(const int fd, const char *buff
     while (bytesWritten != count)
     {
         // Converting the syscall's -1 result to uint64_t gives UINT64_MAX.
-        const uint64_t result = write(fd, buffer + bytesWritten,
-                                      std::min<uint64_t>(count - bytesWritten, SSIZE_MAX));
+        const uint64_t result = write(fd, buffer + bytesWritten, std::min<uint64_t>(count - bytesWritten, SSIZE_MAX));
         if (result == UINT64_MAX)
         {
             if (errno == EINTR)
             {
-                // Interrupted by signal: retry
                 continue;
             }
             return tl::unexpected(getErrorString());
         }
         if (result == 0)
         {
-            // According to POSIX, write() returning 0 is only valid for count == 0
-            return tl::unexpected(getErrorString());
+            // Stop if the pipe makes no progress; errno need not describe this case.
+            return tl::unexpected(std::string("write returned zero bytes"));
         }
         bytesWritten += result;
     }
@@ -136,13 +134,12 @@ void Manager::writeUInt32(std::string &buffer, const uint32_t value)
 void Manager::writeString(std::string &buffer, const std::string_view &str)
 {
     writeUInt32(buffer, str.size());
-    buffer.append(str.begin(), str.end()); // Insert all characters
+    buffer.append(str.begin(), str.end());
 }
 
 void Manager::writePath(std::string &buffer, const std::string_view &str)
 {
-    writeUInt32(buffer, str.size());
-    buffer.append(str.begin(), str.end()); // Insert all characters
+    writeString(buffer, str);
     buffer.push_back('\0');
 }
 
@@ -279,7 +276,7 @@ tl::expected<std::string_view, std::string> Manager::readPath(const std::string_
     }
     std::string_view result = {message.data() + bytesRead, stringSize};
     bytesRead += stringSize;
-    // This string is followed by \0
+    // Consume the terminator without including it in the returned view.
     bytesRead += 1;
     return result;
 }

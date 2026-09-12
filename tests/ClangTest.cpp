@@ -14,13 +14,12 @@
 #include <cstring>
 #include <iostream>
 #ifdef IS_THIS_CLANG_REPO
-#include "clang/IPC2978/IPCManagerBS.hpp"
 #include "gtest/gtest.h"
 #else
-#include "IPCManagerBS.hpp"
 #include "Testing.hpp"
 #endif
 
+#include "TestBuildSystem.hpp"
 #include "TestProcess.hpp"
 #include <filesystem>
 #include <fstream>
@@ -87,7 +86,7 @@ struct CompilerSession
         return {};
     }
 
-    tl::expected<IPCManagerBS, std::string> start(const std::string &command, bool requestExpected)
+    tl::expected<ipc2978_test::TestBuildSystem, std::string> start(const std::string &command, bool requestExpected)
     {
         output.clear();
         if (!process.startAsyncProcess(command.c_str()))
@@ -97,7 +96,7 @@ struct CompilerSession
             if (const auto result = readRequest(); !result)
                 return tl::unexpected(result.error());
         }
-        return IPCManagerBS{process.writePipe};
+        return ipc2978_test::TestBuildSystem{process.writePipe};
     }
 
     tl::expected<void, std::string> finish()

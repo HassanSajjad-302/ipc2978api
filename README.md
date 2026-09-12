@@ -26,15 +26,28 @@ their timestamps to avoid unnecessary rebuilds.
 
 Create an `IPCManagerCompiler` for the compiler session and call
 `findResponse(logicalName, FileType)` when resolving a dependency. Module and
-header-unit responses expose their mapped contents in `response.mapping.file`.
+header-unit responses expose their mapped contents in `response.bmiContents`.
 Ordinary header responses provide a path. The manager caches responses and
-mappings, so aliases reuse the same mapping. Keep the manager alive while using
-the response paths and logical names, which are string views into its storage.
+mappings, so repeated paths and aliases reuse the same mapping.
+`findBMIContents(filePath)` looks up an already mapped BMI; it does not open a
+file or send an IPC request.
+
+BMI contents remain mapped until the compiler process exits, when the operating
+system releases the views. Destroying a manager does not unmap them. Response
+paths and logical names are separate: they are string views into manager-owned
+storage, so keep the manager alive while using them. Initialize mock-file mode
+once on a fresh manager with `readEntriesFromFile`; a second attempt is rejected,
+including after the first attempt failed, and does not invalidate existing views.
 
 The build system should send a BMI only after its producer succeeds and keep
 the completed file available and immutable until all consumers finish. Set
 `BMIFile::fileSize` to `UINT32_MAX` (the default) to let the compiler determine
 its size. No mapping acknowledgement is required.
+
+`IPCManagerBS::receiveMessage` parses compiler requests after the build system
+removes the framing. HMake writes responses through its own event loop. The
+standalone tests use `TestBuildSystem` to send the same response format over
+their test pipes; that sender is test support rather than a production API.
 
 Build and run the standalone protocol and mapping tests with:
 
@@ -46,7 +59,9 @@ ctest --test-dir build --output-on-failure
 
 `BuildSystemTest` launches `CompilerTest` and compares the received dependency
 cache with the sent responses. `MappingTest` covers independent consumers,
-mapping ownership, aliases, invalid files, mock-file loading, and wire encoding.
+process-lifetime views, aliases, invalid files, one-time mock-file loading, and
+wire encoding. Mapping checks run in child processes so their views are released
+before the parent removes the test files.
 
 `ClangTest` simulates the build system and requires a Clang rebuilt with the
 same IPC2978 library and wire format as the test. Copying the library sources
