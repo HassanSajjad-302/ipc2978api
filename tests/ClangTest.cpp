@@ -15,6 +15,9 @@
 #include <iostream>
 #ifdef IS_THIS_CLANG_REPO
 #include "clang/IPC2978/IPCManagerCompiler.hpp"
+#include "llvm/ADT/ScopeExit.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/Support/FileSystem.h"
 #include "gtest/gtest.h"
 #else
 #include "Testing.hpp"
@@ -357,6 +360,9 @@ P2978::Result<void> checkFailureCases(const string &clangCommand, string_view fo
         {"#include \"missing.hpp\"\n",
          {{"missing.hpp", "ipc missing.hpp", FileType::HEADER_FILE}},
          "'ipc missing.hpp' file not found"},
+        {"import \"corrupt.hpp\";\n",
+         {{"corrupt.hpp", "ipc corrupt.pcm", FileType::HEADER_UNIT}},
+         "file 'ipc corrupt.pcm' is not a valid"},
         // Foo also imports a header unit; provide that mapping so loading reaches the missing named dependency A.
         {"import Foo;\n",
          {{"Foo", fooPcm, FileType::MODULE}, {"big.hpp", bigPcm, FileType::HEADER_UNIT}},
@@ -364,6 +370,13 @@ P2978::Result<void> checkFailureCases(const string &clangCommand, string_view fo
     };
 
     remove(path("ipc missing.hpp"));
+    ofstream corrupt("ipc corrupt.pcm", ios::binary);
+    corrupt << "invalid BMI contents";
+    corrupt.close();
+    if (!corrupt)
+    {
+        return P2978::Error{"Could not write corrupt BMI fixture"};
+    }
     CompilerSession session;
     for (const auto &test : cases)
     {
@@ -390,6 +403,60 @@ P2978::Result<void> checkFailureCases(const string &clangCommand, string_view fo
             clangCommand + " -std=c++20 -fsyntax-only -useIPC=\"ipc failure.cache\" \"ipc failure.cpp\"", false))
         // A crash or an unexpected live request must fail the test even if an error diagnostic was printed first.
         CHECK_RESULT(session.finish(1, test.diagnostic))
+    }
+    return {};
+}
+
+P2978::Result<void> checkHeaderUnitVisibility(const string &clangCommand, const string &aPcm,
+                                             const string &aBPcm, const string &aCPcm)
+{
+    CompilerSession session;
+    auto compile = [&](const string &arguments, int exitStatus = 0, string_view diagnostic = {}) -> P2978::Result<void> {
+        CHECK_RESULT(session.start(clangCommand + " -std=c++20 " + arguments, false))
+        return session.finish(exitStatus, diagnostic);
+    };
+    const string headerPcm = absolute("ipc visibility.pcm").string();
+    const string dependencies = " -fmodule-file=A=\"" + aPcm + "\" -fmodule-file=A:B=\"" + aBPcm +
+                                "\" -fmodule-file=A:C=\"" + aCPcm + "\"";
+
+    // Declarations introducing names in the header are implicitly exported.
+    // Importing named module A does not expose A's names to the header's consumers.
+    ofstream header("ipc visibility.hpp", ios::binary);
+    header << "import A;\ninline const char *headerWorld() { return World(); }\n";
+    header.close();
+    CHECK(header)
+    CHECK_RESULT(compile("-fmodule-header=user -xc++-header \"ipc visibility.hpp\" -o \"" + headerPcm +
+                         "\"" + dependencies))
+
+    string mock;
+    Manager::writeUInt32(mock, 4);
+    const pair<string_view, string_view> entries[] = {
+        {"ipc visibility.hpp", headerPcm}, {"A", aPcm}, {"A:B", aBPcm}, {"A:C", aCPcm}};
+    for (const auto &[name, filePath] : entries)
+    {
+        Manager::writeString(mock, name);
+        Manager::writePath(mock, filePath);
+        mock.push_back(static_cast<uint8_t>(name == "ipc visibility.hpp" ? FileType::HEADER_UNIT : FileType::MODULE));
+        mock.push_back(true);
+    }
+    ofstream cache("ipc visibility.cache", ios::binary);
+    cache << mock;
+    cache.close();
+    CHECK(cache)
+
+    const pair<string_view, bool> cases[] = {
+        {"const char *result = headerWorld();\n", true},
+        {"const char *result = World();\n", false},
+        {"import A;\nconst char *result = World();\n", true}};
+    for (const auto &[declarations, succeeds] : cases)
+    {
+        ofstream source("ipc visibility.cpp", ios::binary);
+        source << "import \"ipc visibility.hpp\";\n" << declarations;
+        source.close();
+        CHECK(source)
+        CHECK_RESULT(compile("-fsyntax-only -useIPC=\"ipc visibility.cache\" \"ipc visibility.cpp\"",
+                             succeeds ? 0 : 1,
+                             succeeds ? "" : "declaration of 'World' must be imported from module 'A'"))
     }
     return {};
 }
@@ -694,6 +761,7 @@ P2978::Result<void> runTest(const path &compiler)
     }
 
     CHECK_RESULT(checkFailureCases(clangCommand, fooPcm, bigPcm))
+    CHECK_RESULT(checkHeaderUnitVisibility(clangCommand, aPcm, aBPcm, aCPcm))
     fflush(stdout);
     return {};
 }
@@ -702,19 +770,26 @@ P2978::Result<void> runTest(const path &compiler)
 #ifdef IS_THIS_CLANG_REPO
 TEST(IPC2978Test, IPC2978Test)
 {
-    const path p = current_path();
-    current_path(LLVM_TOOLS_BINARY_DIR);
-    const path mainFilePath = (LLVM_TOOLS_BINARY_DIR / path("main .o")).lexically_normal();
-    const auto &r = runTest(path(LLVM_TOOLS_BINARY_DIR) / clangExecutableName);
-    current_path(p);
-    if (!r)
+    std::error_code error;
+    const path originalDirectory = current_path(error);
+    ASSERT_FALSE(error) << error.message();
+    const path compiler = absolute(path(LLVM_TOOLS_BINARY_DIR) / clangExecutableName, error);
+    ASSERT_FALSE(error) << error.message();
+    llvm::SmallString<128> temporaryDirectory;
+    error = llvm::sys::fs::createUniqueDirectory("ipc2978-test", temporaryDirectory);
+    ASSERT_FALSE(error) << error.message();
+    llvm::scope_exit cleanup([&] {
+        current_path(originalDirectory, error);
+        EXPECT_FALSE(error) << error.message();
+        EXPECT_FALSE(llvm::sys::fs::remove_directories(temporaryDirectory));
+    });
+    current_path(path(temporaryDirectory.c_str()), error);
+    ASSERT_FALSE(error) << error.message();
+    if (const auto result = runTest(compiler); !result)
     {
-        FAIL() << r.error();
+        FAIL() << result.error();
     }
-    if (!exists(mainFilePath))
-    {
-        FAIL() << "main.o not found\n";
-    }
+    EXPECT_TRUE(exists(path("main .o")));
 }
 #else
 int main(int argc, char **argv)
