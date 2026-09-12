@@ -22,11 +22,11 @@ struct CompilerTest
     explicit CompilerTest(IPCManagerCompiler *c) : compilerManager(c)
     {
     }
-    [[nodiscard]] tl::expected<void, std::string> receiveBTCModule(const CTBModule &moduleName)
+    [[nodiscard]] P2978::Result<void> receiveBTCModule(const CTBModule &moduleName)
     {
         return compilerManager->receiveBTCModule(moduleName);
     }
-    [[nodiscard]] tl::expected<void, std::string> receiveBTCNonModule(const CTBNonModule &nonModule)
+    [[nodiscard]] P2978::Result<void> receiveBTCNonModule(const CTBNonModule &nonModule)
     {
         return compilerManager->receiveBTCNonModule(nonModule);
     }
@@ -92,7 +92,9 @@ int main()
     result << output;
     result.close();
     if (!result)
+    {
         exitFailure("Could not write bmi.txt");
+    }
     print("Successfully Completed CompilerTest\n");
 }
 

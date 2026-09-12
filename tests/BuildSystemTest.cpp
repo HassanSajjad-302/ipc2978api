@@ -23,7 +23,9 @@ int runTest()
     while (true)
     {
         if (!compilerTest.readCompilerMessage(compilerTestPrunedOutput))
+        {
             break;
+        }
         if (!endsWith(compilerTestPrunedOutput, delimiter))
         {
             exitFailure("early exit by CompilerTest");
@@ -62,7 +64,9 @@ int runTest()
     }
     compilerTest.reapProcess();
     if (compilerTest.exitStatus != EXIT_SUCCESS)
+    {
         exitFailure("CompilerTest did not exit successfully");
+    }
 
     string output;
     for (auto &r : tempTestFiles)

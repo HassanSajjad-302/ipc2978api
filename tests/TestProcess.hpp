@@ -39,14 +39,18 @@ class TestProcess
     {
         error = std::move(message);
         if (onFailure)
+        {
             onFailure(error);
+        }
         return false;
     }
 
     static void closePipe(uint64_t &pipe)
     {
         if (pipe == invalid)
+        {
             return;
+        }
 #ifdef _WIN32
         CloseHandle(reinterpret_cast<HANDLE>(pipe));
 #else
@@ -91,7 +95,9 @@ class TestProcess
     bool startAsyncProcess(const char *command)
     {
         if (pid != invalid)
+        {
             return fail("A test process is already running");
+        }
         error.clear();
         exitStatus = -1;
 #ifdef _WIN32
@@ -99,7 +105,9 @@ class TestProcess
         HANDLE outputRead = nullptr, outputWrite = nullptr;
         HANDLE inputRead = nullptr, inputWrite = nullptr;
         if (!CreatePipe(&outputRead, &outputWrite, &attributes, 0))
+        {
             return fail(P2978::getErrorString());
+        }
         if (!CreatePipe(&inputRead, &inputWrite, &attributes, 0))
         {
             const auto message = P2978::getErrorString();
@@ -143,7 +151,9 @@ class TestProcess
 #else
         int output[2], input[2];
         if (pipe(output) == -1)
+        {
             return fail(P2978::getErrorString());
+        }
         if (pipe(input) == -1)
         {
             const auto message = P2978::getErrorString();
@@ -158,7 +168,9 @@ class TestProcess
             {
                 const auto message = P2978::getErrorString();
                 for (int pipeFd : {output[0], output[1], input[0], input[1]})
+                {
                     close(pipeFd);
+                }
                 return fail(message);
             }
         }
@@ -167,12 +179,18 @@ class TestProcess
         {
             if (dup2(input[0], STDIN_FILENO) == -1 || dup2(output[1], STDOUT_FILENO) == -1 ||
                 dup2(output[1], STDERR_FILENO) == -1)
+            {
                 _exit(127);
+            }
             for (int fd : {output[0], output[1], input[0], input[1]})
+            {
                 close(fd);
+            }
             wordexp_t words{};
             if (wordexp(command, &words, WRDE_NOCMD) != 0 || words.we_wordc == 0)
+            {
                 _exit(127);
+            }
             execvp(words.we_wordv[0], words.we_wordv);
             perror("execvp");
             _exit(127);
@@ -196,23 +214,32 @@ class TestProcess
     bool reapProcess()
     {
         if (pid == invalid)
+        {
             return fail("No test process to reap");
+        }
 #ifdef _WIN32
         if (WaitForSingleObject(reinterpret_cast<HANDLE>(pid), INFINITE) != WAIT_OBJECT_0)
+        {
             return fail(P2978::getErrorString());
+        }
         DWORD status = 0;
         if (!GetExitCodeProcess(reinterpret_cast<HANDLE>(pid), &status))
+        {
             return fail(P2978::getErrorString());
+        }
         exitStatus = static_cast<int>(status);
         CloseHandle(reinterpret_cast<HANDLE>(pid));
 #else
         int status;
         pid_t result;
         do
+        {
             result = waitpid(static_cast<pid_t>(pid), &status, 0);
-        while (result == -1 && errno == EINTR);
+        } while (result == -1 && errno == EINTR);
         if (result == -1)
+        {
             return fail(P2978::getErrorString());
+        }
         exitStatus = WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
 #endif
         pid = invalid;
@@ -225,7 +252,9 @@ class TestProcess
     bool readCompilerMessage(std::string &output)
     {
         if (readPipe == invalid)
+        {
             return fail("No test process output pipe");
+        }
         while (true)
         {
             char buffer[4096];
@@ -234,7 +263,9 @@ class TestProcess
             if (!ReadFile(reinterpret_cast<HANDLE>(readPipe), buffer, sizeof(buffer), &count, nullptr))
             {
                 if (GetLastError() == ERROR_BROKEN_PIPE)
+                {
                     return false;
+                }
                 return fail(P2978::getErrorString());
             }
 #else
@@ -242,15 +273,21 @@ class TestProcess
             if (count == UINT64_MAX)
             {
                 if (errno == EINTR)
+                {
                     continue;
+                }
                 return fail(P2978::getErrorString());
             }
 #endif
             if (count == 0)
+            {
                 return false;
+            }
             output.append(buffer, count);
             if (endsWith(output, P2978::delimiter))
+            {
                 return true;
+            }
         }
     }
 
@@ -258,14 +295,20 @@ class TestProcess
     {
         const uint64_t trailerSize = sizeof(uint32_t) + strlen(P2978::delimiter);
         if (output.size() < trailerSize)
+        {
             return fail("Received IPC frame without a payload size");
+        }
         uint32_t payloadSize;
         memcpy(&payloadSize, output.data() + output.size() - trailerSize, sizeof(payloadSize));
         if (payloadSize > output.size() - trailerSize)
+        {
             return fail("Received IPC payload size exceeds the available bytes");
+        }
         const char *payload = output.data() + output.size() - trailerSize - payloadSize;
         if (const auto result = P2978::IPCManagerBS::receiveMessage(buffer, type, {payload, payloadSize}); !result)
+        {
             return fail(result.error());
+        }
         output.resize(output.size() - trailerSize - payloadSize);
         return true;
     }

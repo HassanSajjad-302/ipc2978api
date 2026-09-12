@@ -54,6 +54,9 @@ if (IPC2978_CLANG_EXECUTABLE)
 endif ()
 
 enable_testing()
+add_executable(ResultTest tests/ResultTest.cpp)
+target_include_directories(ResultTest PRIVATE include)
+add_test(NAME ResultTest COMMAND ResultTest)
 add_test(
         NAME MyTest
         COMMAND $<TARGET_FILE:BuildSystemTest>  # resolves correct path on all platforms

@@ -13,11 +13,11 @@ struct CompilerTest
 {
     static auto read(std::string_view filePath)
     {
-        return IPCManagerCompiler::readBMIFile(filePath);
+        return IPCManagerCompiler::mapBMIFile(filePath);
     }
     static std::string_view cached(IPCManagerCompiler &manager, const std::string &path)
     {
-        auto result = manager.getOrMapBMIFile(path);
+        auto result = manager.loadBMIContents(path);
         if (!result)
         {
             std::cerr << result.error() << '\n';
@@ -47,7 +47,9 @@ static void finish(ipc2978_test::TestProcess &process)
     require(!process.readCompilerMessage(output), "Unexpected IPC request from mapping helper");
     process.reapProcess();
     if (process.exitStatus != 0)
+    {
         std::cerr << output;
+    }
     require(process.exitStatus == 0, "Mapping helper failed");
 }
 
@@ -180,9 +182,13 @@ int main(int argc, char **argv)
             require(*contents == content, "Consumer read incorrect BMI bytes");
         }
         else if (mode == "--check-mappings")
+        {
             checkMappings(path, content);
+        }
         else
+        {
             require(false, "Unknown mapping helper mode");
+        }
         return 0;
     }
 
@@ -207,7 +213,9 @@ int main(int argc, char **argv)
         consumers.back()->startAsyncProcess(command("--consume", path).c_str());
     }
     for (const auto &consumer : consumers)
+    {
         finish(*consumer);
+    }
 
     // All views intentionally last until process exit. Keep the parent unmapped so Windows can remove the files.
     ipc2978_test::TestProcess checks{fail};

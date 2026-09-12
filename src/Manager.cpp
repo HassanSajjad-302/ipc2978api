@@ -1,7 +1,6 @@
 
 #include "Manager.hpp"
 #include "Messages.hpp"
-#include "expected.hpp"
 #include <algorithm>
 #include <cerrno>
 #include <cstdio>
@@ -74,7 +73,7 @@ std::string getErrorString(const ErrorCategory errorCategory_)
 }
 
 #ifndef _WIN32
-tl::expected<void, std::string> Manager::writeAll(const int fd, const char *buffer, const uint64_t count)
+Result<void> Manager::writeAll(const int fd, const char *buffer, const uint64_t count)
 {
     uint64_t bytesWritten = 0;
 
@@ -88,12 +87,12 @@ tl::expected<void, std::string> Manager::writeAll(const int fd, const char *buff
             {
                 continue;
             }
-            return tl::unexpected(getErrorString());
+            return Error{getErrorString()};
         }
         if (result == 0)
         {
             // Stop if the pipe makes no progress; errno need not describe this case.
-            return tl::unexpected(std::string("write returned zero bytes"));
+            return Error{"write returned zero bytes"};
         }
         bytesWritten += result;
     }
@@ -101,7 +100,7 @@ tl::expected<void, std::string> Manager::writeAll(const int fd, const char *buff
     return {};
 }
 #else
-tl::expected<void, std::string> Manager::writeAll(void *handle, std::string_view buffer)
+Result<void> Manager::writeAll(void *handle, std::string_view buffer)
 {
     uint64_t offset = 0;
     while (offset < buffer.size())
@@ -109,9 +108,13 @@ tl::expected<void, std::string> Manager::writeAll(void *handle, std::string_view
         const DWORD count = static_cast<DWORD>(std::min<uint64_t>(buffer.size() - offset, MAXDWORD));
         DWORD written = 0;
         if (!WriteFile(handle, buffer.data() + offset, count, &written, nullptr))
-            return tl::unexpected(getErrorString());
+        {
+            return Error{getErrorString()};
+        }
         if (!written)
-            return tl::unexpected(std::string("WriteFile wrote zero bytes"));
+        {
+            return Error{"WriteFile wrote zero bytes"};
+        }
         offset += written;
     }
     return {};
@@ -201,36 +204,38 @@ void Manager::writeVectorOfHeaderFiles(std::string &buffer, const std::vector<He
     }
 }
 
-tl::expected<bool, std::string> Manager::readBool(const std::string_view message, uint64_t &bytesRead)
+Result<bool> Manager::readBool(const std::string_view message, uint64_t &bytesRead)
 {
     if (bytesRead >= message.size())
     {
-        return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
+        return Error{getErrorString(ErrorCategory::PARSING_ERROR)};
     }
     const unsigned char value = static_cast<unsigned char>(message[bytesRead]);
     if (value > 1)
-        return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
+    {
+        return Error{getErrorString(ErrorCategory::PARSING_ERROR)};
+    }
     bool result = value != 0;
     bytesRead += 1;
     return result;
 }
 
-tl::expected<uint8_t, std::string> Manager::readUInt8(const std::string_view message, uint64_t &bytesRead)
+Result<uint8_t> Manager::readUInt8(const std::string_view message, uint64_t &bytesRead)
 {
     if (bytesRead >= message.size())
     {
-        return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
+        return Error{getErrorString(ErrorCategory::PARSING_ERROR)};
     }
     uint8_t result = *reinterpret_cast<const uint8_t *>(message.data() + bytesRead);
     bytesRead += 1;
     return result;
 }
 
-tl::expected<uint32_t, std::string> Manager::readUInt32(const std::string_view message, uint64_t &bytesRead)
+Result<uint32_t> Manager::readUInt32(const std::string_view message, uint64_t &bytesRead)
 {
     if (bytesRead > message.size() || message.size() - bytesRead < sizeof(uint32_t))
     {
-        return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
+        return Error{getErrorString(ErrorCategory::PARSING_ERROR)};
     }
     uint32_t result;
     memcpy(&result, message.data() + bytesRead, sizeof(result));
@@ -238,35 +243,35 @@ tl::expected<uint32_t, std::string> Manager::readUInt32(const std::string_view m
     return result;
 }
 
-tl::expected<std::string_view, std::string> Manager::readString(const std::string_view message, uint64_t &bytesRead)
+Result<std::string_view> Manager::readString(const std::string_view message, uint64_t &bytesRead)
 {
     auto r = readUInt32(message, bytesRead);
     if (!r)
     {
-        return tl::unexpected(r.error());
+        return Error{r.error()};
     }
     const uint64_t stringSize = *r;
     if (bytesRead > message.size() || stringSize > message.size() - bytesRead)
     {
-        return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
+        return Error{getErrorString(ErrorCategory::PARSING_ERROR)};
     }
     std::string_view result = {message.data() + bytesRead, stringSize};
     bytesRead += stringSize;
     return result;
 }
 
-tl::expected<std::string_view, std::string> Manager::readPath(const std::string_view message, uint64_t &bytesRead)
+Result<std::string_view> Manager::readPath(const std::string_view message, uint64_t &bytesRead)
 {
     auto r = readUInt32(message, bytesRead);
     if (!r)
     {
-        return tl::unexpected(r.error());
+        return Error{r.error()};
     }
     const uint64_t stringSize = *r;
     if (bytesRead > message.size() || stringSize >= message.size() - bytesRead ||
         message[bytesRead + stringSize] != '\0')
     {
-        return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
+        return Error{getErrorString(ErrorCategory::PARSING_ERROR)};
     }
     std::string_view result = {message.data() + bytesRead, stringSize};
     bytesRead += stringSize;

@@ -70,15 +70,21 @@ static TestResponse createTestFile(FileType type, bool isSystem)
 {
     string name = getRandomString(10);
     for (char &c : name)
+    {
         c = tolower(c);
+    }
     string filePath = (current_path() / name).string();
 #ifdef _WIN32
     for (char &c : filePath)
+    {
         c = tolower(c);
+    }
 #endif
     string contents = getRandomString();
     if (contents.empty())
+    {
         contents.push_back('a');
+    }
     std::ofstream(filePath, std::ios::binary) << contents;
     return {std::move(filePath), std::move(contents), type, isSystem};
 }
@@ -115,7 +121,9 @@ BTCModule getBTCModule(const CTBModule &request)
         const auto type = dep.isHeaderUnit ? FileType::HEADER_UNIT : FileType::MODULE;
         uint64_t names = getRandomNumber(10);
         if (!names || !dep.isHeaderUnit)
+        {
             names = 1;
+        }
         dep.filePath = addLogicalNames(dep.logicalNames, names, createTestFile(type, dep.isSystem));
         response.modDeps.emplace_back(std::move(dep));
     }
@@ -137,7 +145,9 @@ BTCNonModule getBTCNonModule(const CTBNonModule &request)
     const auto requested = addTestFile(request.logicalName, createTestFile(type, response.isSystem));
     response.filePath = requested->second.filePath;
     if (!response.isHeaderUnit)
+    {
         return response;
+    }
     addLogicalNames(response.logicalNames, getRandomNumber(2), requested->second);
     const uint64_t deps = getRandomNumber(10);
     for (uint64_t i = 0; i < deps; ++i)
@@ -146,7 +156,9 @@ BTCNonModule getBTCNonModule(const CTBNonModule &request)
         dep.isSystem = getRandomBool();
         uint64_t names = getRandomNumber(10);
         if (!names)
+        {
             names = 1;
+        }
         dep.filePath = addLogicalNames(dep.logicalNames, names, createTestFile(FileType::HEADER_UNIT, dep.isSystem));
         response.huDeps.emplace_back(std::move(dep));
     }

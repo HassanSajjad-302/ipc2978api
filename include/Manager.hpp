@@ -3,9 +3,11 @@
 #define MANAGER_HPP
 
 #include "Messages.hpp"
-#include "expected.hpp"
+#include "Result.hpp"
 
+#include <new>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace P2978
@@ -30,19 +32,15 @@ std::string getErrorString();
 std::string getErrorString(uint64_t bytesRead_, uint64_t bytesProcessed_);
 std::string getErrorString(ErrorCategory errorCategory_);
 
+// Shared wire encoding and pipe I/O helpers; endpoints do not use polymorphism.
 class Manager
 {
-  protected:
-    // Send already-framed bytes through the endpoint's pipe.
-    virtual tl::expected<void, std::string> writeInternal(std::string_view buffer) const = 0;
-
   public:
-    virtual ~Manager() = default;
     // Complete partial writes; the caller owns the descriptor or handle.
 #ifndef _WIN32
-    static tl::expected<void, std::string> writeAll(const int fd, const char *buffer, const uint64_t count);
+    static Result<void> writeAll(const int fd, const char *buffer, const uint64_t count);
 #else
-    static tl::expected<void, std::string> writeAll(void *handle, std::string_view buffer);
+    static Result<void> writeAll(void *handle, std::string_view buffer);
 #endif
 
     static std::string getBufferWithType(CTB type);
@@ -60,14 +58,14 @@ class Manager
     static void writeVectorOfHeaderFiles(std::string &buffer, const std::vector<HeaderFile> &headerFiles);
 
     // Parsing offsets use uint64_t independently of the wire field widths.
-    static tl::expected<bool, std::string> readBool(std::string_view message, uint64_t &bytesRead);
-    static tl::expected<uint8_t, std::string> readUInt8(std::string_view message, uint64_t &bytesRead);
-    static tl::expected<uint32_t, std::string> readUInt32(std::string_view message, uint64_t &bytesRead);
-    static tl::expected<std::string_view, std::string> readString(std::string_view message, uint64_t &bytesRead);
+    static Result<bool> readBool(std::string_view message, uint64_t &bytesRead);
+    static Result<uint8_t> readUInt8(std::string_view message, uint64_t &bytesRead);
+    static Result<uint32_t> readUInt32(std::string_view message, uint64_t &bytesRead);
+    static Result<std::string_view> readString(std::string_view message, uint64_t &bytesRead);
 
     // Returned string/path views borrow message. A path's view excludes its NUL,
     // but the parser consumes and validates that byte before returning.
-    static tl::expected<std::string_view, std::string> readPath(std::string_view message, uint64_t &bytesRead);
+    static Result<std::string_view> readPath(std::string_view message, uint64_t &bytesRead);
 };
 
 template <typename T, typename... Args> constexpr T *construct_at(T *p, Args &&...args)

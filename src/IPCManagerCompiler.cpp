@@ -25,14 +25,14 @@
     const auto &var = func(__VA_ARGS__);                                                                               \
     if (!var)                                                                                                          \
     {                                                                                                                  \
-        return tl::unexpected(var.error());                                                                            \
+        return Error{var.error()};                                                                                     \
     }
 
 #define TRY_READ_VAL(var, func, ...)                                                                                   \
     const auto &var##_result = func(__VA_ARGS__);                                                                      \
     if (!var##_result)                                                                                                 \
     {                                                                                                                  \
-        return tl::unexpected(var##_result.error());                                                                   \
+        return Error{var##_result.error()};                                                                            \
     }                                                                                                                  \
     auto &var = *var##_result;
 
@@ -48,7 +48,7 @@ static bool endsWith(const std::string_view str, const std::string_view suffix)
     return str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
-tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(char (&buffer)[4096]) const
+Result<std::string_view> IPCManagerCompiler::readInternal(char (&buffer)[4096]) const
 {
     std::string *output = nullptr;
     while (true)
@@ -61,7 +61,7 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(cha
         bytesRead = readCount;
         if (const DWORD lastError = GetLastError(); !success && lastError != ERROR_MORE_DATA)
         {
-            return tl::unexpected(getErrorString());
+            return Error{getErrorString()};
         }
 
 #else
@@ -69,14 +69,16 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(cha
         if (bytesRead == UINT64_MAX)
         {
             if (errno == EINTR)
+            {
                 continue;
-            return tl::unexpected(getErrorString());
+            }
+            return Error{getErrorString()};
         }
 
 #endif
         if (!bytesRead)
         {
-            return tl::unexpected(getErrorString(ErrorCategory::READ_FILE_ZERO_BYTES_READ));
+            return Error{getErrorString(ErrorCategory::READ_FILE_ZERO_BYTES_READ)};
         }
 
         if (!output)
@@ -94,7 +96,7 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readInternal(cha
     }
 }
 
-tl::expected<void, std::string> IPCManagerCompiler::writeInternal(const std::string_view buffer) const
+Result<void> IPCManagerCompiler::writeInternal(const std::string_view buffer) const
 {
 #ifdef _WIN32
     return writeAll(GetStdHandle(STD_OUTPUT_HANDLE), buffer);
@@ -103,36 +105,39 @@ tl::expected<void, std::string> IPCManagerCompiler::writeInternal(const std::str
 #endif
 }
 
-tl::expected<Response, std::string> IPCManagerCompiler::readBMIResponse(const std::string_view message,
-                                                                        uint64_t &bytesRead, const FileType type,
-                                                                        const bool isSystem)
+Result<Response> IPCManagerCompiler::readBMIResponse(const std::string_view message, uint64_t &bytesRead,
+                                                     const FileType type, const bool isSystem)
 {
     TRY_READ_VAL(filePath, readPath, message, bytesRead);
-    TRY_READ_VAL(contents, getOrMapBMIFile, filePath);
+    TRY_READ_VAL(contents, loadBMIContents, filePath);
     return Response{filePath, contents, type, isSystem};
 }
 
-tl::expected<std::string_view, std::string> IPCManagerCompiler::getOrMapBMIFile(const std::string_view filePath)
+Result<std::string_view> IPCManagerCompiler::loadBMIContents(const std::string_view filePath)
 {
     std::string path(filePath);
     if (const auto it = bmiContentsByPath.find(path); it != bmiContentsByPath.end())
+    {
         return it->second;
+    }
 
-    TRY_READ_VAL(contents, readBMIFile, path);
+    TRY_READ_VAL(contents, mapBMIFile, path);
     bmiContentsByPath.emplace(std::move(path), contents);
     return contents;
 }
 
-tl::expected<std::string_view, std::string> IPCManagerCompiler::findBMIContents(const std::string_view filePath) const
+Result<std::string_view> IPCManagerCompiler::findBMIContents(const std::string_view filePath) const
 {
     const auto it = bmiContentsByPath.find(std::string(filePath));
     if (it == bmiContentsByPath.end())
-        return tl::unexpected(std::string("BMI was not supplied by the build system: ") + std::string(filePath));
+    {
+        return Error{std::string("BMI was not supplied by the build system: ") + std::string(filePath)};
+    }
     return it->second;
 }
 
-tl::expected<void, std::string> IPCManagerCompiler::readLogicalNames(const std::string_view message,
-                                                                     uint64_t &bytesRead, const Response &response)
+Result<void> IPCManagerCompiler::readLogicalNames(const std::string_view message, uint64_t &bytesRead,
+                                                  const Response &response)
 {
     TRY_READ_VAL(logicalNamesSize, readUInt32, message, bytesRead);
     for (uint64_t i = 0; i < logicalNamesSize; ++i)
@@ -143,7 +148,7 @@ tl::expected<void, std::string> IPCManagerCompiler::readLogicalNames(const std::
     return {};
 }
 
-tl::expected<void, std::string> IPCManagerCompiler::receiveBTCModule(const CTBModule &moduleName)
+Result<void> IPCManagerCompiler::receiveBTCModule(const CTBModule &moduleName)
 {
     std::string buffer = getBufferWithType(CTB::MODULE);
     writeString(buffer, moduleName.moduleName);
@@ -151,7 +156,7 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCModule(const CTBMo
     buffer.append(delimiter, strlen(delimiter));
     if (const auto &r = writeInternal(buffer); !r)
     {
-        return tl::unexpected(r.error());
+        return Error{r.error()};
     }
 
     char stackBuffer[4096];
@@ -159,7 +164,7 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCModule(const CTBMo
 
     if (!received)
     {
-        return tl::unexpected(received.error());
+        return Error{received.error()};
     }
     const std::string_view message = *received;
 
@@ -185,12 +190,12 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCModule(const CTBMo
 
     if (message.size() != bytesRead)
     {
-        return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
+        return Error{getErrorString(ErrorCategory::PARSING_ERROR)};
     }
     return {};
 }
 
-tl::expected<void, std::string> IPCManagerCompiler::receiveBTCNonModule(const CTBNonModule &nonModule)
+Result<void> IPCManagerCompiler::receiveBTCNonModule(const CTBNonModule &nonModule)
 {
     std::string buffer = getBufferWithType(CTB::NON_MODULE);
     buffer.push_back(nonModule.isHeaderUnit);
@@ -199,7 +204,7 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCNonModule(const CT
     buffer.append(delimiter, strlen(delimiter));
     if (const auto &r = writeInternal(buffer); !r)
     {
-        return tl::unexpected(r.error());
+        return Error{r.error()};
     }
 
     char stackBuffer[4096];
@@ -207,7 +212,7 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCNonModule(const CT
 
     if (!received)
     {
-        return tl::unexpected(received.error());
+        return Error{received.error()};
     }
 
     std::string_view readCompilerMessage = *received;
@@ -233,7 +238,7 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCNonModule(const CT
         responses.emplace(*str, Response{filePath, {}, FileType::HEADER_FILE, isSystem});
         if (readCompilerMessage.size() != bytesRead)
         {
-            return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
+            return Error{getErrorString(ErrorCategory::PARSING_ERROR)};
         }
         return {};
     }
@@ -254,13 +259,12 @@ tl::expected<void, std::string> IPCManagerCompiler::receiveBTCNonModule(const CT
 
     if (readCompilerMessage.size() != bytesRead)
     {
-        return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
+        return Error{getErrorString(ErrorCategory::PARSING_ERROR)};
     }
     return {};
 }
 
-tl::expected<Response, std::string> IPCManagerCompiler::findResponse(const std::string_view logicalName,
-                                                                     const FileType type)
+Result<Response> IPCManagerCompiler::findResponse(const std::string_view logicalName, const FileType type)
 {
 #ifdef _WIN32
     std::string logicalName2{logicalName};
@@ -282,7 +286,7 @@ tl::expected<Response, std::string> IPCManagerCompiler::findResponse(const std::
     {
         if (isMocking)
         {
-            return tl::unexpected("Could not find entry in mocking-mode");
+            return Error{"Could not find entry in mocking-mode"};
         }
 
         if (type == FileType::MODULE)
@@ -291,7 +295,7 @@ tl::expected<Response, std::string> IPCManagerCompiler::findResponse(const std::
             ctbModule.moduleName = logicalName2;
             if (const auto &r2 = receiveBTCModule(ctbModule); !r2)
             {
-                return tl::unexpected(r2.error());
+                return Error{r2.error()};
             }
         }
         else
@@ -301,7 +305,7 @@ tl::expected<Response, std::string> IPCManagerCompiler::findResponse(const std::
             ctbNonModule.isHeaderUnit = type == FileType::HEADER_UNIT;
             if (const auto &r2 = receiveBTCNonModule(ctbNonModule); !r2)
             {
-                return tl::unexpected(r2.error());
+                return Error{r2.error()};
             }
         }
 
@@ -313,26 +317,34 @@ tl::expected<Response, std::string> IPCManagerCompiler::findResponse(const std::
     }
 }
 
-static tl::expected<std::string, std::string> fileToString(const std::string_view fileName)
+static Result<std::string> fileToString(const std::string_view fileName)
 {
     std::ifstream file(std::string(fileName), std::ios::binary);
     if (!file)
-        return tl::unexpected(std::string("Could not open IPC mock file: ") + std::string(fileName));
+    {
+        return Error{std::string("Could not open IPC mock file: ") + std::string(fileName)};
+    }
     std::string fileBuffer{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
     if (file.bad())
-        return tl::unexpected(std::string("Could not read IPC mock file: ") + std::string(fileName));
+    {
+        return Error{std::string("Could not read IPC mock file: ") + std::string(fileName)};
+    }
     return fileBuffer;
 }
 
-tl::expected<void, std::string> IPCManagerCompiler::readEntriesFromFile(const std::string_view filePath)
+Result<void> IPCManagerCompiler::readEntriesFromFile(const std::string_view filePath)
 {
     // Neither a second mock nor a switch from live IPC may replace storage borrowed by cached entries.
     if (isMocking || !responses.empty() || !allocations.empty() || !bmiContentsByPath.empty())
-        return tl::unexpected(std::string("IPC mock dependencies can only be loaded once on a fresh manager"));
+    {
+        return Error{"IPC mock dependencies can only be loaded once on a fresh manager"};
+    }
     isMocking = true;
     auto contents = fileToString(filePath);
     if (!contents)
-        return tl::unexpected(contents.error());
+    {
+        return Error{contents.error()};
+    }
     scanCacheFileData = std::move(*contents);
 
     uint64_t bytesRead = 0;
@@ -344,27 +356,31 @@ tl::expected<void, std::string> IPCManagerCompiler::readEntriesFromFile(const st
         TRY_READ_VAL(valueFilePath, readPath, scanCacheFileData, bytesRead);
         TRY_READ_VAL(fileType, readUInt8, scanCacheFileData, bytesRead);
         if (fileType > static_cast<uint8_t>(FileType::HEADER_FILE))
-            return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
+        {
+            return Error{getErrorString(ErrorCategory::PARSING_ERROR)};
+        }
         TRY_READ_VAL(isSystem, readBool, scanCacheFileData, bytesRead);
 
         const FileType type = static_cast<FileType>(fileType);
         std::string_view contents;
         if (type != FileType::HEADER_FILE)
         {
-            TRY_READ_VAL(mapped, getOrMapBMIFile, valueFilePath);
+            TRY_READ_VAL(mapped, loadBMIContents, valueFilePath);
             contents = mapped;
         }
         responses.emplace(responseKey, Response{valueFilePath, contents, type, isSystem});
     }
 
     if (bytesRead != scanCacheFileData.size())
-        return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
+    {
+        return Error{getErrorString(ErrorCategory::PARSING_ERROR)};
+    }
 
     mockFilePath = filePath;
     return {};
 }
 
-tl::expected<std::string_view, std::string> IPCManagerCompiler::readBMIFile(const std::string_view filePath)
+Result<std::string_view> IPCManagerCompiler::mapBMIFile(const std::string_view filePath)
 {
     // Own a terminated path; callers may supply arbitrary string_views.
     const std::string path(filePath);
@@ -372,19 +388,21 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readBMIFile(cons
     const HANDLE handle = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr,
                                       OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (handle == INVALID_HANDLE_VALUE)
-        return tl::unexpected(getErrorString());
+    {
+        return Error{getErrorString()};
+    }
 
     LARGE_INTEGER size;
     if (!GetFileSizeEx(handle, &size))
     {
         const std::string error = getErrorString();
         CloseHandle(handle);
-        return tl::unexpected(error);
+        return Error{error};
     }
     if (size.QuadPart <= 0 || static_cast<uint64_t>(size.QuadPart) > (std::numeric_limits<size_t>::max)())
     {
         CloseHandle(handle);
-        return tl::unexpected(std::string("Invalid BMI file size: ") + path);
+        return Error{std::string("Invalid BMI file size: ") + path};
     }
 
     // No name or build-system-owned object is needed. All readers open the completed file.
@@ -393,7 +411,7 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readBMIFile(cons
     {
         const std::string error = getErrorString();
         CloseHandle(handle);
-        return tl::unexpected(error);
+        return Error{error};
     }
     CloseHandle(handle);
 
@@ -402,7 +420,7 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readBMIFile(cons
     {
         const std::string error = getErrorString();
         CloseHandle(mapping);
-        return tl::unexpected(error);
+        return Error{error};
     }
     // The view holds its own reference to the mapping object. Keep the view until process exit.
     CloseHandle(mapping);
@@ -410,19 +428,21 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readBMIFile(cons
 #else
     const int fd = open(path.c_str(), O_RDONLY);
     if (fd == -1)
-        return tl::unexpected(getErrorString());
+    {
+        return Error{getErrorString()};
+    }
 
     struct stat st;
     if (fstat(fd, &st) == -1)
     {
         const std::string error = getErrorString();
         close(fd);
-        return tl::unexpected(error);
+        return Error{error};
     }
     if (st.st_size <= 0 || static_cast<uint64_t>(st.st_size) > (std::numeric_limits<size_t>::max)())
     {
         close(fd);
-        return tl::unexpected(std::string("Invalid BMI file size: ") + path);
+        return Error{std::string("Invalid BMI file size: ") + path};
     }
     const size_t size = static_cast<size_t>(st.st_size);
     int flags = MAP_SHARED;
@@ -434,7 +454,7 @@ tl::expected<std::string_view, std::string> IPCManagerCompiler::readBMIFile(cons
     {
         const std::string error = getErrorString();
         close(fd);
-        return tl::unexpected(error);
+        return Error{error};
     }
     close(fd);
     // Closing the descriptor leaves the view valid; process exit releases the mapping.

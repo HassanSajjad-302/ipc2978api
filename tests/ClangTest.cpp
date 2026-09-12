@@ -14,6 +14,7 @@
 #include <cstring>
 #include <iostream>
 #ifdef IS_THIS_CLANG_REPO
+#include "clang/IPC2978/IPCManagerCompiler.hpp"
 #include "gtest/gtest.h"
 #else
 #include "Testing.hpp"
@@ -41,19 +42,25 @@ constexpr const char *clangExecutableName = "clang";
 namespace
 {
 
-tl::expected<string, string> compilerCommand(const path &compiler)
+P2978::Result<string> compilerCommand(const path &compiler)
 {
     std::error_code error;
     const path executable = absolute(compiler, error);
     if (error)
-        return tl::unexpected("Cannot resolve Clang executable: " + error.message());
+    {
+        return P2978::Error{"Cannot resolve Clang executable: " + error.message()};
+    }
     if (!is_regular_file(executable, error))
-        return tl::unexpected("Clang executable not found: " + executable.string() +
-                              "\nPass the path to a Clang rebuilt with this IPC2978 library, or configure "
-                              "IPC2978_CLANG_EXECUTABLE.");
+    {
+        return P2978::Error{"Clang executable not found: " + executable.string() +
+                            "\nPass the path to a Clang rebuilt with this IPC2978 library, or configure "
+                            "IPC2978_CLANG_EXECUTABLE."};
+    }
 #ifndef _WIN32
     if (access(executable.c_str(), X_OK) != 0)
-        return tl::unexpected("Clang file is not executable: " + executable.string());
+    {
+        return P2978::Error{"Clang file is not executable: " + executable.string()};
+    }
 #endif
     string command = "\"";
     for (const char c : executable.string())
@@ -61,7 +68,9 @@ tl::expected<string, string> compilerCommand(const path &compiler)
 #ifndef _WIN32
         // TestProcess uses wordexp on Unix, so preserve shell metacharacters literally.
         if (c == '\\' || c == '"' || c == '$' || c == '`')
+        {
             command += '\\';
+        }
 #endif
         command += c;
     }
@@ -76,39 +85,60 @@ struct CompilerSession
     CTB type{};
     alignas(std::max_align_t) char buffer[320];
 
-    tl::expected<void, std::string> readRequest()
+    P2978::Result<void> readRequest()
     {
         if (!process.readCompilerMessage(output))
-            return tl::unexpected(process.error.empty() ? "Compiler exited before the expected request:\n" + output
-                                                        : process.error);
+        {
+            return P2978::Error{process.error.empty() ? "Compiler exited before the expected request:\n" + output
+                                                      : process.error};
+        }
         if (!process.pruneCompilerOutput(output, buffer, type))
-            return tl::unexpected(process.error);
+        {
+            return P2978::Error{process.error};
+        }
         return {};
     }
 
-    tl::expected<ipc2978_test::TestBuildSystem, std::string> start(const std::string &command, bool requestExpected)
+    P2978::Result<ipc2978_test::TestBuildSystem> start(const std::string &command, bool requestExpected)
     {
         output.clear();
         if (!process.startAsyncProcess(command.c_str()))
-            return tl::unexpected(process.error);
+        {
+            return P2978::Error{process.error};
+        }
         if (requestExpected)
         {
             if (const auto result = readRequest(); !result)
-                return tl::unexpected(result.error());
+            {
+                return P2978::Error{result.error()};
+            }
         }
         return ipc2978_test::TestBuildSystem{process.writePipe};
     }
 
-    tl::expected<void, std::string> finish()
+    P2978::Result<void> finish(int expectedExitStatus = EXIT_SUCCESS, string_view diagnostic = {})
     {
         if (process.readCompilerMessage(output))
-            return tl::unexpected(std::string("Unexpected compiler request at completion"));
+        {
+            return P2978::Error{std::string("Unexpected compiler request at completion")};
+        }
         if (!process.error.empty())
-            return tl::unexpected(process.error);
+        {
+            return P2978::Error{process.error};
+        }
         if (!process.reapProcess())
-            return tl::unexpected(process.error);
-        if (process.exitStatus != EXIT_SUCCESS)
-            return tl::unexpected("Compiler exited with status " + std::to_string(process.exitStatus) + ":\n" + output);
+        {
+            return P2978::Error{process.error};
+        }
+        if (process.exitStatus != expectedExitStatus)
+        {
+            return P2978::Error{"Compiler exited with status " + std::to_string(process.exitStatus) + " (expected " +
+                                std::to_string(expectedExitStatus) + "):\n" + output};
+        }
+        if (!diagnostic.empty() && output.find(diagnostic) == string::npos)
+        {
+            return P2978::Error{"Missing compiler diagnostic: " + string(diagnostic) + "\n" + output};
+        }
         std::cout << output;
         return {};
     }
@@ -284,9 +314,9 @@ export void Foo()
     ofstream("main.cpp") << mainDotCpp;
 }
 
-tl::unexpected<string> errorReturn()
+P2978::Error errorReturn()
 {
-    return tl::unexpected<string>("IPC2978 Test Error: Wrong Message Received\n");
+    return P2978::Error{"IPC2978 Test Error: Wrong Message Received\n"};
 }
 
 #define CHECK(condition)                                                                                               \
@@ -298,14 +328,73 @@ tl::unexpected<string> errorReturn()
 #define SEND_MESSAGE(message)                                                                                          \
     if (const auto &_r_send_##message = manager.sendMessage(message); !_r_send_##message)                              \
     {                                                                                                                  \
-        return tl::unexpected("manager send message failed" + _r_send_##message.error() + "\n");                       \
+        return P2978::Error{"manager send message failed" + _r_send_##message.error() + "\n"};                         \
     }
 
 #define CHECK_RESULT(expression)                                                                                       \
     if (const auto &result = (expression); !result)                                                                    \
-        return tl::unexpected(result.error());
+    {                                                                                                                  \
+        return P2978::Error{result.error()};                                                                           \
+    }
 
-tl::expected<void, string> runTest(const path &compiler)
+P2978::Result<void> checkFailureCases(const string &clangCommand, string_view fooPcm, string_view bigPcm)
+{
+    struct MockEntry
+    {
+        string_view logicalName;
+        string_view filePath;
+        FileType type;
+    };
+    struct FailureCase
+    {
+        string_view source;
+        vector<MockEntry> entries;
+        string_view diagnostic;
+    };
+    const FailureCase cases[] = {
+        {"#include \"missing.hpp\"\n", {}, "could not resolve IPC dependency 'missing.hpp':"},
+        {"import Missing;\n", {}, "could not resolve IPC dependency 'Missing':"},
+        {"#include \"missing.hpp\"\n",
+         {{"missing.hpp", "ipc missing.hpp", FileType::HEADER_FILE}},
+         "'ipc missing.hpp' file not found"},
+        // Foo also imports a header unit; provide that mapping so loading reaches the missing named dependency A.
+        {"import Foo;\n",
+         {{"Foo", fooPcm, FileType::MODULE}, {"big.hpp", bigPcm, FileType::HEADER_UNIT}},
+         "could not resolve IPC dependency 'A':"},
+    };
+
+    remove(path("ipc missing.hpp"));
+    CompilerSession session;
+    for (const auto &test : cases)
+    {
+        string mock;
+        Manager::writeUInt32(mock, static_cast<uint32_t>(test.entries.size()));
+        for (const auto &entry : test.entries)
+        {
+            Manager::writeString(mock, entry.logicalName);
+            Manager::writePath(mock, entry.filePath);
+            mock.push_back(static_cast<uint8_t>(entry.type));
+            mock.push_back(true);
+        }
+        ofstream source("ipc failure.cpp", ios::binary);
+        source << test.source;
+        source.close();
+        ofstream cache("ipc failure.cache", ios::binary);
+        cache << mock;
+        cache.close();
+        if (!source || !cache)
+        {
+            return P2978::Error{"Could not write IPC failure fixtures"};
+        }
+        CHECK_RESULT(session.start(
+            clangCommand + " -std=c++20 -fsyntax-only -useIPC=\"ipc failure.cache\" \"ipc failure.cpp\"", false))
+        // A crash or an unexpected live request must fail the test even if an error diagnostic was printed first.
+        CHECK_RESULT(session.finish(1, test.diagnostic))
+    }
+    return {};
+}
+
+P2978::Result<void> runTest(const path &compiler)
 {
     const auto command = compilerCommand(compiler);
     CHECK_RESULT(command)
@@ -451,8 +540,8 @@ tl::expected<void, string> runTest(const path &compiler)
     // compiling o.hpp with include-translation. BTCNonModule for n.hpp will be received with
     // isHeaderUnit = true.
     {
-        string compileCommand =
-            clangCommand + R"( -std=c++20 -fmodule-header=user -o ")" + oPcm + "\" -useIPC -xc++-header o.hpp -DTRANSLATING";
+        string compileCommand = clangCommand + R"( -std=c++20 -fmodule-header=user -o ")" + oPcm +
+                                "\" -useIPC -xc++-header o.hpp -DTRANSLATING";
 
         auto managerResult = session.start(compileCommand, true);
         CHECK_RESULT(managerResult)
@@ -604,6 +693,7 @@ tl::expected<void, string> runTest(const path &compiler)
         CHECK_RESULT(session.finish())
     }
 
+    CHECK_RESULT(checkFailureCases(clangCommand, fooPcm, bigPcm))
     fflush(stdout);
     return {};
 }
@@ -636,7 +726,9 @@ int main(int argc, char **argv)
     }
     path compiler = argc == 2 ? argv[1] : IPC2978_CLANG_EXECUTABLE;
     if (compiler.empty())
+    {
         compiler = path(".") / clangExecutableName;
+    }
     if (const auto &r = runTest(compiler); !r)
     {
         std::cout << r.error() << std::endl;

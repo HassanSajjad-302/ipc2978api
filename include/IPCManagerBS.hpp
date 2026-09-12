@@ -15,8 +15,7 @@ class IPCManagerBS
     // Parse one payload after the caller removes diagnostics, payload size, and delimiter.
     // ctbBuffer must be aligned for CTBModule/CTBNonModule. Parsed string views borrow
     // serverReadString, whose bytes must remain alive until the request is consumed.
-    static tl::expected<void, std::string> receiveMessage(char (&ctbBuffer)[320], CTB &messageType,
-                                                          std::string_view serverReadString);
+    static Result<void> receiveMessage(char (&ctbBuffer)[320], CTB &messageType, std::string_view serverReadString);
 };
 } // namespace P2978
 #endif // IPC_MANAGER_BS_HPP

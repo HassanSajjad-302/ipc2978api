@@ -3,7 +3,6 @@
 #define IPC_MANAGER_COMPILER_HPP
 
 #include "Manager.hpp"
-#include "expected.hpp"
 
 #include <memory>
 #include <unordered_map>
@@ -36,18 +35,18 @@ class IPCManagerCompiler : Manager
     friend struct ::CompilerTest;
     friend struct ::BuildSystemTest;
 
-    tl::expected<std::string_view, std::string> readInternal(char (&buffer)[4096]) const;
-    tl::expected<void, std::string> writeInternal(std::string_view buffer) const override;
+    Result<std::string_view> readInternal(char (&buffer)[4096]) const;
+    // Send already-framed bytes through the compiler's pipe.
+    Result<void> writeInternal(std::string_view buffer) const;
 
     // Decode a BMI path, reusing its mapped contents if an earlier response supplied it.
-    tl::expected<Response, std::string> readBMIResponse(std::string_view message, uint64_t &bytesRead, FileType type,
-                                                        bool isSystem = true);
-    tl::expected<void, std::string> readLogicalNames(std::string_view message, uint64_t &bytesRead,
-                                                     const Response &response);
+    Result<Response> readBMIResponse(std::string_view message, uint64_t &bytesRead, FileType type,
+                                     bool isSystem = true);
+    Result<void> readLogicalNames(std::string_view message, uint64_t &bytesRead, const Response &response);
 
     // Resolve a cache miss and retain the requested entry and all accompanying dependencies.
-    [[nodiscard]] tl::expected<void, std::string> receiveBTCModule(const CTBModule &moduleName);
-    [[nodiscard]] tl::expected<void, std::string> receiveBTCNonModule(const CTBNonModule &nonModule);
+    [[nodiscard]] Result<void> receiveBTCModule(const CTBModule &moduleName);
+    [[nodiscard]] Result<void> receiveBTCNonModule(const CTBNonModule &nonModule);
 
     // Logical-name keys and response paths borrow the retained message or mock-file storage below.
     std::unordered_map<std::string_view, Response> responses;
@@ -60,8 +59,9 @@ class IPCManagerCompiler : Manager
     bool isMocking = false;
 
     // Successful mappings belong to the process, not to the manager or the returned string_view.
-    static tl::expected<std::string_view, std::string> readBMIFile(std::string_view filePath);
-    tl::expected<std::string_view, std::string> getOrMapBMIFile(std::string_view filePath);
+    static Result<std::string_view> mapBMIFile(std::string_view filePath);
+    // Return cached contents, mapping the completed file only on the first request for its path.
+    Result<std::string_view> loadBMIContents(std::string_view filePath);
 
     // Separate allocations keep string addresses stable as subsequent messages arrive.
     mutable std::vector<std::unique_ptr<std::string>> allocations;
@@ -71,15 +71,15 @@ class IPCManagerCompiler : Manager
     std::string mockFilePath;
 
     // Load mock dependencies once on a fresh manager. A failed attempt also disables live IPC.
-    tl::expected<void, std::string> readEntriesFromFile(std::string_view filePath);
+    Result<void> readEntriesFromFile(std::string_view filePath);
 
     // Look up a BMI already received from the build system; this does not map files or send requests.
     // Use the same normalized path supplied in the response (lowercase on Windows).
-    [[nodiscard]] tl::expected<std::string_view, std::string> findBMIContents(std::string_view filePath) const;
+    [[nodiscard]] Result<std::string_view> findBMIContents(std::string_view filePath) const;
 
     // A textual-header request may resolve to a header unit for include translation. Other kinds must match.
     // Cache misses use one request/reply exchange; mock sessions report a missing entry instead.
-    [[nodiscard]] tl::expected<Response, std::string> findResponse(std::string_view logicalName, FileType type);
+    [[nodiscard]] Result<Response> findResponse(std::string_view logicalName, FileType type);
 };
 
 inline IPCManagerCompiler *managerCompiler;

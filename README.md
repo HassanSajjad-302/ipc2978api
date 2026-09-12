@@ -5,6 +5,13 @@ dependencies. Wire lengths and counts retain their original `uint32_t` format;
 local byte counts and parsing offsets use `uint64_t`. Responses identify each
 BMI by its file path; the compiler obtains its size from the completed file.
 
+Fallible operations return `P2978::Result<T>` with an owned string error. Return
+a value for success (`{}` for `Result<void>`) or `P2978::Error{"message"}` for
+failure. Check the result before using `*result` or `result->member`; call
+`result.error()` only on failure. An empty error message still means failure.
+This small C++17 wrapper uses `std::variant` to manage value lifetimes and does
+not provide throwing accessors or require a third-party expected header.
+
 Completed BMI files are opened and mapped by the compiler process when a
 response is received. The build system publishes the file path and completion
 information; it does not own a cross-process mapping or send a final mapping
@@ -64,6 +71,7 @@ cache with the sent responses. `MappingTest` covers independent consumers,
 process-lifetime views, aliases, invalid files, one-time mock-file loading, and
 wire encoding. Mapping checks run in child processes so their views are released
 before the parent removes the test files.
+`ResultTest` checks success/error distinction, copying, and move-only value lifetimes.
 
 `ClangTest` simulates the build system and requires a Clang rebuilt with the
 same IPC2978 library and wire format as the test. Copying the library sources

@@ -3,19 +3,19 @@
     const auto &var##_result = func(__VA_ARGS__);                                                                      \
     if (!var##_result)                                                                                                 \
     {                                                                                                                  \
-        return tl::unexpected(var##_result.error());                                                                   \
+        return Error{var##_result.error()};                                                                            \
     }                                                                                                                  \
     auto &var = *var##_result;
 
 namespace P2978
 {
 
-tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType,
-                                                             const std::string_view serverReadString)
+Result<void> IPCManagerBS::receiveMessage(char (&ctbBuffer)[320], CTB &messageType,
+                                          const std::string_view serverReadString)
 {
     if (serverReadString.empty())
     {
-        return tl::unexpected(getErrorString(ErrorCategory::PARSING_ERROR));
+        return Error{getErrorString(ErrorCategory::PARSING_ERROR)};
     }
 
     uint64_t bytesRead = 1;
@@ -43,12 +43,12 @@ tl::expected<void, std::string> IPCManagerBS::receiveMessage(char (&ctbBuffer)[3
     break;
 
     default:
-        return tl::unexpected(getErrorString(ErrorCategory::UNKNOWN_CTB_TYPE));
+        return Error{getErrorString(ErrorCategory::UNKNOWN_CTB_TYPE)};
     }
 
     if (serverReadString.size() != bytesRead)
     {
-        return tl::unexpected(getErrorString(serverReadString.size(), bytesRead));
+        return Error{getErrorString(serverReadString.size(), bytesRead)};
     }
 
     return {};
