@@ -20,7 +20,6 @@ inline const char *delimiter = "DELIMITER"
 enum class ErrorCategory : uint8_t
 {
     NONE,
-
     PARSING_ERROR,
     READ_FILE_ZERO_BYTES_READ,
     UNKNOWN_CTB_TYPE,
