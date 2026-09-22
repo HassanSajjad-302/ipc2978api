@@ -51,8 +51,9 @@ class IPCManagerCompiler : Manager
     // Logical-name keys and response paths borrow the retained message or mock-file storage below.
     std::unordered_map<std::string_view, Response> responses;
 
+    // Paths borrow retained message or mock-file storage, just like responses.
     // Each path is mapped once per session. Erasing this cache would not unmap its views.
-    std::unordered_map<std::string, std::string_view> bmiContentsByPath;
+    std::unordered_map<std::string_view, std::string_view> bmiContentsByPath;
 
     // Initialized once so loading another mock cannot invalidate existing string views.
     std::string scanCacheFileData;
@@ -60,7 +61,8 @@ class IPCManagerCompiler : Manager
 
     // Successful mappings belong to the process, not to the manager or the returned string_view.
     static Result<std::string_view> mapBMIFile(std::string_view filePath);
-    // Return cached contents, mapping the completed file only on the first request for its path.
+    // filePath must borrow retained message or mock-file storage.
+    // Map the completed file only on the first request for its path.
     Result<std::string_view> loadBMIContents(std::string_view filePath);
 
     // Separate allocations keep string addresses stable as subsequent messages arrive.

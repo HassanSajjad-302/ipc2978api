@@ -115,20 +115,19 @@ Result<Response> IPCManagerCompiler::readBMIResponse(const std::string_view mess
 
 Result<std::string_view> IPCManagerCompiler::loadBMIContents(const std::string_view filePath)
 {
-    std::string path(filePath);
-    if (const auto it = bmiContentsByPath.find(path); it != bmiContentsByPath.end())
+    if (const auto it = bmiContentsByPath.find(filePath); it != bmiContentsByPath.end())
     {
         return it->second;
     }
 
-    TRY_READ_VAL(contents, mapBMIFile, path);
-    bmiContentsByPath.emplace(std::move(path), contents);
+    TRY_READ_VAL(contents, mapBMIFile, filePath);
+    bmiContentsByPath.emplace(filePath, contents);
     return contents;
 }
 
 Result<std::string_view> IPCManagerCompiler::findBMIContents(const std::string_view filePath) const
 {
-    const auto it = bmiContentsByPath.find(std::string(filePath));
+    const auto it = bmiContentsByPath.find(filePath);
     if (it == bmiContentsByPath.end())
     {
         return Error{std::string("BMI was not supplied by the build system: ") + std::string(filePath)};
